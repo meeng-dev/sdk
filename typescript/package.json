@@ -1,0 +1,38 @@
+{
+  "name": "@meeng-dev/sdk",
+  "version": "0.1.0",
+  "description": "meeng's SDK for TypeScript and JavaScript: emails, domains, contacts, contact books, campaigns, analytics and webhooks, with the same shape as useSend's.",
+  "license": "MIT",
+  "homepage": "https://meeng.dev",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/meeng-dev/sdk.git",
+    "directory": "typescript"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.3"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.2",
+    "typescript": "^7.0.2"
+  }
+}

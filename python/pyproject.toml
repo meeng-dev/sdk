@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling>=1.33"]
+build-backend = "hatchling.build"
+
+[project]
+name = "meeng-sdk"
+version = "0.1.0"
+description = "meeng's SDK for Python: emails, domains, contacts, contact books, campaigns, analytics and webhooks, with the same shape as useSend's."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = []
+classifiers = [
+    "Private :: Do Not Upload",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://meeng.dev"
+Repository = "https://github.com/meeng-dev/sdk"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meeng"]

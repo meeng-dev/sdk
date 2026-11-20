@@ -1,0 +1,597 @@
+import Foundation
+import Meeng
+import XCTest
+
+#if canImport(CryptoKit)
+    import CryptoKit
+#endif
+#if canImport(Network)
+    import Network
+#endif
+
+/// The requests a fake transport was sent.
+final class Recorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requests: [URLRequest] = []
+
+    func append(_ request: URLRequest) {
+        lock.withLock { requests.append(request) }
+    }
+
+    var seen: [URLRequest] {
+        lock.withLock { requests }
+    }
+}
+
+typealias Answer = @Sendable (URLRequest) -> (status: Int, headers: [String: String], body: Any?)
+
+func client(_ answer: @escaping Answer) -> (MeengClient, Recorder) {
+    let recorder = Recorder()
+    let transport: MeengTransport = { request in
+        recorder.append(request)
+        let (status, headers, body) = answer(request)
+        let data = try body.map { try JSONSerialization.data(withJSONObject: $0) } ?? Data()
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
+        return (data, response)
+    }
+    let meeng = MeengClient(apiKey: "prk_test_key", baseURL: URL(string: "https://meeng.test/")!, transport: transport)
+    return (meeng, recorder)
+}
+
+func product(_ id: String) -> [String: Any] {
+    ["id": id, "name": "Curso", "description": "", "status": "active", "showcase_id": "shw_1", "created_at": "2026-10-17T00:00:00Z"]
+}
+
+func queryItem(_ request: URLRequest, _ name: String) -> String? {
+    URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == name }?.value
+}
+
+final class MeengTests: XCTestCase {
+    func testACallCarriesTheKeyAndUnwrapsTheData() async throws {
+        let (meeng, recorder) = client { _ in (200, [:], ["data": product("prod_1")]) }
+        let got = try await meeng.products.get("prod_1")
+        XCTAssertEqual(got.id, "prod_1")
+        XCTAssertEqual(got.status, .active)
+        XCTAssertEqual(got.createdAt, "2026-10-17T00:00:00Z")
+        let seen = recorder.seen[0]
+        XCTAssertEqual(seen.httpMethod, "GET")
+        XCTAssertEqual(seen.url?.path, "/api/v1/products/prod_1")
+        XCTAssertEqual(seen.value(forHTTPHeaderField: "Authorization"), "Bearer prk_test_key")
+        XCTAssertEqual(seen.value(forHTTPHeaderField: "User-Agent"), "meeng-swift/\(MeengClient.version)")
+    }
+
+    func testAWriteSendsItsBodyAndIdempotencyKey() async throws {
+        let (meeng, recorder) = client { _ in (201, [:], ["data": product("prod_1")]) }
+        let created = try await meeng.products.create(ProductsCreateParams(name: "Curso"), idempotencyKey: "create-1")
+        XCTAssertEqual(created.name, "Curso")
+        let seen = recorder.seen[0]
+        XCTAssertEqual(seen.httpMethod, "POST")
+        XCTAssertEqual(seen.value(forHTTPHeaderField: "Idempotency-Key"), "create-1")
+        XCTAssertEqual(seen.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(seen.httpBody)) as? [String: String])
+        // The optional description, left nil, is not sent.
+        XCTAssertEqual(body, ["name": "Curso"])
+    }
+
+    func testACheckoutSessionHandsBackTheClientSecretForTheBrowser() async throws {
+        @Sendable func session(_ clientSecret: String) -> [String: Any] {
+            [
+                    "id": "pcl_1", "url": "https://meeng.dev/pagamento/pcl_1", "product_id": "prod_1", "price_id": "price_1",
+                    "status": "active", "label": "", "quantity": 1, "success_url": "https://loja.example/obrigado", "cancel_url": "",
+                    "expires_at": NSNull(), "created_at": "2026-11-16T12:00:00Z", "session_id": "cs_1", "client_secret": clientSecret,
+                    "client_secret_expires_at": "2026-11-16T12:30:00Z", "status_key": "sk_1",
+                    "amount_cents": NSNull(), "items": [], "metadata": [String: Any](), "client_reference_id": "",
+                    "discount_id": "", "showcase_id": "shw_1", "subscription_start_at": NSNull(),
+            ]
+        }
+        let (meeng, recorder) = client { _ in (201, [:], ["data": session("cs_secret_1")]) }
+        let params = CheckoutsCreateParams(priceID: "price_1", productID: "prod_1", successURL: "https://loja.example/obrigado")
+        let checkout = try await meeng.checkouts.create(params, idempotencyKey: "pedido-1")
+        XCTAssertEqual(checkout.clientSecret, "cs_secret_1")
+        XCTAssertEqual(checkout.sessionID, "cs_1")
+        XCTAssertEqual(checkout.statusKey, "sk_1")
+        XCTAssertEqual(checkout.clientSecretExpiresAt, "2026-11-16T12:30:00Z")
+        XCTAssertEqual(checkout.url, "https://meeng.dev/pagamento/pcl_1")
+        XCTAssertNil(checkout.expiresAt)
+        let seen = recorder.seen[0]
+        XCTAssertEqual(seen.httpMethod, "POST")
+        XCTAssertEqual(seen.url?.path, "/api/v1/checkouts")
+        XCTAssertEqual(seen.value(forHTTPHeaderField: "Idempotency-Key"), "pedido-1")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(seen.httpBody)) as? [String: String])
+        XCTAssertEqual(body, ["product_id": "prod_1", "price_id": "price_1", "success_url": "https://loja.example/obrigado"])
+        // The replay of the same Idempotency-Key carries the secret empty.
+        let (replaying, _) = client { _ in (201, ["Idempotent-Replayed": "true"], ["data": session("")]) }
+        let again = try await replaying.checkouts.create(params, idempotencyKey: "pedido-1")
+        XCTAssertEqual(again.clientSecret, "")
+        XCTAssertEqual(again.sessionID, "cs_1")
+    }
+
+    func testAModelThatMayBeNullDecodesBothWays() throws {
+        let json = """
+            {"id":"pay_1","method":"pix","state":"pending","unresolved":false,"card_brand":"","card_kind":"","installments":1,
+             "pix":{"copia_e_cola":"000201","qr_code_svg":"<svg/>","expires_at":null},"boleto":null}
+            """
+        let payment = try JSONDecoder().decode(CheckoutClientPayment.self, from: Data(json.utf8))
+        XCTAssertNil(payment.boleto)
+        XCTAssertEqual(payment.pix?.copiaECola, "000201")
+        XCTAssertNil(payment.pix?.expiresAt)
+    }
+
+    func testABaseURLMustBeHTTPSUnlessItIsLoopback() async throws {
+        let accepted = ["https://meeng.dev", "http://localhost:8080", "http://LOCALHOST", "http://127.0.0.1:1", "http://127.255.0.3", "http://[::1]:8080"]
+        let refused = ["http://meeng.dev", "http://localhost.evil.test", "http://127.0.0.1.evil.test", "http://10.0.0.1", "ftp://localhost", "http://[::2]"]
+        for base in accepted + refused {
+            let recorder = Recorder()
+            let transport: MeengTransport = { request in
+                recorder.append(request)
+                let data = try JSONSerialization.data(withJSONObject: ["data": product("prod_1")])
+                return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:])!)
+            }
+            let meeng = MeengClient(apiKey: "k", baseURL: URL(string: base)!, transport: transport)
+            do {
+                _ = try await meeng.products.get("prod_1")
+                XCTAssertTrue(accepted.contains(base), base)
+            } catch let error as MeengError {
+                XCTAssertTrue(refused.contains(base), base)
+                XCTAssertEqual(error.code, "insecure_base_url")
+                XCTAssertEqual(recorder.seen.count, 0)
+            }
+        }
+    }
+
+    func testADiscountGoesThroughCreateGetListAndDelete() async throws {
+        @Sendable func discount(_ id: String) -> Any {
+            try! JSONSerialization.jsonObject(with: Data(#"{"id":"__ID__","name":"Black","code":null,"type":"percentage","basis_points":1000,"amount_cents":0,"currency":"BRL","duration":"once","duration_in_months":0,"max_redemptions":null,"max_redemptions_per_customer":null,"redemptions_count":0,"starts_at":"2026-10-17T00:00:00Z","ends_at":null,"status":"active","product_ids":["prod_1"],"created_at":"2026-10-17T00:00:00Z","modified_at":"2026-10-17T00:00:00Z"}"#.replacingOccurrences(of: "__ID__", with: id).utf8))
+        }
+        let (meeng, recorder) = client { request in
+            if request.httpMethod == "POST" { return (201, [:], ["data": discount("disc_1")]) }
+            if request.httpMethod == "DELETE" { return (204, [:], nil) }
+            if request.url?.path == "/api/v1/discounts" {
+                let page = queryItem(request, "page") ?? ""
+                return (200, [:], ["data": ["items": [discount("disc_\(page)")], "pagination": ["total_count": 2, "max_page": 2]]])
+            }
+            return (200, [:], ["data": discount("disc_1")])
+        }
+        let created = try await meeng.discounts.create(DiscountsCreateParams(duration: "once", name: "Black", type: "percentage", basisPoints: 1000))
+        XCTAssertEqual(created.id, "disc_1")
+        XCTAssertNil(created.code)
+        XCTAssertEqual(created.productIds, ["prod_1"])
+        let got = try await meeng.discounts.get("disc_1")
+        XCTAssertEqual(got.name, "Black")
+        var ids: [String] = []
+        for try await each in meeng.discounts.listIter(limit: 1) { ids.append(each.id) }
+        XCTAssertEqual(ids, ["disc_1", "disc_2"])
+        try await meeng.discounts.delete("disc_1")
+        XCTAssertEqual(
+            recorder.seen.map { "\($0.httpMethod ?? "") \($0.url?.path ?? "")" },
+            ["POST /api/v1/discounts", "GET /api/v1/discounts/disc_1", "GET /api/v1/discounts", "GET /api/v1/discounts", "DELETE /api/v1/discounts/disc_1"])
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(recorder.seen[0].httpBody)) as? [String: Any])
+        XCTAssertEqual(body["basis_points"] as? Int, 1000)
+        XCTAssertEqual(body["name"] as? String, "Black")
+    }
+
+    func testAFreeFormValueDecodesNested() async throws {
+        let (meeng, _) = client { _ in
+            let state = try! JSONSerialization.jsonObject(with: Data(#"{"id":"cus_1","showcase_id":"shw_1","name":"Ana","email":"ana@example.com","external_id":"","status":"active","created_at":"2026-10-17T00:00:00Z","active_subscriptions":[],"granted_benefits":[{"id":"gr_1","granted_at":"2026-10-17T00:00:00Z","benefit_id":"ben_1","benefit_type":"feature_flag","benefit_metadata":{"flags":{"beta":true,"limits":{"seats":5,"tiers":["a",2,null,1.5]}}},"properties":{"links":[{"url":"https://example.com","expires":null}]}}]}"#.utf8))
+            return (200, [:], ["data": state])
+        }
+        let grant = try await meeng.customers.getState("cus_1").grantedBenefits[0]
+        XCTAssertEqual(
+            grant.benefitMetadata,
+            ["flags": .object(["beta": .bool(true), "limits": .object(["seats": .int(5), "tiers": .array([.string("a"), .int(2), .null, .double(1.5)])])])])
+        XCTAssertEqual(grant.properties, ["links": .array([.object(["url": .string("https://example.com"), "expires": .null])])])
+    }
+
+    func testAPostWithoutAKeyIsSentWithItsOwnAGetWithNone() async throws {
+        let (meeng, recorder) = client { _ in (201, [:], ["data": product("prod_1")]) }
+        _ = try await meeng.products.create(ProductsCreateParams(name: "Curso"))
+        _ = try await meeng.products.create(ProductsCreateParams(name: "Curso"))
+        _ = try await meeng.products.create(ProductsCreateParams(name: "Curso"), idempotencyKey: "mine")
+        _ = try await meeng.products.get("prod_1")
+        let keys = recorder.seen.map { $0.value(forHTTPHeaderField: "Idempotency-Key") }
+        let uuid = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        XCTAssertNotNil(keys[0]?.range(of: uuid, options: .regularExpression))
+        XCTAssertNotNil(keys[1]?.range(of: uuid, options: .regularExpression))
+        XCTAssertNotEqual(keys[0], keys[1])
+        XCTAssertEqual(keys[2], "mine")
+        XCTAssertNil(keys[3])
+    }
+
+    func testIteratingWalksEveryPage() async throws {
+        let (meeng, recorder) = client { request in
+            let page = queryItem(request, "page") ?? ""
+            return (200, [:], ["data": ["items": [product("prod_\(page)")], "pagination": ["total_count": 3, "max_page": 3]]])
+        }
+        var ids: [String] = []
+        for try await item in meeng.products.listIter(limit: 1) {
+            ids.append(item.id)
+        }
+        XCTAssertEqual(ids, ["prod_1", "prod_2", "prod_3"])
+        XCTAssertEqual(queryItem(recorder.seen[0], "limit"), "1")
+    }
+
+    func testAMetadataFilterIsSentAsOnePairAKeyTheKeysSortedAndEscaped() async throws {
+        let (meeng, recorder) = client { _ in (200, [:], ["data": ["items": [], "pagination": ["total_count": 0, "max_page": 1]]]) }
+        let metadata = ["pedido": "123", "camera id": "a/b"]
+        _ = try await meeng.orders.list(clientReferenceID: "pedido-1", metadata: metadata)
+        XCTAssertEqual(
+            recorder.seen[0].url?.absoluteString,
+            "https://meeng.test/api/v1/orders?client_reference_id=pedido-1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123")
+        XCTAssertEqual(queryItem(recorder.seen[0], "metadata[camera id]"), "a/b")
+        for try await _ in meeng.checkouts.listIter(limit: 1, metadata: metadata) {
+            XCTFail("an empty page has no items")
+        }
+        XCTAssertEqual(
+            recorder.seen[1].url?.absoluteString,
+            "https://meeng.test/api/v1/checkouts?page=1&limit=1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123")
+    }
+
+    func testCustomersAreListedByEmail() async throws {
+        let (meeng, recorder) = client { _ in (200, [:], ["data": ["items": [], "pagination": ["total_count": 0, "max_page": 1]]]) }
+        _ = try await meeng.customers.list(email: "ana@example.com")
+        XCTAssertEqual(recorder.seen[0].url?.absoluteString, "https://meeng.test/api/v1/customers?email=ana%40example.com")
+    }
+
+    // A graduated price goes out with its tiers and without the fixed amount, and
+    // a subscription reads back the quantity it bills and the order reference it
+    // came from; amountCents is the cycle's total for that quantity.
+    func testAGraduatedPriceCarriesItsTiersAndASubscriptionItsQuantity() async throws {
+        @Sendable func price() -> [String: Any] {
+            let tiers: [[String: Any]] = [["up_to": 1, "unit_amount_cents": 25000], ["up_to": NSNull(), "unit_amount_cents": 15000]]
+            return [
+                "id": "price_1", "product_id": "prod_1", "type": "recurring", "interval": "month", "interval_count": 1,
+                "currency": "BRL", "status": "active", "amount_cents": 0, "pricing_model": "graduated",
+                "unit_amount_cents": NSNull(), "unit_label": "câmera", "unit_label_plural": "câmeras", "tiers": tiers,
+            ]
+        }
+        @Sendable func subscription() -> [String: Any] {
+            [
+                "id": "sub_1", "amount_cents": 55000, "cancel_at_period_end": false, "client_reference_id": "pedido-9",
+                "currency": "BRL", "current_period_end": "2026-12-20T00:00:00Z", "current_period_start": "2026-11-20T00:00:00Z",
+                "customer_id": "cus_1", "interval": "month", "metadata": ["camera": "c1"], "price_id": "price_1",
+                "product_id": "prod_1", "quantity": 3, "showcase_id": "shw_1", "status": "active",
+                "suspended_at": NSNull(), "suspension_reason": NSNull(), "trial_end": NSNull(), "trial_start": NSNull(),
+            ]
+        }
+        let (meeng, recorder) = client { request in
+            request.httpMethod == "POST" ? (201, [:], ["data": price()]) : (200, [:], ["data": subscription()])
+        }
+        let created = try await meeng.prices.create(
+            PricesCreateParams(
+                productID: "prod_1", type: .recurring, interval: .month, pricingModel: .graduated,
+                tiers: [PricesCreateTier(unitAmountCents: 25000, upTo: 1), PricesCreateTier(unitAmountCents: 15000)],
+                unitLabel: "câmera", unitLabelPlural: "câmeras"))
+        XCTAssertEqual(recorder.seen[0].url?.path, "/api/v1/prices")
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(recorder.seen[0].httpBody)) as? [String: Any])
+        XCTAssertEqual(sent["pricing_model"] as? String, "graduated")
+        let sentTiers = try XCTUnwrap(sent["tiers"] as? [[String: Int]])
+        XCTAssertEqual(sentTiers, [["up_to": 1, "unit_amount_cents": 25000], ["unit_amount_cents": 15000]])
+        XCTAssertNil(sent["amount_cents"])
+        XCTAssertEqual(created.pricingModel, .graduated)
+        XCTAssertEqual(created.amountCents, 0)
+        XCTAssertNil(created.unitAmountCents)
+        XCTAssertEqual(created.tiers.map(\.upTo), [1, nil])
+        XCTAssertEqual(created.tiers.map(\.unitAmountCents), [25000, 15000])
+        let got = try await meeng.subscriptions.get("sub_1")
+        XCTAssertEqual(recorder.seen[1].url?.path, "/api/v1/subscriptions/sub_1")
+        XCTAssertEqual(got.quantity, 3)
+        XCTAssertEqual(got.amountCents, 55000)
+        XCTAssertEqual(got.clientReferenceID, "pedido-9")
+    }
+
+    func testUsageIngestionCarriesTheSourceCredentialAndItsEvents() async throws {
+        let recorder = Recorder()
+        let transport: MeengTransport = { request in
+            recorder.append(request)
+            let data = try JSONSerialization.data(withJSONObject: ["data": ["created": 1, "replayed": 0]])
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:])!
+            return (data, response)
+        }
+        let usage = MeengClient(apiKey: "pus_live_source", baseURL: URL(string: "https://meeng.test/")!, transport: transport)
+        let receipt = try await usage.usage.ingest(UsageIngestParams(events: [
+            UsageIngestEvent(
+                cachedTokens: "0", customerID: "cus_1", externalEventID: "req-1", inputTokens: "1200",
+                occurredAt: "2026-11-13T12:00:00Z", outputTokens: "300",
+                cost: UsageIngestEventCost(amount: "1.250000", currency: .brl)
+            ),
+        ]))
+        XCTAssertEqual(receipt.created, 1)
+        XCTAssertEqual(receipt.replayed, 0)
+        let seen = recorder.seen[0]
+        XCTAssertEqual(seen.httpMethod, "POST")
+        XCTAssertEqual(seen.url?.path, "/api/v1/usage/token-events")
+        XCTAssertEqual(seen.value(forHTTPHeaderField: "Authorization"), "Bearer pus_live_source")
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(seen.httpBody)) as? [String: Any])
+        let events = try XCTUnwrap(sent["events"] as? [[String: Any]])
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events[0]["customer_id"] as? String, "cus_1")
+        XCTAssertEqual(events[0]["_cost"] as? [String: String], ["amount": "1.250000", "currency": "brl"])
+        XCTAssertNil(events[0]["_llm"])
+        XCTAssertNil(events[0]["parent_id"])
+    }
+
+    func testUsageIngestionErrorsAreTheFlatErrorDocument() async throws {
+        let cases: [(Int, [String: Any], String, Int, String)] = [
+            (401, ["error": "invalid_credential"], "invalid_credential", 0, ""),
+            (409, ["error": "conflict", "record": 2, "message": "conflict"], "conflict", 2, "conflict"),
+            (422, ["error": "invalid_request", "record": 3, "message": "validation failed: customer_id", "fields": ["customer_id": ["unknown"]]], "invalid_request", 3, "validation failed: customer_id"),
+            (400, ["error": "invalid_request", "message": "malformed JSON"], "invalid_request", 0, "malformed JSON"),
+            (415, ["error": "unsupported_media_type"], "unsupported_media_type", 0, ""),
+            (500, ["error": "unavailable"], "unavailable", 0, ""),
+        ]
+        for (status, problem, code, record, message) in cases {
+            nonisolated(unsafe) let answer: [String: Any] = problem
+            let (usage, _) = client { _ in (status, [:], answer) }
+            let event = UsageIngestEvent(cachedTokens: "0", customerID: "cus_1", externalEventID: "req-1", inputTokens: "1", occurredAt: "2026-11-13T12:00:00Z", outputTokens: "0")
+            do {
+                _ = try await usage.usage.ingest(UsageIngestParams(events: [event]))
+                XCTFail("a \(status) was not refused")
+            } catch let refused as MeengError {
+                XCTAssertEqual(refused.status, status)
+                XCTAssertEqual(refused.code, code)
+                XCTAssertEqual(refused.record, record)
+                XCTAssertEqual(refused.message, message)
+                if status == 422 {
+                    XCTAssertEqual(refused.fields["customer_id"], ["unknown"])
+                }
+            }
+        }
+    }
+
+    func testAnErrorWrappedInDataByAnOlderServerIsStillRead() async throws {
+        nonisolated(unsafe) let answer: [String: Any] = ["data": ["error": "event_conflict", "record": 2, "message": "conflict"]]
+        let (usage, _) = client { _ in (409, [:], answer) }
+        let event = UsageIngestEvent(cachedTokens: "0", customerID: "cus_1", externalEventID: "req-1", inputTokens: "1", occurredAt: "2026-11-13T12:00:00Z", outputTokens: "0")
+        do {
+            _ = try await usage.usage.ingest(UsageIngestParams(events: [event]))
+            XCTFail("a 409 was not refused")
+        } catch let refused as MeengError {
+            XCTAssertEqual(refused.status, 409)
+            XCTAssertEqual(refused.code, "event_conflict")
+            XCTAssertEqual(refused.record, 2)
+        }
+    }
+
+    func testARefusalIsATypedError() async throws {
+        let (meeng, _) = client { request in
+            if request.url?.path == "/api/v1/customers" {
+                return (422, [:], ["error": "invalid_request", "fields": ["email": ["send an e-mail"]]])
+            }
+            return (429, ["Retry-After": "7"], nil)
+        }
+        do {
+            _ = try await meeng.customers.create(CustomersCreateParams(email: "x", name: "x"))
+            XCTFail("a 422 was not refused")
+        } catch let refused as MeengError {
+            XCTAssertEqual(refused.status, 422)
+            XCTAssertEqual(refused.code, "invalid_request")
+            XCTAssertEqual(refused.fields["email"], ["send an e-mail"])
+        }
+        do {
+            _ = try await meeng.products.list()
+            XCTFail("a 429 was not refused")
+        } catch let limited as MeengError {
+            XCTAssertEqual(limited.status, 429)
+            XCTAssertEqual(limited.retryAfter, 7)
+        }
+    }
+
+    #if canImport(CryptoKit)
+        // The webhook vectors every SDK checks: Standard Webhooks' own example,
+        // and meeng events signed under two secrets, as while one is rotated.
+        static let referenceSecret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+        static let oldSecret = "whsec_cGVyYXRhLXNkay1vbGQta2V5LTAxMjM0NTY3ODlhYmM="
+        static let newSecret = "whsec_cGVyYXRhLXNkay1uZXcta2V5LTAxMjM0NTY3ODlhYmM="
+        static let orderPaid = Data(#"{"id":"msg_2","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}"#.utf8)
+        static let usageRecorded = Data(#"{"id":"msg_3","type":"usage_event.recorded","timestamp":"2026-10-22T12:00:00Z","data":{"event_id":"ue_1","aggregate":"usage_event","aggregate_id":"ue_1","merchant_id":"mer_1","environment":"test"}}"#.utf8)
+        static let orderPaidLive = Data(#"{"id":"msg_5","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","environment":"live","showcase_id":"shw_1","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}"#.utf8)
+        static let payoutSentTest = Data(#"{"id":"msg_6","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","environment":"test","data":{"payout_id":"po_1","amount_cents":5000}}"#.utf8)
+        static let payoutSent = Data(#"{"id":"msg_4","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","data":{"payout_id":"po_1","amount_cents":5000}}"#.utf8)
+        static let signedAt = 1_792_670_400
+
+        func webhookHeaders(_ id: String, _ at: Int, _ signature: String) -> [String: String] {
+            ["Webhook-Id": id, "webhook-timestamp": String(at), "webhook-signature": signature]
+        }
+
+        func testTheStandardWebhooksVectorVerifies() throws {
+            let body = Data(#"{"test": 2432232314}"#.utf8)
+            let headers = webhookHeaders("msg_p5jXN8AQM9LWM0D4loKWxJek", 1_614_265_330, "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=")
+            let at = Date(timeIntervalSince1970: 1_614_265_330)
+            try verifyWebhookSignature(secret: Self.referenceSecret, headers: headers, body: body, now: at)
+            for (secret, payload, now) in [
+                (Self.referenceSecret, body + Data(" ".utf8), at),
+                (Self.referenceSecret, body, at.addingTimeInterval(301)),
+                (Self.newSecret, body, at),
+            ] {
+                XCTAssertThrowsError(try verifyWebhookSignature(secret: secret, headers: headers, body: payload, now: now)) {
+                    XCTAssertEqual($0 as? WebhookVerificationError, .invalidSignature)
+                }
+            }
+        }
+
+        func testATimestampThatIsNotPlainDigitsIsRefused() throws {
+            let body = Data(#"{"test": 2432232314}"#.utf8)
+            for (stamp, signature) in [("+1614265330", "JQsSpSSK1m9NI2FueDRZN3FL/jU9336idQcq6VmF+c8="), ("²", "PEggIsKE32VQ8J4ZIk9apRhPy7w+a20bxGpjk1K4/HY="), ("", "x"), ("1_6", "x")] {
+                var headers = webhookHeaders("msg_p5jXN8AQM9LWM0D4loKWxJek", 0, "v1,\(signature)")
+                headers["webhook-timestamp"] = stamp
+                XCTAssertThrowsError(
+                    try verifyWebhookSignature(secret: Self.referenceSecret, headers: headers, body: body, now: Date(timeIntervalSince1970: 1_614_265_330)), stamp)
+            }
+        }
+
+        func testAWebhookCarriesTheEnvironmentItHappenedIn() throws {
+            let now = Date(timeIntervalSince1970: TimeInterval(Self.signedAt + 120))
+            let older: [(String, String, Data)] = [
+                ("msg_2", "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=", Self.orderPaid),
+                ("msg_3", "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=", Self.usageRecorded),
+                ("msg_4", "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=", Self.payoutSent),
+            ]
+            for (id, signature, body) in older {
+                let event = try verifyWebhook(secret: Self.newSecret, headers: webhookHeaders(id, Self.signedAt, signature), body: body, now: now)
+                XCTAssertEqual(event.environment, "", id)
+                XCTAssertEqual(event.showcaseId, "", id)
+            }
+            let order = try verifyWebhook(secret: Self.newSecret, headers: webhookHeaders("msg_5", Self.signedAt, "v1,9CgfDokxQ7tBEd7vvv32TI4QUdqkaHrxgUo2UUNQpOY="), body: Self.orderPaidLive, now: now)
+            guard case .order = order else {
+                return XCTFail("not an order event")
+            }
+            XCTAssertEqual(order.environment, "live")
+            XCTAssertEqual(order.showcaseId, "shw_1")
+            let unknown = try verifyWebhook(secret: Self.newSecret, headers: webhookHeaders("msg_6", Self.signedAt, "v1,6He63m1rUlB789sgtRAHqex4wyKkzAwdHt6uRsp8YQM="), body: Self.payoutSentTest, now: now)
+            guard case .unknown = unknown else {
+                return XCTFail("not an unknown event")
+            }
+            XCTAssertEqual(unknown.environment, "test")
+            XCTAssertEqual(unknown.showcaseId, "")
+        }
+
+        func testAWebhookAnswersItsTypedEvent() throws {
+            let now = Date(timeIntervalSince1970: TimeInterval(Self.signedAt + 120))
+            let headers = webhookHeaders("msg_2", Self.signedAt, "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=")
+            for secret in [Self.newSecret, Self.oldSecret] {
+                guard case let .order(order) = try verifyWebhook(secret: secret, headers: headers, body: Self.orderPaid, now: now) else {
+                    return XCTFail("not an order event")
+                }
+                XCTAssertEqual(order.type, "order.paid")
+                XCTAssertEqual(order.data.id, "ord_1")
+                XCTAssertEqual(order.data.installments, 3)
+                XCTAssertEqual(order.data.installmentInterestCents, 360)
+            }
+            XCTAssertThrowsError(try verifyWebhook(secret: Self.referenceSecret, headers: headers, body: Self.orderPaid, now: now))
+            let usage = try verifyWebhook(secret: Self.newSecret, headers: webhookHeaders("msg_3", Self.signedAt, "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU="), body: Self.usageRecorded, now: now)
+            XCTAssertEqual(usage.id, "msg_3")
+            guard case let .identifiers(identifiers) = usage else {
+                return XCTFail("not an identifiers event")
+            }
+            XCTAssertEqual(identifiers.data["merchant_id"], "mer_1")
+            let unknown = try verifyWebhook(secret: Self.newSecret, headers: webhookHeaders("msg_4", Self.signedAt, "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY="), body: Self.payoutSent, now: now)
+            guard case let .unknown(event) = unknown else {
+                return XCTFail("not an unknown event")
+            }
+            XCTAssertEqual(event.type, "payout.sent")
+            XCTAssertEqual(event.body, Self.payoutSent)
+        }
+    #endif
+
+    #if canImport(Network)
+        func testTheRealHTTPSendsAndReadsThroughURLSession() async throws {
+            let server = try EchoServer()
+            let port = try await server.start()
+            defer { server.stop() }
+            let base = URL(string: "http://127.0.0.1:\(port)")!
+            let meeng = MeengClient(apiKey: "prk_test_key", baseURL: base)
+            let created = try await meeng.products.create(ProductsCreateParams(name: "Curso"), idempotencyKey: "create-1")
+            XCTAssertEqual(created.name, "Curso")
+            XCTAssertEqual(created.description, "create-1")
+            XCTAssertEqual(created.createdAt, "POST /api/v1/products")
+            do {
+                _ = try await MeengClient(apiKey: "prk_test_other", baseURL: base).products.get("prod_1")
+                XCTFail("a 401 was not refused")
+            } catch let refused as MeengError {
+                XCTAssertEqual(refused.status, 401)
+                XCTAssertEqual(refused.code, "invalid_credential")
+                XCTAssertEqual(refused.retryAfter, 3)
+            }
+        }
+    #endif
+}
+
+#if canImport(Network)
+    /// Answers what it was sent, wrapped as the API wraps a resource; a request
+    /// without the test key is refused with a 401 and Retry-After 3.
+    final class EchoServer: @unchecked Sendable {
+        private let listener: NWListener
+        private let queue = DispatchQueue(label: "meeng.echo")
+        private var started = false
+
+        init() throws {
+            listener = try NWListener(using: .tcp, on: .any)
+        }
+
+        func start() async throws -> UInt16 {
+            listener.newConnectionHandler = { [queue] connection in
+                connection.start(queue: queue)
+                Self.read(connection, Data())
+            }
+            return try await withCheckedThrowingContinuation { continuation in
+                // The handler runs on the server's serial queue only.
+                listener.stateUpdateHandler = { [self] state in
+                    guard !started else { return }
+                    switch state {
+                    case .ready:
+                        started = true
+                        continuation.resume(returning: listener.port?.rawValue ?? 0)
+                    case .failed(let error):
+                        started = true
+                        continuation.resume(throwing: error)
+                    default:
+                        break
+                    }
+                }
+                listener.start(queue: queue)
+            }
+        }
+
+        func stop() {
+            listener.cancel()
+        }
+
+        private static func read(_ connection: NWConnection, _ buffer: Data) {
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, complete, error in
+                var buffer = buffer
+                if let data {
+                    buffer.append(data)
+                }
+                if let answer = answer(buffer) {
+                    connection.send(content: answer, completion: .contentProcessed { _ in connection.cancel() })
+                } else if complete || error != nil {
+                    connection.cancel()
+                } else {
+                    read(connection, buffer)
+                }
+            }
+        }
+
+        /// The answer to a whole request, or nil while it has not all arrived.
+        private static func answer(_ buffer: Data) -> Data? {
+            guard let end = buffer.range(of: Data("\r\n\r\n".utf8)) else {
+                return nil
+            }
+            let head = String(decoding: buffer[..<end.lowerBound], as: UTF8.self).components(separatedBy: "\r\n")
+            var headers: [String: String] = [:]
+            for line in head.dropFirst() {
+                let parts = line.split(separator: ":", maxSplits: 1)
+                if parts.count == 2 {
+                    headers[parts[0].lowercased()] = parts[1].trimmingCharacters(in: .whitespaces)
+                }
+            }
+            let length = Int(headers["content-length"] ?? "") ?? 0
+            let body = buffer[end.upperBound...]
+            guard body.count >= length else {
+                return nil
+            }
+            let line = head[0].split(separator: " ")
+            var status = "201 Created"
+            var extra = ""
+            var payload: [String: Any]
+            if headers["authorization"] != "Bearer prk_test_key" {
+                status = "401 Unauthorized"
+                extra = "Retry-After: 3\r\n"
+                payload = ["error": "invalid_credential"]
+            } else {
+                let sent = (try? JSONSerialization.jsonObject(with: Data(body.prefix(length)))) as? [String: Any]
+                payload = ["data": [
+                    "id": "prod_1",
+                    "name": sent?["name"] as? String ?? "",
+                    "description": headers["idempotency-key"] ?? "",
+                    "status": "active",
+                    "showcase_id": "shw_1",
+                    "created_at": "\(line[0]) \(line.count > 1 ? line[1] : "")",
+                ]]
+            }
+            let json = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
+            let header = "HTTP/1.1 \(status)\r\nContent-Type: application/json\r\n\(extra)Content-Length: \(json.count)\r\nConnection: close\r\n\r\n"
+            return Data(header.utf8) + json
+        }
+    }
+#endif

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    net8.0 and net10.0 are the LTS releases: System.Text.Json, HMACSHA256 and
+    IAsyncEnumerable are in the box there, so the package depends on nothing.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>Meeng</RootNamespace>
+    <AssemblyName>Meeng</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <PackageId>MeengDev.Sdk</PackageId>
+    <Version>{{.Version}}</Version>
+    <Authors>meeng</Authors>
+    <Company>meeng</Company>
+    <Description>meeng's SDK for .NET: products, customers, checkouts, payments, subscriptions and webhooks.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://meeng.dev</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/meeng-dev/sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>meeng;payments;pix;boleto;checkout;subscriptions;webhooks</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

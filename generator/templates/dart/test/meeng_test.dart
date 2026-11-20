@@ -1,0 +1,920 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:meeng_sdk/meeng_sdk.dart';
+import 'package:test/test.dart';
+
+typedef Answer = http.Response Function(http.Request request);
+
+(Meeng, List<http.Request>) client(Answer answer) {
+  final seen = <http.Request>[];
+  final fake = MockClient((request) async {
+    seen.add(request);
+    return answer(request);
+  });
+  final meeng = Meeng(
+    'prk_test_key',
+    baseUrl: 'https://meeng.test/',
+    httpClient: fake,
+  );
+  return (meeng, seen);
+}
+
+http.Response json(
+  int status,
+  Object? body, [
+  Map<String, String> headers = const {},
+]) => http.Response(
+  body == null ? '' : jsonEncode(body),
+  status,
+  headers: {'content-type': 'application/json', ...headers},
+);
+
+Map<String, Object?> product(String id) => {
+  'id': id,
+  'name': 'Curso',
+  'description': '',
+  'status': 'active',
+  'showcase_id': 'shw_1',
+  'created_at': '2026-10-17T00:00:00Z',
+};
+
+// The webhook vectors every SDK checks: Standard Webhooks' own example, and
+// meeng events signed under two secrets, as while one is rotated.
+const referenceSecret = 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw';
+const oldSecret = 'whsec_cGVyYXRhLXNkay1vbGQta2V5LTAxMjM0NTY3ODlhYmM=';
+const newSecret = 'whsec_cGVyYXRhLXNkay1uZXcta2V5LTAxMjM0NTY3ODlhYmM=';
+const orderPaid =
+    '{"id":"msg_2","type":"order.paid","timestamp":"2026-10-22T12:00:00'
+    'Z","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1'
+    '","price_id":"price_1","amount_cents":12000,"currency":"BRL","stat'
+    'us":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"p'
+    'aid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cen'
+    'ts":null,"installments":3,"installment_interest_cents":360,"items"'
+    ':[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}';
+const usageRecorded =
+    '{"id":"msg_3","type":"usage_event.recorded",'
+    '"timestamp":"2026-10-22T12:00:00Z","data":{"event_id":"ue_1",'
+    '"aggregate":"usage_event","aggregate_id":"ue_1","merchant_id":"mer_1",'
+    '"environment":"test"}}';
+const payoutSent =
+    '{"id":"msg_4","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z",'
+    '"data":{"payout_id":"po_1","amount_cents":5000}}';
+const orderPaidLive =
+    '{"id":"msg_5","type":"order.paid","timestamp":"2026-10-22T12:00:00'
+    'Z","environment":"live","showcase_id":"shw_1","data":{"id":"ord_1","customer_id":"cus_1"'
+    ',"product_id":"prod_1","price_id":"price_1","amount_cents":12000,"'
+    'currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:0'
+    '0Z","order_status":"paid","refunded_amount_cents":0,"refund_id":nu'
+    'll,"refund_amount_cents":null,"installments":3,"installment_intere'
+    'st_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}';
+const payoutSentTest =
+    '{"id":"msg_6","type":"payout.sent","timestamp":"2026-10-22T12:00:0'
+    '0Z","environment":"test","data":{"payout_id":"po_1","amount_cents"'
+    ':5000}}';
+const signedAt = 1792670400;
+
+Map<String, String> webhookHeaders(String id, int at, String signature) => {
+  'Webhook-Id': id,
+  'Webhook-Timestamp': '$at',
+  'Webhook-Signature': signature,
+};
+
+void main() {
+  test('a call carries the key and unwraps the data', () async {
+    final (meeng, seen) = client(
+      (_) => json(200, {'data': product('prod_1')}),
+    );
+    final got = await meeng.products.get('prod_1');
+    expect(got.id, 'prod_1');
+    expect(got.status, 'active');
+    expect(got.createdAt, '2026-10-17T00:00:00Z');
+    expect(seen.single.method, 'GET');
+    expect(seen.single.url.path, '/api/v1/products/prod_1');
+    expect(seen.single.headers['authorization'], 'Bearer prk_test_key');
+    expect(seen.single.headers['accept'], 'application/json');
+  });
+
+  test('a write sends its body and idempotency key', () async {
+    final (meeng, seen) = client(
+      (_) => json(201, {'data': product('prod_1')}),
+    );
+    await meeng.products.create(
+      const ProductsCreateParams(name: 'Curso'),
+      idempotencyKey: 'create-1',
+    );
+    expect(seen.single.method, 'POST');
+    expect(seen.single.headers['idempotency-key'], 'create-1');
+    expect(seen.single.headers['content-type'], 'application/json');
+    expect(jsonDecode(seen.single.body), {'name': 'Curso'});
+  });
+
+  test(
+    'a checkout session hands back the client secret for the browser',
+    () async {
+      Map<String, Object?> session(String clientSecret) => {
+        'id': 'pcl_1',
+        'url': 'https://meeng.dev/pagamento/pcl_1',
+        'product_id': 'prod_1',
+        'price_id': 'price_1',
+        'status': 'active',
+        'label': '',
+        'quantity': 1,
+        'success_url': 'https://loja.example/obrigado',
+        'cancel_url': '',
+        'expires_at': null,
+        'created_at': '2026-11-16T12:00:00Z',
+        'session_id': 'cs_1',
+        'client_secret': clientSecret,
+        'client_secret_expires_at': '2026-11-16T12:30:00Z',
+        'status_key': 'sk_1',
+        'amount_cents': null,
+        'items': <dynamic>[],
+        'metadata': <String, dynamic>{},
+        'client_reference_id': '',
+        'discount_id': '',
+        'showcase_id': 'shw_1',
+        'subscription_start_at': null,
+      };
+      var calls = 0;
+      final (meeng, seen) = client(
+        (_) => calls++ == 0
+            ? json(201, {'data': session('cs_secret_1')})
+            : json(201, {'data': session('')}, {'idempotent-replayed': 'true'}),
+      );
+      const params = CheckoutsCreateParams(
+        productId: 'prod_1',
+        priceId: 'price_1',
+        successUrl: 'https://loja.example/obrigado',
+      );
+      final checkout = await meeng.checkouts.create(
+        params,
+        idempotencyKey: 'pedido-1',
+      );
+      expect(checkout.clientSecret, 'cs_secret_1');
+      expect(checkout.sessionId, 'cs_1');
+      expect(checkout.statusKey, 'sk_1');
+      expect(checkout.clientSecretExpiresAt, '2026-11-16T12:30:00Z');
+      expect(checkout.url, 'https://meeng.dev/pagamento/pcl_1');
+      expect(checkout.expiresAt, isNull);
+      expect(seen.first.method, 'POST');
+      expect(seen.first.url.path, '/api/v1/checkouts');
+      expect(seen.first.headers['idempotency-key'], 'pedido-1');
+      expect(jsonDecode(seen.first.body), {
+        'product_id': 'prod_1',
+        'price_id': 'price_1',
+        'success_url': 'https://loja.example/obrigado',
+      });
+      final again = await meeng.checkouts.create(
+        params,
+        idempotencyKey: 'pedido-1',
+      );
+      expect(again.clientSecret, '');
+      expect(again.sessionId, 'cs_1');
+    },
+  );
+
+  test('a model that may be null decodes both ways', () {
+    final payment = CheckoutClientPayment.fromJson({
+      'id': 'pay_1',
+      'method': 'pix',
+      'state': 'pending',
+      'unresolved': false,
+      'card_brand': '',
+      'card_kind': '',
+      'installments': 1,
+      'pix': {
+        'copia_e_cola': '000201',
+        'qr_code_svg': '<svg/>',
+        'expires_at': null,
+      },
+      'boleto': null,
+    });
+    expect(payment.boleto, isNull);
+    expect(payment.pix!.copiaECola, '000201');
+    expect(payment.pix!.expiresAt, isNull);
+  });
+
+  test('a base URL must be https unless it is loopback', () {
+    for (final baseUrl in [
+      'https://meeng.dev',
+      'http://localhost:8080',
+      'http://LOCALHOST',
+      'http://127.0.0.1:1',
+      'http://127.255.0.3',
+      'http://[::1]:8080',
+    ]) {
+      Meeng('k', baseUrl: baseUrl).close();
+    }
+    for (final baseUrl in [
+      'http://meeng.dev',
+      'http://localhost.evil.test',
+      'http://127.0.0.1.evil.test',
+      'http://10.0.0.1',
+      'ftp://localhost',
+      'meeng.dev',
+      '',
+      'http://[::2]',
+    ]) {
+      expect(
+        () => Meeng('k', baseUrl: baseUrl),
+        throwsA(
+          isA<ArgumentError>().having(
+            (error) => error.message,
+            'message',
+            contains('must be https'),
+          ),
+        ),
+        reason: baseUrl,
+      );
+    }
+  });
+
+  test('a discount goes through create, get, list and delete', () async {
+    Map<String, Object?> discount(String id) =>
+        jsonDecode(
+              '''{"id":"__ID__","name":"Black","code":null,"type":"percentage","basis_points":1000,"amount_cents":0,"currency":"BRL","duration":"once","duration_in_months":0,"max_redemptions":null,"max_redemptions_per_customer":null,"redemptions_count":0,"starts_at":"2026-10-17T00:00:00Z","ends_at":null,"status":"active","product_ids":["prod_1"],"created_at":"2026-10-17T00:00:00Z","modified_at":"2026-10-17T00:00:00Z"}'''
+                  .replaceFirst('__ID__', id),
+            )
+            as Map<String, Object?>;
+    final (meeng, seen) = client((request) {
+      if (request.method == 'POST') {
+        return json(201, {'data': discount('disc_1')});
+      }
+      if (request.method == 'DELETE') {
+        return http.Response('', 204);
+      }
+      if (request.url.path == '/api/v1/discounts') {
+        final page = request.url.queryParameters['page'];
+        return json(200, {
+          'data': {
+            'items': [discount('disc_$page')],
+            'pagination': {'total_count': 2, 'max_page': 2},
+          },
+        });
+      }
+      return json(200, {'data': discount('disc_1')});
+    });
+    final created = await meeng.discounts.create(
+      const DiscountsCreateParams(
+        duration: 'once',
+        name: 'Black',
+        type: 'percentage',
+        basisPoints: 1000,
+      ),
+    );
+    expect(created.id, 'disc_1');
+    expect(created.code, isNull);
+    expect(created.productIds, ['prod_1']);
+    expect((await meeng.discounts.get('disc_1')).name, 'Black');
+    expect(
+      [
+        await for (final each in meeng.discounts.listIter(limit: 1)) each.id,
+      ],
+      ['disc_1', 'disc_2'],
+    );
+    await meeng.discounts.delete('disc_1');
+    expect(
+      [for (final each in seen) '${each.method} ${each.url.path}'],
+      [
+        'POST /api/v1/discounts',
+        'GET /api/v1/discounts/disc_1',
+        'GET /api/v1/discounts',
+        'GET /api/v1/discounts',
+        'DELETE /api/v1/discounts/disc_1',
+      ],
+    );
+    expect(jsonDecode(seen.first.body), {
+      'name': 'Black',
+      'type': 'percentage',
+      'duration': 'once',
+      'basis_points': 1000,
+    });
+  });
+
+  test('a free-form value decodes nested', () async {
+    final state = jsonDecode(
+      '''{"id":"cus_1","showcase_id":"shw_1","name":"Ana","email":"ana@example.com","external_id":"","status":"active","created_at":"2026-10-17T00:00:00Z","active_subscriptions":[],"granted_benefits":[{"id":"gr_1","granted_at":"2026-10-17T00:00:00Z","benefit_id":"ben_1","benefit_type":"feature_flag","benefit_metadata":{"flags":{"beta":true,"limits":{"seats":5,"tiers":["a",2,null,1.5]}}},"properties":{"links":[{"url":"https://example.com","expires":null}]}}]}''',
+    );
+    final (meeng, _) = client((_) => json(200, {'data': state}));
+    final grant = (await meeng.customers.getState('cus_1')).grantedBenefits[0];
+    expect(grant.benefitMetadata, {
+      'flags': {
+        'beta': true,
+        'limits': {
+          'seats': 5,
+          'tiers': ['a', 2, null, 1.5],
+        },
+      },
+    });
+    expect(grant.properties, {
+      'links': [
+        {'url': 'https://example.com', 'expires': null},
+      ],
+    });
+  });
+
+  test('a POST without a key is sent with its own, a GET with none', () async {
+    final (meeng, seen) = client(
+      (_) => json(201, {'data': product('prod_1')}),
+    );
+    const params = ProductsCreateParams(name: 'Curso');
+    await meeng.products.create(params);
+    await meeng.products.create(params);
+    await meeng.products.create(params, idempotencyKey: 'mine');
+    await meeng.products.get('prod_1');
+    final keys = [for (final each in seen) each.headers['idempotency-key']];
+    final uuid = RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+    );
+    expect(keys[0], matches(uuid));
+    expect(keys[1], matches(uuid));
+    expect(keys[0], isNot(keys[1]));
+    expect(keys[2], 'mine');
+    expect(keys[3], isNull);
+  });
+
+  test('iterating walks every page', () async {
+    final (meeng, seen) = client(
+      (request) => json(200, {
+        'data': {
+          'items': [product('prod_${request.url.queryParameters['page']}')],
+          'pagination': {'total_count': 3, 'max_page': 3},
+        },
+      }),
+    );
+    final ids = await meeng.products
+        .listIter(limit: 1)
+        .map((item) => item.id)
+        .toList();
+    expect(ids, ['prod_1', 'prod_2', 'prod_3']);
+    expect(seen.first.url.queryParameters['limit'], '1');
+  });
+
+  test(
+    'a metadata filter is sent as one pair a key, the keys sorted and escaped',
+    () async {
+      final (meeng, seen) = client(
+        (request) => json(200, {
+          'data': {
+            'items': <Object?>[],
+            'pagination': {'total_count': 0, 'max_page': 1},
+          },
+        }),
+      );
+      final metadata = {'pedido': '123', 'camera id': 'a/b'};
+      await meeng.orders.list(
+        clientReferenceId: 'pedido-1',
+        metadata: metadata,
+      );
+      expect(
+        seen[0].url.query,
+        'client_reference_id=pedido-1&metadata%5Bcamera+id%5D=a%2Fb&metadata%5Bpedido%5D=123',
+      );
+      expect(seen[0].url.queryParameters['metadata[camera id]'], 'a/b');
+      final walked = await meeng.checkouts
+          .listIter(limit: 1, metadata: metadata)
+          .toList();
+      expect(walked, isEmpty);
+      expect(
+        seen[1].url.query,
+        'page=1&limit=1&metadata%5Bcamera+id%5D=a%2Fb&metadata%5Bpedido%5D=123',
+      );
+    },
+  );
+
+  test('customers are listed by e-mail', () async {
+    final (meeng, seen) = client(
+      (request) => json(200, {
+        'data': {
+          'items': <Object?>[],
+          'pagination': {'total_count': 0, 'max_page': 1},
+        },
+      }),
+    );
+    await meeng.customers.list(email: 'ana@example.com');
+    expect(seen.single.url.path, '/api/v1/customers');
+    expect(seen.single.url.query, 'email=ana%40example.com');
+  });
+
+  // A graduated price goes out with its tiers and without the fixed amount, and
+  // a subscription reads back the quantity it bills and the order reference it
+  // came from; amountCents is the cycle's total for that quantity.
+  test(
+    'a graduated price carries its tiers and a subscription its quantity',
+    () async {
+      final tiers = [
+        {'up_to': 1, 'unit_amount_cents': 25000},
+        {'up_to': null, 'unit_amount_cents': 15000},
+      ];
+      final price = {
+        'id': 'price_1',
+        'product_id': 'prod_1',
+        'type': 'recurring',
+        'interval': 'month',
+        'interval_count': 1,
+        'currency': 'BRL',
+        'status': 'active',
+        'amount_cents': 0,
+        'pricing_model': 'graduated',
+        'unit_amount_cents': null,
+        'unit_label': 'câmera',
+        'unit_label_plural': 'câmeras',
+        'tiers': tiers,
+      };
+      final subscription = {
+        'id': 'sub_1',
+        'amount_cents': 55000,
+        'cancel_at_period_end': false,
+        'client_reference_id': 'pedido-9',
+        'currency': 'BRL',
+        'current_period_end': '2026-12-20T00:00:00Z',
+        'current_period_start': '2026-11-20T00:00:00Z',
+        'customer_id': 'cus_1',
+        'interval': 'month',
+        'metadata': {'camera': 'c1'},
+        'price_id': 'price_1',
+        'product_id': 'prod_1',
+        'quantity': 3,
+        'showcase_id': 'shw_1',
+        'status': 'active',
+        'suspended_at': null,
+        'suspension_reason': null,
+        'trial_end': null,
+        'trial_start': null,
+      };
+      final (meeng, seen) = client(
+        (request) => request.method == 'POST'
+            ? json(201, {'data': price})
+            : json(200, {'data': subscription}),
+      );
+      final created = await meeng.prices.create(
+        const PricesCreateParams(
+          productId: 'prod_1',
+          type: 'recurring',
+          interval: 'month',
+          pricingModel: 'graduated',
+          tiers: [
+            PricesCreateTier(upTo: 1, unitAmountCents: 25000),
+            PricesCreateTier(unitAmountCents: 15000),
+          ],
+          unitLabel: 'câmera',
+          unitLabelPlural: 'câmeras',
+        ),
+      );
+      expect(seen[0].url.path, '/api/v1/prices');
+      final sent = jsonDecode(seen[0].body) as Map<String, Object?>;
+      expect(sent['pricing_model'], 'graduated');
+      expect(sent['tiers'], [
+        {'up_to': 1, 'unit_amount_cents': 25000},
+        {'unit_amount_cents': 15000},
+      ]);
+      expect(sent.containsKey('amount_cents'), isFalse);
+      expect(created.pricingModel, 'graduated');
+      expect(created.amountCents, 0);
+      expect(created.unitAmountCents, isNull);
+      expect(created.tiers.map((tier) => (tier.upTo, tier.unitAmountCents)), [
+        (1, 25000),
+        (null, 15000),
+      ]);
+      final got = await meeng.subscriptions.get('sub_1');
+      expect(seen[1].url.path, '/api/v1/subscriptions/sub_1');
+      expect(got.quantity, 3);
+      expect(got.amountCents, 55000);
+      expect(got.clientReferenceId, 'pedido-9');
+    },
+  );
+
+  test(
+    'usage ingestion carries the source credential and its events',
+    () async {
+      final seen = <http.Request>[];
+      final usage = Meeng(
+        'pus_live_source',
+        baseUrl: 'https://meeng.test/',
+        httpClient: MockClient((request) async {
+          seen.add(request);
+          return json(200, {
+            'data': {'created': 1, 'replayed': 0},
+          });
+        }),
+      );
+      final receipt = await usage.usage.ingest(
+        const UsageIngestParams(
+          events: [
+            UsageIngestEvent(
+              customerId: 'cus_1',
+              externalEventId: 'req-1',
+              inputTokens: '1200',
+              outputTokens: '300',
+              cachedTokens: '0',
+              occurredAt: '2026-11-13T12:00:00Z',
+              cost: UsageIngestEventCost(amount: '1.250000', currency: 'brl'),
+            ),
+          ],
+        ),
+      );
+      expect(receipt.created, 1);
+      expect(receipt.replayed, 0);
+      expect(seen.single.method, 'POST');
+      expect(seen.single.url.path, '/api/v1/usage/token-events');
+      expect(seen.single.headers['authorization'], 'Bearer pus_live_source');
+      final sent = jsonDecode(seen.single.body) as Map<String, Object?>;
+      final events = sent['events'] as List<Object?>;
+      expect(events, hasLength(1));
+      final event = events.single as Map<String, Object?>;
+      expect(event['customer_id'], 'cus_1');
+      expect(event['_cost'], {'amount': '1.250000', 'currency': 'brl'});
+      expect(event.containsKey('_llm'), isFalse);
+      expect(event.containsKey('parent_id'), isFalse);
+    },
+  );
+
+  test('usage ingestion errors are the flat error document', () async {
+    const event = UsageIngestEvent(
+      customerId: 'cus_1',
+      externalEventId: 'req-1',
+      inputTokens: '1',
+      outputTokens: '0',
+      cachedTokens: '0',
+      occurredAt: '2026-11-13T12:00:00Z',
+    );
+    final cases = <(int, Map<String, Object?>, String, int, String)>[
+      (401, {'error': 'invalid_credential'}, 'invalid_credential', 0, ''),
+      (
+        409,
+        {'error': 'conflict', 'record': 2, 'message': 'conflict'},
+        'conflict',
+        2,
+        'conflict',
+      ),
+      (
+        422,
+        {
+          'error': 'invalid_request',
+          'record': 3,
+          'message': 'validation failed: customer_id',
+          'fields': {
+            'customer_id': ['unknown'],
+          },
+        },
+        'invalid_request',
+        3,
+        'validation failed: customer_id',
+      ),
+      (
+        400,
+        {'error': 'invalid_request', 'message': 'malformed JSON'},
+        'invalid_request',
+        0,
+        'malformed JSON',
+      ),
+      (
+        415,
+        {'error': 'unsupported_media_type'},
+        'unsupported_media_type',
+        0,
+        '',
+      ),
+      (500, {'error': 'unavailable'}, 'unavailable', 0, ''),
+    ];
+    for (final (status, problem, code, record, message) in cases) {
+      final (usage, _) = client((request) => json(status, problem));
+      await expectLater(
+        usage.usage.ingest(const UsageIngestParams(events: [event])),
+        throwsA(
+          isA<MeengException>()
+              .having((error) => error.status, 'status', status)
+              .having((error) => error.code, 'code', code)
+              .having((error) => error.record, 'record', record)
+              .having((error) => error.message, 'message', message)
+              .having(
+                (error) => error.fields['customer_id'],
+                'fields',
+                status == 422 ? ['unknown'] : isNull,
+              ),
+        ),
+      );
+    }
+  });
+
+  test('an error wrapped in data by an older server is still read', () async {
+    const event = UsageIngestEvent(
+      customerId: 'cus_1',
+      externalEventId: 'req-1',
+      inputTokens: '1',
+      outputTokens: '0',
+      cachedTokens: '0',
+      occurredAt: '2026-11-13T12:00:00Z',
+    );
+    final (usage, _) = client(
+      (request) => json(409, {
+        'data': {'error': 'event_conflict', 'record': 2, 'message': 'conflict'},
+      }),
+    );
+    await expectLater(
+      usage.usage.ingest(const UsageIngestParams(events: [event])),
+      throwsA(
+        isA<MeengException>()
+            .having((error) => error.code, 'code', 'event_conflict')
+            .having((error) => error.record, 'record', 2),
+      ),
+    );
+  });
+
+  test('a refusal is a typed error', () async {
+    final (meeng, _) = client(
+      (request) => request.url.path == '/api/v1/customers'
+          ? json(422, {
+              'error': 'invalid_request',
+              'fields': {
+                'email': ['send an e-mail'],
+              },
+            })
+          : json(429, null, {'retry-after': '7'}),
+    );
+    await expectLater(
+      meeng.customers.create(
+        const CustomersCreateParams(name: 'x', email: 'x'),
+      ),
+      throwsA(
+        isA<MeengException>()
+            .having((error) => error.status, 'status', 422)
+            .having((error) => error.code, 'code', 'invalid_request')
+            .having((error) => error.fields['email'], 'fields', [
+              'send an e-mail',
+            ]),
+      ),
+    );
+    await expectLater(
+      meeng.products.list(),
+      throwsA(
+        isA<MeengException>()
+            .having((error) => error.status, 'status', 429)
+            .having((error) => error.retryAfter, 'retryAfter', 7),
+      ),
+    );
+  });
+
+  test('the Standard Webhooks vector verifies', () {
+    const body = '{"test": 2432232314}';
+    final headers = webhookHeaders(
+      'msg_p5jXN8AQM9LWM0D4loKWxJek',
+      1614265330,
+      'v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=',
+    );
+    final at = DateTime.fromMillisecondsSinceEpoch(1614265330000, isUtc: true);
+    verifyWebhookSignature(referenceSecret, headers, body, now: at);
+    for (final (secret, payload, now) in [
+      (referenceSecret, '$body ', at),
+      (referenceSecret, body, at.add(const Duration(seconds: 301))),
+      (newSecret, body, at),
+    ]) {
+      expect(
+        () => verifyWebhookSignature(secret, headers, payload, now: now),
+        throwsA(isA<WebhookVerificationException>()),
+      );
+    }
+  });
+
+  test('a timestamp that is not plain digits is refused', () {
+    for (final (stamp, signature) in [
+      ('+1614265330', 'JQsSpSSK1m9NI2FueDRZN3FL/jU9336idQcq6VmF+c8='),
+      ('²', 'PEggIsKE32VQ8J4ZIk9apRhPy7w+a20bxGpjk1K4/HY='),
+      ('', 'x'),
+      ('1_6', 'x'),
+    ]) {
+      final headers = {
+        ...webhookHeaders(
+          'msg_p5jXN8AQM9LWM0D4loKWxJek',
+          0,
+          'v1,$signature',
+        ),
+        'Webhook-Timestamp': stamp,
+      };
+      expect(
+        () => verifyWebhookSignature(
+          referenceSecret,
+          headers,
+          '{"test": 2432232314}',
+          now: DateTime.fromMillisecondsSinceEpoch(1614265330000, isUtc: true),
+        ),
+        throwsA(isA<WebhookVerificationException>()),
+        reason: stamp,
+      );
+    }
+  });
+
+  test('a webhook carries the environment it happened in', () {
+    final now = DateTime.fromMillisecondsSinceEpoch(
+      (signedAt + 120) * 1000,
+      isUtc: true,
+    );
+    final older = [
+      (
+        'msg_2',
+        'v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=',
+        orderPaid,
+      ),
+      (
+        'msg_3',
+        'v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=',
+        usageRecorded,
+      ),
+      ('msg_4', 'v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=', payoutSent),
+    ];
+    for (final (id, signature, body) in older) {
+      final event = verifyWebhook(
+        newSecret,
+        webhookHeaders(id, signedAt, signature),
+        body,
+        now: now,
+      );
+      expect(event.environment, '', reason: id);
+      expect(event.showcaseId, '', reason: id);
+    }
+    final order = verifyWebhook(
+      newSecret,
+      webhookHeaders(
+        'msg_5',
+        signedAt,
+        'v1,9CgfDokxQ7tBEd7vvv32TI4QUdqkaHrxgUo2UUNQpOY=',
+      ),
+      orderPaidLive,
+      now: now,
+    );
+    expect(order, isA<OrderWebhookEvent>());
+    expect(order.environment, 'live');
+    expect(order.showcaseId, 'shw_1');
+    expect((order as OrderWebhookEvent).data.showcaseId, 'shw_1');
+    final unknown = verifyWebhook(
+      newSecret,
+      webhookHeaders(
+        'msg_6',
+        signedAt,
+        'v1,6He63m1rUlB789sgtRAHqex4wyKkzAwdHt6uRsp8YQM=',
+      ),
+      payoutSentTest,
+      now: now,
+    );
+    expect(unknown, isA<UnknownWebhookEvent>());
+    expect(unknown.environment, 'test');
+    expect(unknown.showcaseId, '');
+  });
+
+  test('a webhook answers its typed event', () {
+    final now = DateTime.fromMillisecondsSinceEpoch(
+      (signedAt + 120) * 1000,
+      isUtc: true,
+    );
+    final headers = webhookHeaders(
+      'msg_2',
+      signedAt,
+      'v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= '
+          'v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=',
+    );
+    for (final secret in [newSecret, oldSecret]) {
+      final event = verifyWebhook(secret, headers, orderPaid, now: now);
+      if (event is! OrderWebhookEvent) {
+        fail('not an order event: $event');
+      }
+      expect(event.type, 'order.paid');
+      expect(event.data.id, 'ord_1');
+      expect(event.data.installments, 3);
+      expect(event.data.installmentInterestCents, 360);
+    }
+    expect(
+      () => verifyWebhook(referenceSecret, headers, orderPaid, now: now),
+      throwsA(isA<WebhookVerificationException>()),
+    );
+    final usage = verifyWebhook(
+      newSecret,
+      webhookHeaders(
+        'msg_3',
+        signedAt,
+        'v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=',
+      ),
+      utf8.encode(usageRecorded),
+      now: now,
+    );
+    expect(
+      usage,
+      isA<IdentifiersWebhookEvent>()
+          .having((event) => event.id, 'id', 'msg_3')
+          .having((event) => event.data['merchant_id'], 'merchant', 'mer_1'),
+    );
+    final unknown = verifyWebhook(
+      newSecret,
+      webhookHeaders(
+        'msg_4',
+        signedAt,
+        'v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=',
+      ),
+      payoutSent,
+      now: now,
+    );
+    expect(
+      unknown,
+      isA<UnknownWebhookEvent>()
+          .having((event) => event.type, 'type', 'payout.sent')
+          .having((event) => event.data, 'data', {
+            'payout_id': 'po_1',
+            'amount_cents': 5000,
+          }),
+    );
+  });
+
+  test('a call goes over real HTTP', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final seen = <String, String>{};
+    server.listen((request) async {
+      final body = await utf8.decodeStream(request);
+      seen['method'] = request.method;
+      seen['path'] = request.uri.path;
+      seen['authorization'] = request.headers.value('authorization') ?? '';
+      seen['user-agent'] = request.headers.value('user-agent') ?? '';
+      seen['content-type'] = request.headers.value('content-type') ?? '';
+      seen['idempotency-key'] = request.headers.value('idempotency-key') ?? '';
+      seen['body'] = body;
+      final created = request.uri.path == '/api/v1/products';
+      request.response
+        ..statusCode = created ? 201 : 404
+        ..headers.contentType = ContentType.json
+        ..write(
+          jsonEncode(
+            created
+                ? {'data': product('prod_1')}
+                : {'error': 'not_found', 'message': 'no such product'},
+          ),
+        );
+      await request.response.close();
+    });
+    final meeng = Meeng(
+      'prk_test_key',
+      baseUrl: 'http://${server.address.host}:${server.port}',
+    );
+    addTearDown(meeng.close);
+
+    final created = await meeng.products.create(
+      const ProductsCreateParams(name: 'Curso', description: 'Um curso'),
+      idempotencyKey: 'create-1',
+      apiKey: 'prk_test_other',
+    );
+    expect(created.id, 'prod_1');
+    expect(seen['method'], 'POST');
+    expect(seen['path'], '/api/v1/products');
+    expect(seen['authorization'], 'Bearer prk_test_other');
+    expect(seen['user-agent'], 'meeng-dart/$sdkVersion');
+    expect(seen['content-type'], 'application/json');
+    expect(seen['idempotency-key'], 'create-1');
+    expect(jsonDecode(seen['body']!), {
+      'name': 'Curso',
+      'description': 'Um curso',
+    });
+
+    await expectLater(
+      meeng.products.get('a b/c'),
+      throwsA(
+        isA<MeengException>()
+            .having((error) => error.status, 'status', 404)
+            .having((error) => error.code, 'code', 'not_found')
+            .having((error) => error.message, 'message', 'no such product'),
+      ),
+    );
+    expect(seen['path'], '/api/v1/products/a%20b%2Fc');
+  });
+
+  test('a redirect is refused and the key never follows it', () async {
+    final other = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => other.close(force: true));
+    var elsewhere = 0;
+    other.listen((request) async {
+      elsewhere++;
+      await request.response.close();
+    });
+    final first = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => first.close(force: true));
+    first.listen((request) async {
+      request.response
+        ..statusCode = 302
+        ..headers.set('location', 'http://127.0.0.1:${other.port}/steal');
+      await request.response.close();
+    });
+    final meeng = Meeng(
+      'prk_test_key',
+      baseUrl: 'http://${first.address.host}:${first.port}',
+    );
+    addTearDown(meeng.close);
+
+    await expectLater(
+      meeng.products.get('prod_1'),
+      throwsA(
+        isA<MeengException>().having((error) => error.status, 'status', 302),
+      ),
+    );
+    expect(elsewhere, 0);
+  });
+}

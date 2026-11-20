@@ -1,0 +1,387 @@
+# frozen_string_literal: true
+
+# meeng's Ruby SDK tests, with nothing to install: ruby -Ilib -Itest test/meeng_test.rb
+
+require "minitest/autorun"
+require "json"
+require "openssl"
+require "socket"
+require "uri"
+require "meeng"
+
+class MeengTest < Minitest::Test
+  # Records each request and answers what the test says.
+  class Recorder
+    attr_reader :seen
+
+    def initialize(&answer)
+      @answer = answer
+      @seen = []
+    end
+
+    def call(method, url, headers, body, _timeout)
+      request = { method: method, url: URI(url), headers: headers, body: body }
+      @seen << request
+      status, payload, extra = @answer.call(request)
+      [status, extra, payload.nil? ? "" : JSON.generate(payload)]
+    end
+  end
+
+  def client(&answer)
+    recorder = Recorder.new(&answer)
+    [Meeng::Client.new("prk_test_key", base_url: "https://meeng.test/", transport: recorder), recorder]
+  end
+
+  def product(id)
+    { "id" => id, "name" => "Curso", "description" => "", "status" => "active", "showcase_id" => "shw_1", "created_at" => "2026-10-17T00:00:00Z" }
+  end
+
+  def query(request)
+    URI.decode_www_form(request[:url].query.to_s).to_h
+  end
+
+  def test_a_call_carries_the_key_and_unwraps_the_data
+    meeng, recorder = client { [200, { "data" => product("prod_1") }, {}] }
+    got = meeng.products.get("prod_1")
+    assert_equal "prod_1", got.id
+    assert_equal "active", got.status
+    seen = recorder.seen.first
+    assert_equal "GET", seen[:method]
+    assert_equal "/api/v1/products/prod_1", seen[:url].path
+    assert_equal "Bearer prk_test_key", seen[:headers]["Authorization"]
+  end
+
+  def test_a_write_sends_its_body_and_idempotency_key
+    meeng, recorder = client { [201, { "data" => product("prod_1") }, {}] }
+    meeng.products.create(Meeng::ProductsCreateParams.new(name: "Curso"), idempotency_key: "create-1")
+    seen = recorder.seen.first
+    assert_equal "POST", seen[:method]
+    assert_equal "create-1", seen[:headers]["Idempotency-Key"]
+    assert_equal({ "name" => "Curso" }, JSON.parse(seen[:body]))
+  end
+
+  def session(client_secret)
+    {
+      "id" => "pcl_1", "url" => "https://meeng.dev/pagamento/pcl_1", "product_id" => "prod_1", "price_id" => "price_1",
+      "status" => "active", "label" => "", "quantity" => 1, "success_url" => "https://loja.example/obrigado", "cancel_url" => "",
+      "expires_at" => nil, "created_at" => "2026-11-16T12:00:00Z", "session_id" => "cs_1", "client_secret" => client_secret,
+      "client_secret_expires_at" => "2026-11-16T12:30:00Z", "status_key" => "sk_1",
+      "amount_cents" => nil, "items" => [], "metadata" => {}, "client_reference_id" => "",
+      "discount_id" => "", "showcase_id" => "shw_1", "subscription_start_at" => nil
+    }
+  end
+
+  def test_a_checkout_session_hands_back_the_client_secret_for_the_browser
+    calls = 0
+    meeng, recorder = client do
+      calls += 1
+      calls == 1 ? [201, { "data" => session("cs_secret_1") }, {}] : [201, { "data" => session("") }, { "Idempotent-Replayed" => "true" }]
+    end
+    params = { product_id: "prod_1", price_id: "price_1", success_url: "https://loja.example/obrigado" }
+    checkout = meeng.checkouts.create(params, idempotency_key: "pedido-1")
+    assert_equal "cs_secret_1", checkout.client_secret
+    assert_equal "cs_1", checkout.session_id
+    assert_equal "sk_1", checkout.status_key
+    assert_equal "2026-11-16T12:30:00Z", checkout.client_secret_expires_at
+    assert_equal "https://meeng.dev/pagamento/pcl_1", checkout.url
+    assert_nil checkout.expires_at
+    seen = recorder.seen.first
+    assert_equal "POST", seen[:method]
+    assert_equal "/api/v1/checkouts", seen[:url].path
+    assert_equal "pedido-1", seen[:headers]["Idempotency-Key"]
+    assert_equal({ "product_id" => "prod_1", "price_id" => "price_1", "success_url" => "https://loja.example/obrigado" }, JSON.parse(seen[:body]))
+    again = meeng.checkouts.create(params, idempotency_key: "pedido-1")
+    assert_equal "", again.client_secret
+    assert_equal "cs_1", again.session_id
+  end
+
+  def test_a_model_that_may_be_null_decodes_both_ways
+    pix = { "copia_e_cola" => "000201", "qr_code_svg" => "<svg/>", "expires_at" => nil }
+    payment = { "id" => "pay_1", "method" => "pix", "state" => "pending", "unresolved" => false, "card_brand" => "", "card_kind" => "",
+                "installments" => 1, "pix" => pix, "boleto" => nil }
+    got = Meeng::CheckoutClientPayment.from_hash(payment)
+    assert_nil got.boleto
+    assert_equal "000201", got.pix.copia_e_cola
+    assert_nil got.pix.expires_at
+  end
+
+  def test_a_base_url_must_be_https_unless_it_is_loopback
+    ["https://meeng.dev", "http://localhost:8080", "http://LOCALHOST", "http://127.0.0.1:1", "http://127.255.0.3", "http://[::1]:8080"].each do |base_url|
+      Meeng::Client.new("k", base_url: base_url)
+    end
+    ["http://meeng.dev", "http://localhost.evil.test", "http://127.0.0.1.evil.test", "http://10.0.0.1", "ftp://localhost", "meeng.dev", "", "http://[::2]"].each do |base_url|
+      error = assert_raises(ArgumentError, base_url) { Meeng::Client.new("k", base_url: base_url) }
+      assert_match(/must be https/, error.message)
+    end
+  end
+
+  def test_a_discount_goes_through_create_get_list_and_delete
+    discount = ->(id) { JSON.parse(%q({"id":"__ID__","name":"Black","code":null,"type":"percentage","basis_points":1000,"amount_cents":0,"currency":"BRL","duration":"once","duration_in_months":0,"max_redemptions":null,"max_redemptions_per_customer":null,"redemptions_count":0,"starts_at":"2026-10-17T00:00:00Z","ends_at":null,"status":"active","product_ids":["prod_1"],"created_at":"2026-10-17T00:00:00Z","modified_at":"2026-10-17T00:00:00Z"}).sub("__ID__", id)) }
+    meeng, recorder = client do |request|
+      case request[:method]
+      when "POST" then [201, { "data" => discount.call("disc_1") }, {}]
+      when "DELETE" then [204, nil, {}]
+      else
+        if request[:url].path == "/api/v1/discounts"
+          page = query(request)["page"]
+          [200, { "data" => { "items" => [discount.call("disc_#{page}")], "pagination" => { "total_count" => 2, "max_page" => 2 } } }, {}]
+        else
+          [200, { "data" => discount.call("disc_1") }, {}]
+        end
+      end
+    end
+    created = meeng.discounts.create({ name: "Black", type: "percentage", duration: "once", basis_points: 1000 })
+    assert_equal ["disc_1", nil, ["prod_1"]], [created.id, created.code, created.product_ids]
+    assert_equal "Black", meeng.discounts.get("disc_1").name
+    assert_equal %w[disc_1 disc_2], meeng.discounts.list_iter(limit: 1).map(&:id)
+    assert_nil meeng.discounts.delete("disc_1")
+    assert_equal [["POST", "/api/v1/discounts"], ["GET", "/api/v1/discounts/disc_1"], ["GET", "/api/v1/discounts"], ["GET", "/api/v1/discounts"], ["DELETE", "/api/v1/discounts/disc_1"]],
+                 recorder.seen.map { |seen| [seen[:method], seen[:url].path] }
+    assert_equal({ "name" => "Black", "type" => "percentage", "duration" => "once", "basis_points" => 1000 }, JSON.parse(recorder.seen.first[:body]))
+  end
+
+  def test_a_free_form_value_decodes_nested
+    state = JSON.parse('{"id":"cus_1","showcase_id":"shw_1","name":"Ana","email":"ana@example.com","external_id":"","status":"active","created_at":"2026-10-17T00:00:00Z","active_subscriptions":[],"granted_benefits":[{"id":"gr_1","granted_at":"2026-10-17T00:00:00Z","benefit_id":"ben_1","benefit_type":"feature_flag","benefit_metadata":{"flags":{"beta":true,"limits":{"seats":5,"tiers":["a",2,null,1.5]}}},"properties":{"links":[{"url":"https://example.com","expires":null}]}}]}')
+    meeng, = client { [200, { "data" => state }, {}] }
+    grant = meeng.customers.get_state("cus_1").granted_benefits.first
+    assert_equal({ "flags" => { "beta" => true, "limits" => { "seats" => 5, "tiers" => ["a", 2, nil, 1.5] } } }, grant.benefit_metadata)
+    assert_equal({ "links" => [{ "url" => "https://example.com", "expires" => nil }] }, grant.properties)
+  end
+
+  def test_a_post_without_a_key_is_sent_with_its_own_a_get_with_none
+    meeng, recorder = client { [201, { "data" => product("prod_1") }, {}] }
+    2.times { meeng.products.create(Meeng::ProductsCreateParams.new(name: "Curso")) }
+    meeng.products.create(Meeng::ProductsCreateParams.new(name: "Curso"), idempotency_key: "mine")
+    meeng.products.get("prod_1")
+    keys = recorder.seen.map { |seen| seen[:headers]["Idempotency-Key"] }
+    uuid = /\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
+    assert_match uuid, keys[0]
+    assert_match uuid, keys[1]
+    refute_equal keys[0], keys[1]
+    assert_equal ["mine", nil], keys[2..]
+  end
+
+  def test_iterating_walks_every_page
+    meeng, recorder = client do |request|
+      page = query(request)["page"]
+      [200, { "data" => { "items" => [product("prod_#{page}")], "pagination" => { "total_count" => 3, "max_page" => 3 } } }, {}]
+    end
+    assert_equal %w[prod_1 prod_2 prod_3], meeng.products.list_iter(limit: 1).map(&:id)
+    assert_equal "1", query(recorder.seen.first)["limit"]
+  end
+
+  def test_a_metadata_filter_is_sent_as_one_pair_a_key_the_keys_sorted_and_escaped
+    meeng, recorder = client { [200, { "data" => { "items" => [], "pagination" => { "total_count" => 0, "max_page" => 1 } } }, {}] }
+    metadata = { "pedido" => "123", "camera id" => "a/b" }
+    meeng.orders.list(client_reference_id: "pedido-1", metadata: metadata)
+    assert_equal "client_reference_id=pedido-1&metadata%5Bcamera+id%5D=a%2Fb&metadata%5Bpedido%5D=123", recorder.seen[0][:url].query
+    assert_equal({ "client_reference_id" => "pedido-1", "metadata[camera id]" => "a/b", "metadata[pedido]" => "123" }, query(recorder.seen[0]))
+    assert_empty meeng.checkouts.list_iter(limit: 1, metadata: metadata).to_a
+    assert_equal "page=1&limit=1&metadata%5Bcamera+id%5D=a%2Fb&metadata%5Bpedido%5D=123", recorder.seen[1][:url].query
+  end
+
+  def test_customers_are_listed_by_email
+    meeng, recorder = client { [200, { "data" => { "items" => [], "pagination" => { "total_count" => 0, "max_page" => 1 } } }, {}] }
+    meeng.customers.list(email: "ana@example.com")
+    assert_equal "/api/v1/customers", recorder.seen[0][:url].path
+    assert_equal "email=ana%40example.com", recorder.seen[0][:url].query
+  end
+
+  # A graduated price goes out with its tiers and without the fixed amount, and a
+  # subscription reads back the quantity it bills and the order reference it came
+  # from; amount_cents is the cycle's total for that quantity.
+  def test_a_graduated_price_carries_its_tiers_and_a_subscription_its_quantity
+    tiers = [{ "up_to" => 1, "unit_amount_cents" => 25_000 }, { "up_to" => nil, "unit_amount_cents" => 15_000 }]
+    price = { "id" => "price_1", "product_id" => "prod_1", "type" => "recurring", "interval" => "month", "interval_count" => 1, "currency" => "BRL", "status" => "active", "amount_cents" => 0, "pricing_model" => "graduated", "unit_amount_cents" => nil, "unit_label" => "câmera", "unit_label_plural" => "câmeras", "tiers" => tiers }
+    subscription = { "id" => "sub_1", "amount_cents" => 55_000, "cancel_at_period_end" => false, "client_reference_id" => "pedido-9", "currency" => "BRL", "current_period_end" => "2026-12-20T00:00:00Z", "current_period_start" => "2026-11-20T00:00:00Z", "customer_id" => "cus_1", "interval" => "month", "metadata" => { "camera" => "c1" }, "price_id" => "price_1", "product_id" => "prod_1", "quantity" => 3, "showcase_id" => "shw_1", "status" => "active", "suspended_at" => nil, "suspension_reason" => nil, "trial_end" => nil, "trial_start" => nil }
+    meeng, recorder = client { |request| request[:method] == "POST" ? [201, { "data" => price }, {}] : [200, { "data" => subscription }, {}] }
+    created = meeng.prices.create({ product_id: "prod_1", type: "recurring", interval: "month", pricing_model: "graduated", tiers: tiers, unit_label: "câmera", unit_label_plural: "câmeras" })
+    assert_equal "/api/v1/prices", recorder.seen[0][:url].path
+    sent = JSON.parse(recorder.seen[0][:body])
+    assert_equal "graduated", sent["pricing_model"]
+    assert_equal tiers, sent["tiers"]
+    refute sent.key?("amount_cents")
+    assert_equal ["graduated", 0, nil], [created.pricing_model, created.amount_cents, created.unit_amount_cents]
+    assert_equal [[1, 25_000], [nil, 15_000]], created.tiers.map { |tier| [tier.up_to, tier.unit_amount_cents] }
+    got = meeng.subscriptions.get("sub_1")
+    assert_equal "/api/v1/subscriptions/sub_1", recorder.seen[1][:url].path
+    assert_equal [3, 55_000, "pedido-9"], [got.quantity, got.amount_cents, got.client_reference_id]
+  end
+
+  def test_usage_ingestion_carries_the_source_credential_and_its_events
+    recorder = Recorder.new { [200, { "data" => { "created" => 1, "replayed" => 0 } }, {}] }
+    usage = Meeng::Client.new("pus_live_source", base_url: "https://meeng.test/", transport: recorder)
+    receipt = usage.usage.ingest({ events: [{
+      customer_id: "cus_1", external_event_id: "req-1", input_tokens: "1200", output_tokens: "300", cached_tokens: "0",
+      occurred_at: "2026-11-13T12:00:00Z", _cost: { amount: "1.250000", currency: "brl" }
+    }] })
+    assert_equal [1, 0], [receipt.created, receipt.replayed]
+    seen = recorder.seen.first
+    assert_equal "POST", seen[:method]
+    assert_equal "/api/v1/usage/token-events", seen[:url].path
+    assert_equal "Bearer pus_live_source", seen[:headers]["Authorization"]
+    sent = JSON.parse(seen[:body])
+    assert_equal 1, sent["events"].length
+    assert_equal({ "amount" => "1.250000", "currency" => "brl" }, sent["events"][0]["_cost"])
+    refute sent["events"][0].key?("_llm")
+    refute sent["events"][0].key?("parent_id")
+    typed = Meeng::UsageIngestEvent.new(customer_id: "cus_1", external_event_id: "req-2", input_tokens: "1", output_tokens: "0", cached_tokens: "0",
+                                         occurred_at: "2026-11-13T12:00:00Z", _llm: Meeng::UsageIngestEventLlm.new(vendor: "openai", model: "gpt"))
+    usage.usage.ingest(Meeng::UsageIngestParams.new(events: [typed]))
+    assert_equal({ "vendor" => "openai", "model" => "gpt" }, JSON.parse(recorder.seen.last[:body])["events"][0]["_llm"])
+  end
+
+  def test_usage_ingestion_errors_are_the_flat_error_document
+    event = { customer_id: "cus_1", external_event_id: "req-1", input_tokens: "1", output_tokens: "0", cached_tokens: "0", occurred_at: "2026-11-13T12:00:00Z" }
+    [
+      [401, { "error" => "invalid_credential" }, "invalid_credential", 0, ""],
+      [409, { "error" => "conflict", "record" => 2, "message" => "conflict" }, "conflict", 2, "conflict"],
+      [422, { "error" => "invalid_request", "record" => 3, "message" => "validation failed: customer_id", "fields" => { "customer_id" => ["unknown"] } }, "invalid_request", 3, "validation failed: customer_id"],
+      [400, { "error" => "invalid_request", "message" => "malformed JSON" }, "invalid_request", 0, "malformed JSON"],
+      [415, { "error" => "unsupported_media_type" }, "unsupported_media_type", 0, ""],
+      [500, { "error" => "unavailable" }, "unavailable", 0, ""]
+    ].each do |status, body, code, record, message|
+      meeng, = client { [status, body, {}] }
+      refused = assert_raises(Meeng::Error) { meeng.usage.ingest({ events: [event] }) }
+      assert_equal [status, code, record, message], [refused.status, refused.code, refused.record, refused.message]
+      assert_equal({ "customer_id" => ["unknown"] }, refused.fields) if status == 422
+    end
+  end
+
+  def test_an_error_wrapped_in_data_by_an_older_server_is_still_read
+    event = { customer_id: "cus_1", external_event_id: "req-1", input_tokens: "1", output_tokens: "0", cached_tokens: "0", occurred_at: "2026-11-13T12:00:00Z" }
+    meeng, = client { [409, { "data" => { "error" => "event_conflict", "record" => 2, "message" => "conflict" } }, {}] }
+    refused = assert_raises(Meeng::Error) { meeng.usage.ingest({ events: [event] }) }
+    assert_equal [409, "event_conflict", 2, "conflict"], [refused.status, refused.code, refused.record, refused.message]
+  end
+
+  def test_a_refusal_is_a_typed_error
+    meeng, = client do |request|
+      if request[:url].path == "/api/v1/customers"
+        [422, { "error" => "invalid_request", "fields" => { "email" => ["send an e-mail"] } }, {}]
+      else
+        [429, nil, { "retry-after" => "7" }]
+      end
+    end
+    refused = assert_raises(Meeng::Error) { meeng.customers.create({ name: "x", email: "x" }) }
+    assert_equal [422, "invalid_request"], [refused.status, refused.code]
+    assert_equal ["send an e-mail"], refused.fields["email"]
+    limited = assert_raises(Meeng::Error) { meeng.products.list }
+    assert_equal [429, 7], [limited.status, limited.retry_after]
+  end
+
+  # The webhook vectors every SDK checks: Standard Webhooks' own example, and
+  # meeng events signed under two secrets, as while one is rotated.
+  REFERENCE_SECRET = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+  OLD_SECRET = "whsec_cGVyYXRhLXNkay1vbGQta2V5LTAxMjM0NTY3ODlhYmM="
+  NEW_SECRET = "whsec_cGVyYXRhLXNkay1uZXcta2V5LTAxMjM0NTY3ODlhYmM="
+  ORDER_PAID = '{"id":"msg_2","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}'
+  USAGE_RECORDED = '{"id":"msg_3","type":"usage_event.recorded","timestamp":"2026-10-22T12:00:00Z","data":{"event_id":"ue_1","aggregate":"usage_event","aggregate_id":"ue_1","merchant_id":"mer_1","environment":"test"}}'
+  PAYOUT_SENT = '{"id":"msg_4","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","data":{"payout_id":"po_1","amount_cents":5000}}'
+  ORDER_PAID_LIVE = '{"id":"msg_5","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","environment":"live","showcase_id":"shw_1","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}'
+  PAYOUT_SENT_TEST = '{"id":"msg_6","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","environment":"test","data":{"payout_id":"po_1","amount_cents":5000}}'
+  SIGNED_AT = 1_792_670_400
+
+  def webhook_headers(id, at, signature)
+    { "Webhook-Id" => id, "webhook-timestamp" => at.to_s, "webhook-signature" => signature }
+  end
+
+  def test_the_standard_webhooks_vector_verifies
+    body = '{"test": 2432232314}'
+    headers = webhook_headers("msg_p5jXN8AQM9LWM0D4loKWxJek", 1_614_265_330, "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=")
+    at = Time.at(1_614_265_330)
+    assert_nil Meeng.verify_webhook_signature(REFERENCE_SECRET, headers, body, now: at)
+    [[REFERENCE_SECRET, "#{body} ", at], [REFERENCE_SECRET, body, at + 301], [NEW_SECRET, body, at]].each do |secret, payload, now|
+      assert_raises(Meeng::WebhookVerificationError) { Meeng.verify_webhook_signature(secret, headers, payload, now: now) }
+    end
+  end
+
+  def test_a_timestamp_that_is_not_plain_digits_is_refused
+    body = '{"test": 2432232314}'
+    [["+1614265330", "JQsSpSSK1m9NI2FueDRZN3FL/jU9336idQcq6VmF+c8="], ["²", "PEggIsKE32VQ8J4ZIk9apRhPy7w+a20bxGpjk1K4/HY="], ["", "x"], ["1_6", "x"]].each do |stamp, signature|
+      headers = webhook_headers("msg_p5jXN8AQM9LWM0D4loKWxJek", stamp, "v1,#{signature}")
+      assert_raises(Meeng::WebhookVerificationError, stamp) { Meeng.verify_webhook_signature(REFERENCE_SECRET, headers, body, now: Time.at(1_614_265_330)) }
+    end
+  end
+
+  def test_a_webhook_carries_the_environment_it_happened_in
+    now = Time.at(SIGNED_AT + 120)
+    [["msg_2", "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=", ORDER_PAID], ["msg_3", "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=", USAGE_RECORDED], ["msg_4", "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=", PAYOUT_SENT]].each do |id, signature, body|
+      assert_equal "", Meeng.verify_webhook(NEW_SECRET, webhook_headers(id, SIGNED_AT, signature), body, now: now).environment, id
+      assert_equal "", Meeng.verify_webhook(NEW_SECRET, webhook_headers(id, SIGNED_AT, signature), body, now: now).showcase_id, id
+    end
+    order = Meeng.verify_webhook(NEW_SECRET, webhook_headers("msg_5", SIGNED_AT, "v1,9CgfDokxQ7tBEd7vvv32TI4QUdqkaHrxgUo2UUNQpOY="), ORDER_PAID_LIVE, now: now)
+    assert_instance_of Meeng::OrderWebhookEvent, order
+    assert_equal "live", order.environment
+    assert_equal "shw_1", order.showcase_id
+    assert_equal "shw_1", order.data.showcase_id
+    unknown = Meeng.verify_webhook(NEW_SECRET, webhook_headers("msg_6", SIGNED_AT, "v1,6He63m1rUlB789sgtRAHqex4wyKkzAwdHt6uRsp8YQM="), PAYOUT_SENT_TEST, now: now)
+    assert_instance_of Meeng::UnknownWebhookEvent, unknown
+    assert_equal "test", unknown.environment
+    assert_equal "", unknown.showcase_id
+  end
+
+  def test_a_webhook_answers_its_typed_event
+    now = Time.at(SIGNED_AT + 120)
+    headers = webhook_headers("msg_2", SIGNED_AT, "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=")
+    [NEW_SECRET, OLD_SECRET].each do |secret|
+      event = Meeng.verify_webhook(secret, headers, ORDER_PAID, now: now)
+      assert_instance_of Meeng::OrderWebhookEvent, event
+      assert_equal ["order.paid", "ord_1", 3, 360], [event.type, event.data.id, event.data.installments, event.data.installment_interest_cents]
+    end
+    assert_raises(Meeng::WebhookVerificationError) { Meeng.verify_webhook(REFERENCE_SECRET, headers, ORDER_PAID, now: now) }
+    usage = Meeng.verify_webhook(NEW_SECRET, webhook_headers("msg_3", SIGNED_AT, "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU="), USAGE_RECORDED, now: now)
+    assert_instance_of Meeng::IdentifiersWebhookEvent, usage
+    assert_equal %w[msg_3 mer_1], [usage.id, usage.data["merchant_id"]]
+    unknown = Meeng.verify_webhook(NEW_SECRET, webhook_headers("msg_4", SIGNED_AT, "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY="), PAYOUT_SENT, now: now)
+    assert_instance_of Meeng::UnknownWebhookEvent, unknown
+    assert_equal ["payout.sent", { "payout_id" => "po_1", "amount_cents" => 5000 }], [unknown.type, unknown.data]
+  end
+
+  def test_the_real_http_sends_and_reads_through_net_http
+    server = TCPServer.new("127.0.0.1", 0)
+    thread = Thread.new { loop { answer(server.accept) } }
+    base_url = "http://127.0.0.1:#{server.addr[1]}"
+    product = Meeng::Client.new("prk_test_key", base_url: base_url).products.create({ name: "meeng" }, idempotency_key: "create-1")
+    assert_equal ["meeng", "create-1", "POST /api/v1/products application/json"], [product.name, product.description, product.created_at]
+    detached = Meeng::Client.new("prk_test_key", base_url: base_url).payment_methods.detach("pm 1/2")
+    assert_equal "POST /api/v1/payment_methods/pm%201%2F2/detach -", detached.id
+    refused = assert_raises(Meeng::Error) { Meeng::Client.new("prk_test_other", base_url: base_url).products.get("prod_1") }
+    assert_equal [401, "invalid_credential", 3], [refused.status, refused.code, refused.retry_after]
+  ensure
+    thread&.kill
+    server&.close
+  end
+
+  private
+
+  # Answers one connection as the API would: what it was sent, wrapped in
+  # data, or a 401 to another key.
+  def answer(socket)
+    request_line = socket.gets.to_s
+    headers = {}
+    while (line = socket.gets) && line != "\r\n"
+      name, value = line.split(":", 2)
+      headers[name.downcase] = value.strip
+    end
+    body = socket.read(headers["content-length"].to_i).to_s.force_encoding(Encoding::UTF_8)
+    status, extra, payload = respond(request_line.split[0, 2].join(" "), headers, body)
+    encoded = JSON.generate(payload).b
+    socket.write("HTTP/1.1 #{status} X\r\nContent-Type: application/json\r\n#{extra}Content-Length: #{encoded.bytesize}\r\nConnection: close\r\n\r\n")
+    socket.write(encoded)
+  ensure
+    socket.close
+  end
+
+  def respond(request, headers, body)
+    return [401, "Retry-After: 3\r\n", { "error" => "invalid_credential" }] if headers["authorization"] != "Bearer prk_test_key"
+
+    name = body.empty? ? "" : JSON.parse(body)["name"]
+    if request.end_with?("/detach")
+      return [200, "", { "data" => { "id" => "#{request} #{headers["content-type"] || "-"}", "detached" => true } }]
+    end
+
+    [201, "", { "data" => { "id" => "prod_1", "name" => name, "description" => headers["idempotency-key"].to_s, "status" => "active",
+                            "showcase_id" => "shw_1", "created_at" => "#{request} #{headers["content-type"]}" } }]
+  end
+end
