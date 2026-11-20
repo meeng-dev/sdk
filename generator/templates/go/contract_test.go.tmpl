@@ -1,0 +1,82 @@
+package meeng
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+)
+
+// The contract test calls every method of the SDK against a fake of the API
+// that is built from the API's contract and refuses what the contract does not
+// allow. check.sh starts the fake and sets MEENG_FAKE_URL.
+
+func contractClient(t *testing.T) *Client {
+	t.Helper()
+	base := os.Getenv("MEENG_FAKE_URL")
+	if base == "" {
+		t.Skip("MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test")
+	}
+	return New("mg_contract_test", WithBaseURL(base), WithRetryDelay(time.Millisecond))
+}
+
+func TestEveryMethodMakesTheCallTheContractDescribes(t *testing.T) {
+	client := contractClient(t)
+	ctx := context.Background()
+{{- range .ContractCalls}}
+	if _, err := {{contractCall .}}; err != nil {
+		t.Errorf("{{.Method.OperationID}}: %v", err)
+	}
+{{- end}}
+}
+
+func TestARefusalIsATypedError(t *testing.T) {
+	client := contractClient(t)
+	_, err := client.Emails.Get(context.Background(), "fake-404")
+	var refusal *Error
+	if !errors.As(err, &refusal) || refusal.StatusCode != 404 || refusal.Code != "NOT_FOUND" {
+		t.Fatalf("a 404 is %#v", err)
+	}
+}
+
+func TestATooManyRequestsAnswerIsRepeatedUntilItPasses(t *testing.T) {
+	client := contractClient(t)
+	if _, err := client.Domains.Get(context.Background(), "flaky-429-2"); err != nil {
+		t.Fatalf("two 429s then success: %v", err)
+	}
+	_, err := client.Domains.Get(context.Background(), "fake-429")
+	var refusal *Error
+	if !errors.As(err, &refusal) || refusal.StatusCode != 429 || refusal.Code != "RATE_LIMITED" {
+		t.Fatalf("a 429 that never passes is %#v", err)
+	}
+}
+
+func TestAServerFailureIsRepeatedForAReadAndNotForAnUnkeyedSend(t *testing.T) {
+	client := contractClient(t)
+	if _, err := client.Emails.Get(context.Background(), "flaky-503-2"); err != nil {
+		t.Fatalf("a read after two 503s: %v", err)
+	}
+}
+
+func TestTheSameIdempotencyKeyAnswersTheSameEmail(t *testing.T) {
+	client := contractClient(t)
+	ctx := context.Background()
+	key := WithIdempotencyKey(fmt.Sprintf("order-%d", time.Now().UnixNano()))
+	params := EmailsSendParams{From: "hello@example.com", To: StringList{"a@example.com"}}
+	first, err := client.Emails.Send(ctx, params, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := client.Emails.Send(ctx, params, key)
+	if err != nil || again.EmailID != first.EmailID {
+		t.Fatalf("the same key answered %v (%v), then %v", first, err, again)
+	}
+	other := EmailsSendParams{From: "hello@example.com", To: StringList{"b@example.com"}}
+	_, err = client.Emails.Send(ctx, other, key)
+	var refusal *Error
+	if !errors.As(err, &refusal) || refusal.StatusCode != 409 || refusal.Code != "NOT_UNIQUE" {
+		t.Fatalf("another body under the same key is %#v", err)
+	}
+}

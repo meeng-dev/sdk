@@ -1,0 +1,64 @@
+# frozen_string_literal: true
+
+# The contract test calls every method of the SDK against a fake of the API that is
+# built from the API's contract and refuses what the contract does not allow.
+# check.sh starts the fake and sets MEENG_FAKE_URL.
+
+require "minitest/autorun"
+require "meeng"
+
+class ContractTest < Minitest::Test
+  FAKE = ENV.fetch("MEENG_FAKE_URL", nil)
+
+  def setup
+    skip "MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test" if FAKE.nil? || FAKE.empty?
+  end
+
+  def meeng
+    @meeng ||= Meeng::Client.new("mg_contract_test", FAKE, retry_delay: 0.001)
+  end
+
+  def test_every_method_makes_the_call_the_contract_describes
+{{- range .ContractCalls}}
+    begin
+      {{contractCall .}}
+    rescue Meeng::Error => e
+      flunk "{{.Method.OperationID}}: #{e.message}"
+    end
+{{- end}}
+  end
+
+  def test_a_refusal_is_a_typed_error
+    error = assert_raises(Meeng::Error) { meeng.emails.get("fake-404") }
+    assert_equal 404, error.status
+    assert_equal "NOT_FOUND", error.code
+  end
+
+  def test_a_too_many_requests_answer_is_repeated_until_it_passes
+    meeng.domains.get("flaky-429-2")
+    error = assert_raises(Meeng::Error) { meeng.domains.get("fake-429") }
+    assert_equal 429, error.status
+    assert_equal "RATE_LIMITED", error.code
+  end
+
+  def test_a_server_failure_is_repeated_for_a_read
+    meeng.emails.get("flaky-503-2")
+  end
+
+  def test_the_same_idempotency_key_answers_the_same_email
+    key = "order-#{Process.clock_gettime(Process::CLOCK_REALTIME, :nanosecond)}"
+    email = { from: "hello@example.com", to: ["a@example.com"] }
+    first = meeng.emails.send(email, idempotency_key: key)
+    again = meeng.emails.send(email, idempotency_key: key)
+    assert_equal first[:emailId], again[:emailId]
+    error = assert_raises(Meeng::Error) { meeng.emails.send({ from: "hello@example.com", to: ["b@example.com"] }, idempotency_key: key) }
+    assert_equal 409, error.status
+    assert_equal "NOT_UNIQUE", error.code
+  end
+
+  def test_an_email_needs_its_required_fields
+    error = assert_raises(Meeng::Error) { meeng.emails.send({ to: "a@example.com" }) }
+    assert_equal 400, error.status
+    assert_equal "ZodError", error.code
+  end
+end

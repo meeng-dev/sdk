@@ -1,0 +1,68 @@
+import Foundation
+import Meeng
+import XCTest
+
+/// The contract test calls every method of the SDK against a fake of the API that is
+/// built from the API's contract and refuses what the contract does not allow.
+/// check.sh starts the fake and sets MEENG_FAKE_URL.
+final class ContractTests: XCTestCase {
+    private func contractClient() throws -> MeengClient {
+        guard let base = ProcessInfo.processInfo.environment["MEENG_FAKE_URL"], let url = URL(string: base) else {
+            throw XCTSkip("MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test")
+        }
+        return MeengClient(apiKey: "mg_contract_test", baseURL: url, retryDelay: 0.001)
+    }
+
+    func testEveryMethodMakesTheCallTheContractDescribes() async throws {
+        let meeng = try contractClient()
+        var failures: [String] = []
+{{- range .ContractCalls}}
+        do { _ = try await {{contractCall .}} } catch { failures.append("{{.Method.OperationID}}: \(error)") }
+{{- end}}
+        XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
+    }
+
+    func testARefusalIsATypedError() async throws {
+        let meeng = try contractClient()
+        do {
+            _ = try await meeng.emails.get("fake-404")
+            XCTFail("a 404 was accepted")
+        } catch let refusal as MeengError {
+            XCTAssertEqual(refusal.status, 404)
+            XCTAssertEqual(refusal.code, "NOT_FOUND")
+        }
+    }
+
+    func testATooManyRequestsAnswerIsRepeatedUntilItPasses() async throws {
+        let meeng = try contractClient()
+        _ = try await meeng.domains.get("flaky-429-2")
+        do {
+            _ = try await meeng.domains.get("fake-429")
+            XCTFail("a 429 that never passes was accepted")
+        } catch let refusal as MeengError {
+            XCTAssertEqual(refusal.status, 429)
+            XCTAssertEqual(refusal.code, "RATE_LIMITED")
+        }
+    }
+
+    func testAServerFailureIsRepeatedForARead() async throws {
+        let meeng = try contractClient()
+        _ = try await meeng.emails.get("flaky-503-2")
+    }
+
+    func testTheSameIdempotencyKeyAnswersTheSameEmail() async throws {
+        let meeng = try contractClient()
+        let key = "order-\(UInt64(Date().timeIntervalSince1970 * 1_000_000))"
+        let email = EmailsSendParams(to: ["a@example.com"], from: "hello@example.com")
+        let first = try await meeng.emails.send(email, idempotencyKey: key)
+        let again = try await meeng.emails.send(email, idempotencyKey: key)
+        XCTAssertEqual(first.emailID, again.emailID)
+        do {
+            _ = try await meeng.emails.send(EmailsSendParams(to: ["b@example.com"], from: "hello@example.com"), idempotencyKey: key)
+            XCTFail("another body under the same key was accepted")
+        } catch let refusal as MeengError {
+            XCTAssertEqual(refusal.status, 409)
+            XCTAssertEqual(refusal.code, "NOT_UNIQUE")
+        }
+    }
+}

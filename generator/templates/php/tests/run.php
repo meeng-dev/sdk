@@ -343,6 +343,8 @@ $tests['a connection that fails is repeated for a read only'] = static function 
     }
 };
 
+require __DIR__ . '/contract.php';
+
 foreach ($tests as $name => $test) {
     try {
         $test();

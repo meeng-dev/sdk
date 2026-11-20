@@ -1,0 +1,73 @@
+package dev.meeng;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The contract test calls every method of the SDK against a fake of the API that is
+ * built from the API's contract and refuses what the contract does not allow.
+ * check.sh starts the fake and sets MEENG_FAKE_URL.
+ */
+class ContractTest {
+    private static Meeng client() {
+        String fake = System.getenv("MEENG_FAKE_URL");
+        Assumptions.assumeTrue(fake != null && !fake.isEmpty(), "MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test");
+        return Meeng.builder("mg_contract_test").baseUrl(fake).retryDelay(Duration.ofMillis(1)).build();
+    }
+
+    @Test
+    void everyMethodMakesTheCallTheContractDescribes() {
+        Meeng meeng = client();
+        List<String> failures = new ArrayList<>();
+{{- range .ContractCalls}}
+        try {
+            {{contractCall .}};
+        } catch (RuntimeException e) {
+            failures.add("{{.Method.OperationID}}: " + e.getMessage());
+        }
+{{- end}}
+        assertTrue(failures.isEmpty(), failures.toString());
+    }
+
+    @Test
+    void aRefusalIsATypedError() {
+        MeengException refusal = assertThrows(MeengException.class, () -> client().emails().get("fake-404"));
+        assertEquals(404, refusal.getStatus());
+        assertEquals("NOT_FOUND", refusal.getCode());
+    }
+
+    @Test
+    void aTooManyRequestsAnswerIsRepeatedUntilItPasses() {
+        Meeng meeng = client();
+        meeng.domains().get("flaky-429-2");
+        MeengException refusal = assertThrows(MeengException.class, () -> meeng.domains().get("fake-429"));
+        assertEquals(429, refusal.getStatus());
+        assertEquals("RATE_LIMITED", refusal.getCode());
+    }
+
+    @Test
+    void aServerFailureIsRepeatedForARead() {
+        client().emails().get("flaky-503-2");
+    }
+
+    @Test
+    void theSameIdempotencyKeyAnswersTheSameEmail() {
+        Meeng meeng = client();
+        RequestOptions options = RequestOptions.builder().idempotencyKey("order-" + System.nanoTime()).build();
+        EmailsService.SendParams email = EmailsService.SendParams.builder().from("hello@example.com").to(List.of("a@example.com")).build();
+        EmailsSendResponse first = meeng.emails().send(email, options);
+        EmailsSendResponse again = meeng.emails().send(email, options);
+        assertEquals(first.getEmailId(), again.getEmailId());
+        EmailsService.SendParams other = EmailsService.SendParams.builder().from("hello@example.com").to(List.of("b@example.com")).build();
+        MeengException refusal = assertThrows(MeengException.class, () -> meeng.emails().send(other, options));
+        assertEquals(409, refusal.getStatus());
+        assertEquals("NOT_UNIQUE", refusal.getCode());
+    }
+}

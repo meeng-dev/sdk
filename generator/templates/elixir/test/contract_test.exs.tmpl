@@ -1,0 +1,50 @@
+# The contract test calls every method of the SDK against a fake of the API that is
+# built from the API's contract and refuses what the contract does not allow.
+# check.sh starts the fake and sets MEENG_FAKE_URL.
+
+defmodule ContractTest do
+  use ExUnit.Case, async: false
+
+  @fake System.get_env("MEENG_FAKE_URL")
+
+  if @fake in [nil, ""] do
+    @moduletag skip: "MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test"
+  end
+
+  setup do
+    {:ok, meeng: Meeng.new("mg_contract_test", base_url: @fake, retry_delay: 1)}
+  end
+
+  test "every method makes the call the contract describes", %{meeng: meeng} do
+{{- range .ContractCalls}}
+    assert {:ok, _} = {{contractCall .}}, {{quote .Method.OperationID}}
+{{- end}}
+  end
+
+  test "a refusal is a typed error", %{meeng: meeng} do
+    assert {:error, %Meeng.Error{status: 404, code: "NOT_FOUND"}} = Meeng.Emails.get(meeng, "fake-404")
+  end
+
+  test "a too many requests answer is repeated until it passes", %{meeng: meeng} do
+    assert {:ok, _} = Meeng.Domains.get(meeng, "flaky-429-2")
+    assert {:error, %Meeng.Error{status: 429, code: "RATE_LIMITED"}} = Meeng.Domains.get(meeng, "fake-429")
+  end
+
+  test "a server failure is repeated for a read", %{meeng: meeng} do
+    assert {:ok, _} = Meeng.Emails.get(meeng, "flaky-503-2")
+  end
+
+  test "the same idempotency key answers the same email", %{meeng: meeng} do
+    key = "order-#{System.unique_integer([:positive])}-#{System.os_time(:nanosecond)}"
+    email = %{"from" => "hello@example.com", "to" => ["a@example.com"]}
+    assert {:ok, %{"emailId" => id}} = Meeng.Emails.send(meeng, email, idempotency_key: key)
+    assert {:ok, %{"emailId" => ^id}} = Meeng.Emails.send(meeng, email, idempotency_key: key)
+
+    other = %{email | "to" => ["b@example.com"]}
+    assert {:error, %Meeng.Error{status: 409, code: "NOT_UNIQUE"}} = Meeng.Emails.send(meeng, other, idempotency_key: key)
+  end
+
+  test "an email needs its required fields", %{meeng: meeng} do
+    assert {:error, %Meeng.Error{status: 400, code: "ZodError"}} = Meeng.Emails.send(meeng, %{"to" => "a@example.com"})
+  end
+end

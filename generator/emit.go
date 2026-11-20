@@ -48,6 +48,13 @@ func Generate(ir *IR, language, out string) error {
 		return err
 	}
 	funcs := commonFuncs()
+	funcs["contractCall"] = func(c *ContractCall) (string, error) {
+		caller := callers[language]
+		if caller == nil {
+			return "", fmt.Errorf("generator: %s has no renderer for the contract test calls", language)
+		}
+		return caller(c), nil
+	}
 	for name, fn := range lang.Funcs {
 		funcs[name] = fn
 	}

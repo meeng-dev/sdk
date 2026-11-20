@@ -13,5 +13,8 @@ let package = Package(
     targets: [
         .target(name: "Meeng"),
         .testTarget(name: "MeengTests", dependencies: ["Meeng"]),
+        // The examples, one program: `swift run MeengExamples send-email`. The root
+        // Package.swift does not build them, so dependents get no executable.
+        .executableTarget(name: "MeengExamples", dependencies: ["Meeng"], path: "Examples"),
     ]
 )

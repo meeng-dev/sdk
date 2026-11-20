@@ -1,0 +1,66 @@
+"""The contract test calls every method of the SDK against a fake of the API that
+is built from the API's contract and refuses what the contract does not allow.
+check.sh starts the fake and sets MEENG_FAKE_URL."""
+
+import os
+import time
+import unittest
+
+from meeng import Meeng, MeengHTTPError
+
+BASE = os.environ.get("MEENG_FAKE_URL")
+
+
+@unittest.skipUnless(BASE, "MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test")
+class ContractTest(unittest.TestCase):
+    def client(self, **options):
+        return Meeng("mg_contract_test", BASE, retry_delay=0.001, **options)
+
+    def test_every_method_makes_the_call_the_contract_describes(self):
+        meeng = self.client()
+{{- range .ContractCalls}}
+        with self.subTest({{quote .Method.OperationID}}):
+            {{contractCall .}}
+{{- end}}
+
+    def test_a_refusal_is_a_typed_error(self):
+        with self.assertRaises(MeengHTTPError) as raised:
+            self.client().emails.get("fake-404")
+        self.assertEqual(raised.exception.status_code, 404)
+        self.assertEqual(raised.exception.error["code"], "NOT_FOUND")
+        data, error = self.client(raise_on_error=False).emails.get("fake-404")
+        self.assertIsNone(data)
+        self.assertEqual(error["code"], "NOT_FOUND")
+
+    def test_a_too_many_requests_answer_is_repeated_until_it_passes(self):
+        meeng = self.client()
+        meeng.domains.get("flaky-429-2")
+        with self.assertRaises(MeengHTTPError) as raised:
+            meeng.domains.get("fake-429")
+        self.assertEqual(raised.exception.status_code, 429)
+        self.assertEqual(raised.exception.error["code"], "RATE_LIMITED")
+
+    def test_a_server_failure_is_repeated_for_a_read(self):
+        self.client().emails.get("flaky-503-2")
+
+    def test_the_same_idempotency_key_answers_the_same_email(self):
+        meeng = self.client()
+        key = f"order-{time.time_ns()}"
+        email = {"from": "hello@example.com", "to": ["a@example.com"]}
+        first, _ = meeng.emails.send(email, options={"idempotency_key": key})
+        again, _ = meeng.emails.send(email, options={"idempotency_key": key})
+        self.assertEqual(first["emailId"], again["emailId"])
+        with self.assertRaises(MeengHTTPError) as raised:
+            meeng.emails.send({**email, "to": ["b@example.com"]}, options={"idempotency_key": key})
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(raised.exception.error["code"], "NOT_UNIQUE")
+
+    def test_an_email_needs_its_required_fields(self):
+        with self.assertRaises(MeengHTTPError) as raised:
+            self.client().emails.send({"to": "a@example.com"})  # type: ignore[typeddict-item]
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertEqual(raised.exception.error["code"], "ZodError")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,80 @@
+//! The contract test calls every method of the SDK against a fake of the API that
+//! is built from the API's contract and refuses what the contract does not allow.
+//! check.sh starts the fake and sets MEENG_FAKE_URL.
+
+// Written by the generator, as the modules of the SDK are: not for rustfmt.
+#![cfg_attr(rustfmt, rustfmt::skip)]
+
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use meeng::{
+    Client, Error,{{range .ContractTypes}}
+    {{.}},{{end}}
+};
+
+fn fake() -> Option<Client> {
+    let base = std::env::var("MEENG_FAKE_URL").ok().filter(|value| !value.is_empty());
+    if base.is_none() {
+        eprintln!("MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test");
+    }
+    base.map(|base| {
+        Client::builder("mg_contract_test")
+            .base_url(base)
+            .retry_delay(Duration::from_millis(1))
+            .build()
+    })
+}
+
+fn refusal(error: Error) -> (u16, String) {
+    match error {
+        Error::Api(api) => (api.status, api.code),
+        other => panic!("not a refusal of the API: {other}"),
+    }
+}
+
+#[test]
+fn every_method_makes_the_call_the_contract_describes() {
+    let Some(client) = fake() else { return };
+    let mut failures = Vec::new();
+{{- range .ContractCalls}}
+    if let Err(error) = {{contractCall .}} {
+        failures.push(format!("{{.Method.OperationID}}: {error}"));
+    }
+{{- end}}
+    assert!(failures.is_empty(), "{failures:#?}");
+}
+
+#[test]
+fn a_refusal_is_a_typed_error() {
+    let Some(client) = fake() else { return };
+    let error = client.emails().get("fake-404").unwrap_err();
+    assert_eq!(refusal(error), (404, "NOT_FOUND".to_owned()));
+}
+
+#[test]
+fn a_too_many_requests_answer_is_repeated_until_it_passes() {
+    let Some(client) = fake() else { return };
+    client.domains().get("flaky-429-2").unwrap();
+    let error = client.domains().get("fake-429").unwrap_err();
+    assert_eq!(refusal(error), (429, "RATE_LIMITED".to_owned()));
+}
+
+#[test]
+fn a_server_failure_is_repeated_for_a_read() {
+    let Some(client) = fake() else { return };
+    client.emails().get("flaky-503-2").unwrap();
+}
+
+#[test]
+fn the_same_idempotency_key_answers_the_same_email() {
+    let Some(client) = fake() else { return };
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let key = format!("order-{nanos}");
+    let email = EmailsSendParams::new(vec!["a@example.com".to_owned()], "hello@example.com");
+    let first = client.emails().idempotency_key(key.as_str()).send(&email).unwrap();
+    let again = client.emails().idempotency_key(key.as_str()).send(&email).unwrap();
+    assert_eq!(first.email_id, again.email_id);
+    let other = EmailsSendParams::new(vec!["b@example.com".to_owned()], "hello@example.com");
+    let error = client.emails().idempotency_key(key.as_str()).send(&other).unwrap_err();
+    assert_eq!(refusal(error), (409, "NOT_UNIQUE".to_owned()));
+}

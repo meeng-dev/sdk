@@ -1,0 +1,66 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { Meeng } from "../src/index.ts";
+
+// The contract test calls every method of the SDK against a fake of the API that
+// is built from the API's contract and refuses what the contract does not allow.
+// check.sh starts the fake and sets MEENG_FAKE_URL.
+
+const base = process.env.MEENG_FAKE_URL;
+const skip = base ? false : "MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test";
+
+function client(): Meeng {
+  return new Meeng("mg_contract_test", base, { retryDelayMs: 1 });
+}
+
+test("every method makes the call the contract describes", { skip }, async () => {
+  const meeng = client();
+  const answers = [
+{{- range .ContractCalls}}
+    ["{{.Method.OperationID}}", {{contractCall .}}],
+{{- end}}
+  ] as const;
+  for (const [name, answer] of answers) {
+    const { error } = await answer;
+    assert.equal(error, null, `${name}: ${JSON.stringify(error)}`);
+  }
+});
+
+test("a refusal is a typed error", { skip }, async () => {
+  const { data, error } = await client().emails.get("fake-404");
+  assert.equal(data, null);
+  assert.equal(error?.status, 404);
+  assert.equal(error?.code, "NOT_FOUND");
+});
+
+test("a too many requests answer is repeated until it passes", { skip }, async () => {
+  const meeng = client();
+  assert.equal((await meeng.domains.get("flaky-429-2")).error, null);
+  const { error } = await meeng.domains.get("fake-429");
+  assert.equal(error?.status, 429);
+  assert.equal(error?.code, "RATE_LIMITED");
+});
+
+test("a server failure is repeated for a read", { skip }, async () => {
+  assert.equal((await client().emails.get("flaky-503-2")).error, null);
+});
+
+test("the same idempotency key answers the same email", { skip }, async () => {
+  const meeng = client();
+  const key = `order-${Date.now()}`;
+  const email = { from: "hello@example.com", to: ["a@example.com"] };
+  const first = await meeng.emails.send(email, { idempotencyKey: key });
+  const again = await meeng.emails.send(email, { idempotencyKey: key });
+  assert.equal(first.error, null);
+  assert.equal(again.data?.emailId, first.data?.emailId);
+  const other = await meeng.emails.send({ ...email, to: ["b@example.com"] }, { idempotencyKey: key });
+  assert.equal(other.error?.status, 409);
+  assert.equal(other.error?.code, "NOT_UNIQUE");
+});
+
+test("an email needs its required fields", { skip }, async () => {
+  const { error } = await client().emails.send({ to: "a@example.com" } as never);
+  assert.equal(error?.status, 400);
+  assert.equal(error?.code, "ZodError");
+});

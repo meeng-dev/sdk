@@ -1,0 +1,81 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace Meeng.Tests;
+
+/// <summary>
+/// The contract test calls every method of the SDK against a fake of the API that is
+/// built from the API's contract and refuses what the contract does not allow.
+/// check.sh starts the fake and sets MEENG_FAKE_URL.
+/// </summary>
+public class ContractTests
+{
+    /// <summary>A fact that is skipped, and says why, when there is no fake API to call.</summary>
+    public sealed class FakeFactAttribute : FactAttribute
+    {
+        public FakeFactAttribute()
+        {
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MEENG_FAKE_URL")))
+            {
+                Skip = "MEENG_FAKE_URL is not set: start the fake API (go run ./cmd/fakeapi) to run the contract test";
+            }
+        }
+    }
+
+    private static MeengClient Client()
+    {
+        var fake = Environment.GetEnvironmentVariable("MEENG_FAKE_URL");
+        return new MeengClient("mg_contract_test", new MeengClientOptions { BaseUrl = fake, RetryDelay = TimeSpan.FromMilliseconds(1) });
+    }
+
+    [FakeFact]
+    public async Task EveryMethodMakesTheCallTheContractDescribes()
+    {
+        var meeng = Client();
+        var failures = new List<string>();
+{{- range .ContractCalls}}
+        try { await {{contractCall .}}; } catch (Exception e) { failures.Add("{{.Method.OperationID}}: " + e.Message); }
+{{- end}}
+        Assert.Empty(failures);
+    }
+
+    [FakeFact]
+    public async Task ARefusalIsATypedError()
+    {
+        var refusal = await Assert.ThrowsAsync<MeengException>(() => Client().Emails.GetAsync("fake-404"));
+        Assert.Equal(404, refusal.Status);
+        Assert.Equal("NOT_FOUND", refusal.Code);
+    }
+
+    [FakeFact]
+    public async Task ATooManyRequestsAnswerIsRepeatedUntilItPasses()
+    {
+        var meeng = Client();
+        await meeng.Domains.GetAsync("flaky-429-2");
+        var refusal = await Assert.ThrowsAsync<MeengException>(() => meeng.Domains.GetAsync("fake-429"));
+        Assert.Equal(429, refusal.Status);
+        Assert.Equal("RATE_LIMITED", refusal.Code);
+    }
+
+    [FakeFact]
+    public async Task AServerFailureIsRepeatedForARead()
+    {
+        await Client().Emails.GetAsync("flaky-503-2");
+    }
+
+    [FakeFact]
+    public async Task TheSameIdempotencyKeyAnswersTheSameEmail()
+    {
+        var meeng = Client();
+        var options = new RequestOptions { IdempotencyKey = $"order-{DateTime.UtcNow.Ticks}" };
+        var email = new EmailsSendParams { From = "hello@example.com", To = ["a@example.com"] };
+        var first = await meeng.Emails.SendAsync(email, options);
+        var again = await meeng.Emails.SendAsync(email, options);
+        Assert.Equal(first.EmailId, again.EmailId);
+        var refusal = await Assert.ThrowsAsync<MeengException>(() => meeng.Emails.SendAsync(new EmailsSendParams { From = "hello@example.com", To = ["b@example.com"] }, options));
+        Assert.Equal(409, refusal.Status);
+        Assert.Equal("NOT_UNIQUE", refusal.Code);
+    }
+}
