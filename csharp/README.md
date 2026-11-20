@@ -1,8 +1,8 @@
 # MeengDev.Sdk (.NET)
 
-SDK do meeng para .NET 8 ou mais novo (C#): e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Sem dependências; o JSON é gerado em tempo de compilação, então o pacote funciona com trimming e AOT.
+SDK do Meeng.dev para .NET 8 ou mais novo (C#): e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Sem dependências; o JSON é gerado em tempo de compilação, então o pacote funciona com trimming e AOT.
 
-Gerado pelo `sdk/generator` a partir do contrato da API (versão 1.0.0); não edite à mão.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão 1.0.0); não edite à mão.
 
 > O pacote ainda não foi publicado: o nome `MeengDev.Sdk` (NuGet) é uma proposta aguardando confirmação.
 
@@ -15,8 +15,8 @@ var meeng = new MeengClient("mg_123");
 
 var sent = await meeng.Emails.SendAsync(new EmailsSendParams
 {
-    From = "hello@acme.com",
-    To = ["cliente@example.com"],
+    From = "contato@acme.com.br",
+    To = ["ana@example.com"],
     Subject = "Olá",
     Html = "<p>Olá!</p>",
 });
@@ -82,6 +82,83 @@ Uma recusa da API lança `MeengException` (`Status`, `Code`, como `NOT_UNIQUE` o
 
 Os parâmetros de caminho são `string`; os filtros de listagem são o `<Recurso><Método>Query` (uma lista em `DomainId` vira um `domainId` por valor). `Emails.SendAsync` e `Emails.BatchAsync` aceitam `new RequestOptions { IdempotencyKey = "pedido-1" }`: a mesma chave com o mesmo corpo devolve o primeiro resultado. Os destinatários são `IReadOnlyList<string>`; a API aceita uma string solta, e o SDK a lê como lista de um item.
 
+## Configuração
+
+A API do Meeng.dev fica em `https://meeng.dev/api`. O cliente recebe o endereço do app, `https://meeng.dev` (o padrão), e acrescenta `/api/v1` a cada chamada. Crie uma chave em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves); ela tem a forma `mg_<id>_<segredo>`.
+
+- A chave vem do argumento ou de `MEENG_API_KEY`; o endereço, do argumento ou de `MEENG_BASE_URL`.
+- Só `https` é aceito. `http` vale para `localhost`, `127.0.0.0/8` e `::1` (um servidor local), para a chave nunca viajar em texto puro. Nenhum cliente segue redirecionamento.
+
+```csharp
+var meeng = new MeengClient("mg_...", new MeengClientOptions
+{
+    BaseUrl = "https://meeng.dev",
+    Timeout = TimeSpan.FromSeconds(10),
+    MaxRetries = 3,
+    RetryDelay = TimeSpan.FromSeconds(1),
+});
+```
+
+## Exemplos
+
+A pasta [`examples/`](examples) tem programas que rodam: enviar um e-mail, enviar em lote, agendar (remarcar e cancelar), adicionar um domínio (com os registros DNS) e verificar um webhook.
+
+| Exemplo | Arquivo | Rode com |
+|---|---|---|
+| Enviar um e-mail | `examples/SendEmail.cs` | `dotnet run --project examples -- send-email` |
+| Enviar em lote | `examples/SendBatch.cs` | `dotnet run --project examples -- send-batch` |
+| Agendar, remarcar e cancelar | `examples/ScheduleEmail.cs` | `dotnet run --project examples -- schedule-email` |
+| Adicionar um domínio | `examples/AddDomain.cs` | `dotnet run --project examples -- add-domain` |
+| Verificar um webhook | `examples/VerifyWebhook.cs` | `dotnet run --project examples -- verify-webhook` |
+
+Todos leem `MEENG_API_KEY` e, se quiser apontar para outro app, `MEENG_BASE_URL`; o de webhook roda sem chave, com uma requisição montada no próprio programa.
+
+## Paginação
+
+As listagens de e-mails, contatos e campanhas são paginadas por `page` (a partir de 1) e, nas duas primeiras, `limit`. `emails.list` devolve `count`, o total de e-mails; `campaigns.list` devolve `totalPage`, o total de páginas; `contacts.list` devolve a lista sem total, e a última página é a que vem com menos de `limit` contatos.
+
+```csharp
+var todos = new List<EmailsListItem>();
+for (var page = 1; ; page++)
+{
+    var lista = await meeng.Emails.ListAsync(new EmailsListQuery { Page = page, Limit = 100 });
+    todos.AddRange(lista.Data);
+    if (todos.Count >= lista.Count || lista.Data.Count == 0)
+    {
+        break;
+    }
+}
+```
+
+## Erros
+
+Uma recusa da API lança `MeengException`, com `Status`, `Code`, `ApiMessage` e `RetryAfter`:
+
+```csharp
+try
+{
+    await meeng.Emails.GetAsync("em_123");
+}
+catch (MeengException erro) when (erro.Code == "NOT_FOUND")
+{
+    // o e-mail não existe, ou é de outro time
+}
+```
+
+Os códigos que a API devolve: `UNAUTHORIZED` (sem chave), `FORBIDDEN` (chave inválida ou sem permissão), `NOT_FOUND`, `NOT_UNIQUE` (a mesma chave de idempotência com outro corpo, ou ainda em andamento), `RATE_LIMITED`, `BAD_REQUEST`, `METHOD_NOT_ALLOWED`, `NOT_IMPLEMENTED` e `INTERNAL_SERVER_ERROR`. Uma validação recusada vira o código `ZodError`, e a mensagem é a primeira falha (`from: Required`).
+
+## Tentativas automáticas
+
+O cliente repete sozinho a chamada que pode ser repetida, até `MaxRetries` vezes depois da primeira tentativa (2 por padrão; 0 envia cada chamada uma vez só):
+
+| Resposta | Repete? |
+|---|---|
+| 429 (limite de requisições por segundo) | Sempre: a chamada não foi processada, então qualquer uma pode ser repetida. |
+| 500, 502, 503, 504 ou falha de conexão | Só quando repetir não faz o trabalho duas vezes: uma leitura (`GET`), um `PUT`, um `DELETE`, ou uma chamada com chave de idempotência. Um envio sem chave não é repetido. |
+| 409 e qualquer outra recusa | Nunca. |
+
+A primeira repetição espera `RetryDelay` (500 ms por padrão), cada uma seguinte espera o dobro, até 30 segundos, e o `Retry-After` que a API devolve vale no lugar dessa espera. Esgotadas as tentativas, a última resposta é o erro.
+
 ## Webhooks
 
 ```csharp
@@ -98,7 +175,7 @@ if (evento is EmailWebhookEvent email)
 
 `Verify(corpo, cabecalhos)` só confere a assinatura e devolve `true` ou `false`. `ConstructEvent` confere e devolve o evento, ou lança `WebhookVerificationException` com um `Code`: `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `INVALID_SIGNATURE_FORMAT`, `INVALID_TIMESTAMP`, `TIMESTAMP_OUT_OF_RANGE`, `SIGNATURE_MISMATCH` ou `INVALID_JSON`.
 
-A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`WebhookOptions.Tolerance`; negativa desliga a checagem; `WebhookOptions.Secret` troca o segredo de uma checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`; os `X-UseSend-*` também são aceitos.
+A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`WebhookOptions.Tolerance`; negativa desliga a checagem; `WebhookOptions.Secret` troca o segredo de uma checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`.
 
 Eventos: `contact.created`, `contact.updated`, `contact.deleted`, `domain.created`, `domain.verified`, `domain.updated`, `domain.deleted`, `email.queued`, `email.sent`, `email.delivery_delayed`, `email.delivered`, `email.rejected`, `email.rendering_failure`, `email.complained`, `email.cancelled`, `email.bounced`, `email.clicked`, `email.failed`, `email.opened`, `email.suppressed`, `webhook.test`. Um tipo que o SDK não conhece vira `UnknownWebhookEvent`.
 
@@ -106,4 +183,7 @@ Eventos: `contact.created`, `contact.updated`, `contact.deleted`, `domain.create
 
 ```sh
 dotnet test --nologo
+dotnet build examples
 ```
+
+O `./check.sh` da raiz do repositório sobe uma API de mentira gerada do contrato (`go run ./cmd/fakeapi`), que recusa o que o contrato não permite, e roda contra ela o teste de contrato (cada método do SDK é chamado, e nenhuma operação pode ficar de fora) e os exemplos.

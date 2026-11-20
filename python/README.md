@@ -1,8 +1,8 @@
 # meeng-sdk (Python)
 
-SDK do meeng para Python 3.11 ou mais novo: e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Tem o mesmo formato do SDK do useSend: troque o import, o nome do cliente e a chave, e o resto do código continua igual. Sem dependências além da biblioteca padrão.
+SDK do Meeng.dev para Python 3.11 ou mais novo: e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Sem dependências além da biblioteca padrão.
 
-Gerado pelo `sdk/generator` a partir do contrato da API (versão 1.0.0); não edite à mão.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão 1.0.0); não edite à mão.
 
 > O pacote ainda não foi publicado: o nome `meeng-sdk` é uma proposta aguardando confirmação.
 
@@ -14,15 +14,15 @@ from meeng import Meeng
 meeng = Meeng("mg_123")
 
 data, _ = meeng.emails.send({
-    "from": "hello@acme.com",
-    "to": "cliente@example.com",
+    "from": "contato@acme.com.br",
+    "to": "ana@example.com",
     "subject": "Olá",
     "html": "<p>Olá!</p>",
 })
 print(data["emailId"])
 ```
 
-Toda chamada devolve `(data, error)`, como no useSend. Por padrão uma recusa da API levanta `MeengHTTPError` (com `status_code` e `error`, que é `{"code", "message"}`) e `error` volta sempre `None`; com `Meeng("mg_123", raise_on_error=False)` a chamada devolve `(None, error)`.
+Toda chamada devolve `(data, error)`. Por padrão uma recusa da API levanta `MeengHTTPError` (com `status_code` e `error`, que é `{"code", "message"}`) e `error` volta sempre `None`; com `Meeng("mg_123", raise_on_error=False)` a chamada devolve `(None, error)`.
 
 Os corpos e as respostas são dicionários com as chaves da API, em camelCase (`contactBookId`, `scheduledAt`). Os tipos estão em `meeng.types` (`meeng.types.EmailsSendParams`, `meeng.types.Domain`…) e funcionam com o `mypy --strict`.
 
@@ -85,6 +85,75 @@ Sem argumentos, `Meeng()` lê a chave de `MEENG_API_KEY` e o endereço do app de
 
 Os filtros de listagem são argumentos nomeados em snake_case (`start_date`, `domain_id`); uma lista em `domain_id` vira um `domainId` por valor. `emails.send` e `emails.batch` aceitam `options={"idempotency_key": "pedido-1"}`: a mesma chave com o mesmo corpo devolve o primeiro resultado.
 
+## Configuração
+
+A API do Meeng.dev fica em `https://meeng.dev/api`. O cliente recebe o endereço do app, `https://meeng.dev` (o padrão), e acrescenta `/api/v1` a cada chamada. Crie uma chave em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves); ela tem a forma `mg_<id>_<segredo>`.
+
+- A chave vem do argumento ou de `MEENG_API_KEY`; o endereço, do argumento ou de `MEENG_BASE_URL`.
+- Só `https` é aceito. `http` vale para `localhost`, `127.0.0.0/8` e `::1` (um servidor local), para a chave nunca viajar em texto puro. Nenhum cliente segue redirecionamento.
+
+```python
+meeng = Meeng("mg_...", "https://meeng.dev", timeout=10, max_retries=3, retry_delay=1.0)
+```
+
+## Exemplos
+
+A pasta [`examples/`](examples) tem programas que rodam: enviar um e-mail, enviar em lote, agendar (remarcar e cancelar), adicionar um domínio (com os registros DNS) e verificar um webhook.
+
+| Exemplo | Arquivo | Rode com |
+|---|---|---|
+| Enviar um e-mail | `examples/send_email.py` | `PYTHONPATH=src python3 examples/send_email.py` |
+| Enviar em lote | `examples/send_batch.py` | `PYTHONPATH=src python3 examples/send_batch.py` |
+| Agendar, remarcar e cancelar | `examples/schedule_email.py` | `PYTHONPATH=src python3 examples/schedule_email.py` |
+| Adicionar um domínio | `examples/add_domain.py` | `PYTHONPATH=src python3 examples/add_domain.py` |
+| Verificar um webhook | `examples/verify_webhook.py` | `PYTHONPATH=src python3 examples/verify_webhook.py` |
+
+Todos leem `MEENG_API_KEY` e, se quiser apontar para outro app, `MEENG_BASE_URL`; o de webhook roda sem chave, com uma requisição montada no próprio programa.
+
+## Paginação
+
+As listagens de e-mails, contatos e campanhas são paginadas por `page` (a partir de 1) e, nas duas primeiras, `limit`. `emails.list` devolve `count`, o total de e-mails; `campaigns.list` devolve `totalPage`, o total de páginas; `contacts.list` devolve a lista sem total, e a última página é a que vem com menos de `limit` contatos.
+
+```python
+todos, page = [], 1
+while True:
+    lista, _ = meeng.emails.list(page=page, limit=100)
+    todos += lista["data"]
+    if len(todos) >= lista["count"] or not lista["data"]:
+        break
+    page += 1
+```
+
+## Erros
+
+Por padrão uma recusa da API levanta `MeengHTTPError`, com `status_code` e `error` (`{"code", "message"}`):
+
+```python
+from meeng import MeengHTTPError
+
+try:
+    meeng.emails.get("em_123")
+except MeengHTTPError as erro:
+    if erro.error["code"] == "NOT_FOUND":
+        ...  # o e-mail não existe, ou é de outro time
+```
+
+Com `Meeng(..., raise_on_error=False)` a chamada devolve `(None, error)` em vez de levantar.
+
+Os códigos que a API devolve: `UNAUTHORIZED` (sem chave), `FORBIDDEN` (chave inválida ou sem permissão), `NOT_FOUND`, `NOT_UNIQUE` (a mesma chave de idempotência com outro corpo, ou ainda em andamento), `RATE_LIMITED`, `BAD_REQUEST`, `METHOD_NOT_ALLOWED`, `NOT_IMPLEMENTED` e `INTERNAL_SERVER_ERROR`. Uma validação recusada vira o código `ZodError`, e a mensagem é a primeira falha (`from: Required`).
+
+## Tentativas automáticas
+
+O cliente repete sozinho a chamada que pode ser repetida, até `max_retries` vezes depois da primeira tentativa (2 por padrão; 0 envia cada chamada uma vez só):
+
+| Resposta | Repete? |
+|---|---|
+| 429 (limite de requisições por segundo) | Sempre: a chamada não foi processada, então qualquer uma pode ser repetida. |
+| 500, 502, 503, 504 ou falha de conexão | Só quando repetir não faz o trabalho duas vezes: uma leitura (`GET`), um `PUT`, um `DELETE`, ou uma chamada com chave de idempotência. Um envio sem chave não é repetido. |
+| 409 e qualquer outra recusa | Nunca. |
+
+A primeira repetição espera `retry_delay` (500 ms por padrão), cada uma seguinte espera o dobro, até 30 segundos, e o `Retry-After` que a API devolve vale no lugar dessa espera. Esgotadas as tentativas, a última resposta é o erro.
+
 ## Webhooks
 
 ```python
@@ -101,7 +170,7 @@ elif event["type"] == "email.bounced":
 
 `verify(body, headers=...)` só confere a assinatura e devolve `True` ou `False`. `construct_event` confere e devolve o evento, ou levanta `WebhookVerificationError` com um `code`: `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `INVALID_SIGNATURE_FORMAT`, `INVALID_TIMESTAMP`, `TIMESTAMP_OUT_OF_RANGE`, `SIGNATURE_MISMATCH`, `INVALID_BODY` ou `INVALID_JSON`.
 
-A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`tolerance`, em milissegundos; `-1` desliga a checagem; `secret` troca o segredo de uma checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`; os `X-UseSend-*` também são aceitos.
+A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`tolerance`, em milissegundos; `-1` desliga a checagem; `secret` troca o segredo de uma checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`.
 
 Eventos: `contact.created`, `contact.updated`, `contact.deleted`, `domain.created`, `domain.verified`, `domain.updated`, `domain.deleted`, `email.queued`, `email.sent`, `email.delivery_delayed`, `email.delivered`, `email.rejected`, `email.rendering_failure`, `email.complained`, `email.cancelled`, `email.bounced`, `email.clicked`, `email.failed`, `email.opened`, `email.suppressed`, `webhook.test`.
 
@@ -109,5 +178,7 @@ Eventos: `contact.created`, `contact.updated`, `contact.deleted`, `domain.create
 
 ```sh
 PYTHONPATH=src python3 -m unittest discover -s tests
-mypy --strict --python-version 3.11 src/meeng
+mypy --strict --python-version 3.11 src/meeng examples
 ```
+
+O `./check.sh` da raiz do repositório sobe uma API de mentira gerada do contrato (`go run ./cmd/fakeapi`), que recusa o que o contrato não permite, e roda contra ela o teste de contrato (cada método do SDK é chamado, e nenhuma operação pode ficar de fora) e os exemplos.

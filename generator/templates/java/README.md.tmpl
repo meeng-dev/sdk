@@ -1,8 +1,8 @@
 # dev.meeng:sdk (Java)
 
-SDK do meeng para Java 11 ou mais novo: e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Sem dependências em tempo de execução (usa o `java.net.http` do JDK e um leitor de JSON próprio).
+SDK do Meeng.dev para Java 11 ou mais novo: e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Sem dependências em tempo de execução (usa o `java.net.http` do JDK e um leitor de JSON próprio).
 
-Gerado pelo `sdk/generator` a partir do contrato da API (versão {{.APIVersion}}); não edite à mão.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão {{.APIVersion}}); não edite à mão.
 
 > O artefato ainda não foi publicado: as coordenadas `dev.meeng:sdk` (Maven) são uma proposta aguardando confirmação.
 
@@ -16,8 +16,8 @@ Meeng meeng = new Meeng("mg_123");
 
 EmailsSendResponse sent = meeng.emails().send(
     EmailsService.SendParams.builder()
-        .from("hello@acme.com")
-        .to(List.of("cliente@example.com"))
+        .from("contato@acme.com.br")
+        .to(List.of("ana@example.com"))
         .subject("Olá")
         .html("<p>Olá!</p>")
         .build());
@@ -36,6 +36,81 @@ Uma recusa da API lança `MeengException` (`getStatus()`, `getCode()`, como `NOT
 {{end}}
 {{end}}Os parâmetros de caminho são `String`; os filtros de listagem são o `ListParams` do serviço (uma lista em `domainId` vira um `domainId` por valor). `emails().send` e `emails().batch` aceitam `RequestOptions.builder().idempotencyKey("pedido-1").build()`: a mesma chave com o mesmo corpo devolve o primeiro resultado. Os destinatários são `List<String>`; a API aceita uma string solta, e o SDK a lê como lista de um item.
 
+## Configuração
+
+A API do Meeng.dev fica em `https://meeng.dev/api`. O cliente recebe o endereço do app, `https://meeng.dev` (o padrão), e acrescenta `/api/v1` a cada chamada. Crie uma chave em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves); ela tem a forma `mg_<id>_<segredo>`.
+
+- A chave vem do argumento ou de `MEENG_API_KEY`; o endereço, do argumento ou de `MEENG_BASE_URL`.
+- Só `https` é aceito. `http` vale para `localhost`, `127.0.0.0/8` e `::1` (um servidor local), para a chave nunca viajar em texto puro. Nenhum cliente segue redirecionamento.
+
+```java
+Meeng meeng = Meeng.builder("mg_...")
+    .baseUrl("https://meeng.dev")
+    .timeout(Duration.ofSeconds(10))
+    .maxRetries(3)
+    .retryDelay(Duration.ofSeconds(1))
+    .build();
+```
+
+## Exemplos
+
+A pasta [`examples/`](examples) tem programas que rodam: enviar um e-mail, enviar em lote, agendar (remarcar e cancelar), adicionar um domínio (com os registros DNS) e verificar um webhook.
+
+| Exemplo | Arquivo | Rode com |
+|---|---|---|
+| Enviar um e-mail | `examples/SendEmail.java` | `java -cp target/classes examples/SendEmail.java` |
+| Enviar em lote | `examples/SendBatch.java` | `java -cp target/classes examples/SendBatch.java` |
+| Agendar, remarcar e cancelar | `examples/ScheduleEmail.java` | `java -cp target/classes examples/ScheduleEmail.java` |
+| Adicionar um domínio | `examples/AddDomain.java` | `java -cp target/classes examples/AddDomain.java` |
+| Verificar um webhook | `examples/VerifyWebhook.java` | `java -cp target/classes examples/VerifyWebhook.java` |
+
+Compile antes com `mvn -q package -DskipTests`.
+
+Todos leem `MEENG_API_KEY` e, se quiser apontar para outro app, `MEENG_BASE_URL`; o de webhook roda sem chave, com uma requisição montada no próprio programa.
+
+## Paginação
+
+As listagens de e-mails, contatos e campanhas são paginadas por `page` (a partir de 1) e, nas duas primeiras, `limit`. `emails.list` devolve `count`, o total de e-mails; `campaigns.list` devolve `totalPage`, o total de páginas; `contacts.list` devolve a lista sem total, e a última página é a que vem com menos de `limit` contatos.
+
+```java
+List<EmailsListItem> todos = new ArrayList<>();
+for (int page = 1; ; page++) {
+    EmailsListResponse lista = meeng.emails().list(EmailsService.ListParams.builder().page(page).limit(100).build());
+    todos.addAll(lista.getData());
+    if (todos.size() >= lista.getCount() || lista.getData().isEmpty()) {
+        break;
+    }
+}
+```
+
+## Erros
+
+Uma recusa da API lança `MeengException`, com `getStatus()`, `getCode()`, `getRetryAfter()` e a mensagem. Uma falha de rede lança `UncheckedIOException`:
+
+```java
+try {
+    meeng.emails().get("em_123");
+} catch (MeengException erro) {
+    if (erro.getCode().equals("NOT_FOUND")) {
+        // o e-mail não existe, ou é de outro time
+    }
+}
+```
+
+Os códigos que a API devolve: `UNAUTHORIZED` (sem chave), `FORBIDDEN` (chave inválida ou sem permissão), `NOT_FOUND`, `NOT_UNIQUE` (a mesma chave de idempotência com outro corpo, ou ainda em andamento), `RATE_LIMITED`, `BAD_REQUEST`, `METHOD_NOT_ALLOWED`, `NOT_IMPLEMENTED` e `INTERNAL_SERVER_ERROR`. Uma validação recusada vira o código `ZodError`, e a mensagem é a primeira falha (`from: Required`).
+
+## Tentativas automáticas
+
+O cliente repete sozinho a chamada que pode ser repetida, até `maxRetries` vezes depois da primeira tentativa (2 por padrão; 0 envia cada chamada uma vez só):
+
+| Resposta | Repete? |
+|---|---|
+| 429 (limite de requisições por segundo) | Sempre: a chamada não foi processada, então qualquer uma pode ser repetida. |
+| 500, 502, 503, 504 ou falha de conexão | Só quando repetir não faz o trabalho duas vezes: uma leitura (`GET`), um `PUT`, um `DELETE`, ou uma chamada com chave de idempotência. Um envio sem chave não é repetido. |
+| 409 e qualquer outra recusa | Nunca. |
+
+A primeira repetição espera `retryDelay` (500 ms por padrão), cada uma seguinte espera o dobro, até 30 segundos, e o `Retry-After` que a API devolve vale no lugar dessa espera. Esgotadas as tentativas, a última resposta é o erro.
+
 ## Webhooks
 
 ```java
@@ -51,7 +126,7 @@ if (event instanceof EmailWebhookEvent) {
 
 `verify(body, headers)` só confere a assinatura e devolve `true` ou `false`. `constructEvent` confere e devolve o evento, ou lança `WebhookVerificationException` com um `getCode()`: `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `INVALID_SIGNATURE_FORMAT`, `INVALID_TIMESTAMP`, `TIMESTAMP_OUT_OF_RANGE`, `SIGNATURE_MISMATCH` ou `INVALID_JSON`.
 
-A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`Webhooks.Options.defaults().tolerance(...)`; negativa desliga a checagem; `.secret(...)` troca o segredo de uma checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`; os `X-UseSend-*` também são aceitos.
+A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`Webhooks.Options.defaults().tolerance(...)`; negativa desliga a checagem; `.secret(...)` troca o segredo de uma checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`.
 
 Eventos: {{range $i, $g := .Webhooks}}{{range $j, $t := .Types}}{{if or $i $j}}, {{end}}`{{$t}}`{{end}}{{end}}. Um tipo que o SDK não conhece vira `UnknownWebhookEvent`.
 
@@ -60,3 +135,5 @@ Eventos: {{range $i, $g := .Webhooks}}{{range $j, $t := .Types}}{{if or $i $j}},
 ```sh
 mvn -q -B verify
 ```
+
+O `./check.sh` da raiz do repositório sobe uma API de mentira gerada do contrato (`go run ./cmd/fakeapi`), que recusa o que o contrato não permite, e roda contra ela o teste de contrato (cada método do SDK é chamado, e nenhuma operação pode ficar de fora) e os exemplos.

@@ -1,8 +1,8 @@
 # @meeng-dev/sdk (TypeScript e JavaScript)
 
-SDK do meeng para Node.js 20.3 ou mais novo (também funciona em Bun e Deno): e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Tem o mesmo formato do SDK do useSend: troque o import, o nome do cliente e a chave, e o resto do código continua igual.
+SDK do Meeng.dev para Node.js 20.3 ou mais novo (também funciona em Bun e Deno): e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks.
 
-Gerado pelo `sdk/generator` a partir do contrato da API (versão {{.APIVersion}}); não edite à mão. Sem dependências em tempo de execução.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão {{.APIVersion}}); não edite à mão. Sem dependências em tempo de execução.
 
 > O pacote ainda não foi publicado: o nome `@meeng-dev/sdk` é uma proposta aguardando confirmação.
 
@@ -14,8 +14,8 @@ import { Meeng } from "@meeng-dev/sdk";
 const meeng = new Meeng("mg_123");
 
 const { data, error } = await meeng.emails.send({
-  from: "hello@acme.com",
-  to: "cliente@example.com",
+  from: "contato@acme.com.br",
+  to: "ana@example.com",
   subject: "Olá",
   html: "<p>Olá!</p>",
 });
@@ -35,7 +35,75 @@ Sem argumentos, `new Meeng()` lê a chave de `MEENG_API_KEY` e o endereço do ap
 
 `emails.send` e `emails.batch` aceitam `{ idempotencyKey }` como último argumento: a mesma chave com o mesmo corpo devolve o primeiro resultado, sem enviar de novo.
 
-`emails.batch` devolve na `data` a lista de ids (`[{ emailId }]`), como o useSend.
+`emails.batch` devolve na `data` a lista de ids (`[{ emailId }]`).
+
+## Configuração
+
+A API do Meeng.dev fica em `https://meeng.dev/api`. O cliente recebe o endereço do app, `https://meeng.dev` (o padrão), e acrescenta `/api/v1` a cada chamada. Crie uma chave em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves); ela tem a forma `mg_<id>_<segredo>`.
+
+- A chave vem do argumento ou de `MEENG_API_KEY`; o endereço, do argumento ou de `MEENG_BASE_URL`.
+- Só `https` é aceito. `http` vale para `localhost`, `127.0.0.0/8` e `::1` (um servidor local), para a chave nunca viajar em texto puro. Nenhum cliente segue redirecionamento.
+
+```ts
+const meeng = new Meeng("mg_...", "https://meeng.dev", {
+  timeoutMs: 10_000,
+  maxRetries: 3,
+  retryDelayMs: 1_000,
+});
+```
+
+## Exemplos
+
+A pasta [`examples/`](examples) tem programas que rodam: enviar um e-mail, enviar em lote, agendar (remarcar e cancelar), adicionar um domínio (com os registros DNS) e verificar um webhook.
+
+| Exemplo | Arquivo | Rode com |
+|---|---|---|
+| Enviar um e-mail | `examples/send-email.ts` | `node examples/send-email.ts` |
+| Enviar em lote | `examples/send-batch.ts` | `node examples/send-batch.ts` |
+| Agendar, remarcar e cancelar | `examples/schedule-email.ts` | `node examples/schedule-email.ts` |
+| Adicionar um domínio | `examples/add-domain.ts` | `node examples/add-domain.ts` |
+| Verificar um webhook | `examples/verify-webhook.ts` | `node examples/verify-webhook.ts` |
+
+Todos leem `MEENG_API_KEY` e, se quiser apontar para outro app, `MEENG_BASE_URL`; o de webhook roda sem chave, com uma requisição montada no próprio programa.
+
+## Paginação
+
+As listagens de e-mails, contatos e campanhas são paginadas por `page` (a partir de 1) e, nas duas primeiras, `limit`. `emails.list` devolve `count`, o total de e-mails; `campaigns.list` devolve `totalPage`, o total de páginas; `contacts.list` devolve a lista sem total, e a última página é a que vem com menos de `limit` contatos.
+
+```ts
+const todos = [];
+for (let page = 1; ; page++) {
+  const { data, error } = await meeng.emails.list({ page, limit: 100 });
+  if (error) throw new Error(error.message);
+  todos.push(...data.data);
+  if (todos.length >= data.count || data.data.length === 0) break;
+}
+```
+
+## Erros
+
+Uma recusa da API é o `error` do resultado, com `status`, `code` e `message`:
+
+```ts
+const { data, error } = await meeng.emails.get("em_123");
+if (error?.code === "NOT_FOUND") {
+  // o e-mail não existe, ou é de outro time
+}
+```
+
+Os códigos que a API devolve: `UNAUTHORIZED` (sem chave), `FORBIDDEN` (chave inválida ou sem permissão), `NOT_FOUND`, `NOT_UNIQUE` (a mesma chave de idempotência com outro corpo, ou ainda em andamento), `RATE_LIMITED`, `BAD_REQUEST`, `METHOD_NOT_ALLOWED`, `NOT_IMPLEMENTED` e `INTERNAL_SERVER_ERROR`. Uma validação recusada vira o código `ZodError`, e a mensagem é a primeira falha (`from: Required`).
+
+## Tentativas automáticas
+
+O cliente repete sozinho a chamada que pode ser repetida, até `maxRetries` vezes depois da primeira tentativa (2 por padrão; 0 envia cada chamada uma vez só):
+
+| Resposta | Repete? |
+|---|---|
+| 429 (limite de requisições por segundo) | Sempre: a chamada não foi processada, então qualquer uma pode ser repetida. |
+| 500, 502, 503, 504 ou falha de conexão | Só quando repetir não faz o trabalho duas vezes: uma leitura (`GET`), um `PUT`, um `DELETE`, ou uma chamada com chave de idempotência. Um envio sem chave não é repetido. |
+| 409 e qualquer outra recusa | Nunca. |
+
+A primeira repetição espera `retryDelayMs` (500 ms por padrão), cada uma seguinte espera o dobro, até 30 segundos, e o `Retry-After` que a API devolve vale no lugar dessa espera. Esgotadas as tentativas, a última resposta é o erro.
 
 ## Webhooks
 
@@ -52,7 +120,7 @@ if (event.type === "email.delivered") {
 
 `verify(body, { headers })` só confere a assinatura e devolve `true` ou `false`. `constructEvent` confere e devolve o evento tipado, ou lança `WebhookVerificationError` com um `code`: `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `INVALID_SIGNATURE_FORMAT`, `INVALID_TIMESTAMP`, `TIMESTAMP_OUT_OF_RANGE`, `SIGNATURE_MISMATCH`, `INVALID_BODY` ou `INVALID_JSON`.
 
-A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`tolerance`, em milissegundos; um número negativo desliga a checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`; os `X-UseSend-*` também são aceitos.
+A assinatura é `v1=` mais o HMAC-SHA256, em hexadecimal, de `{timestamp}.{corpo}` com o segredo do webhook; o timestamp vem em milissegundos. A tolerância padrão é de 5 minutos (`tolerance`, em milissegundos; um número negativo desliga a checagem). Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`.
 
 Eventos: {{range $i, $g := .Webhooks}}{{range $j, $t := .Types}}{{if or $i $j}}, {{end}}`{{$t}}`{{end}}{{end}}.
 
@@ -63,3 +131,5 @@ npm ci
 npm run typecheck
 npm test
 ```
+
+O `./check.sh` da raiz do repositório sobe uma API de mentira gerada do contrato (`go run ./cmd/fakeapi`), que recusa o que o contrato não permite, e roda contra ela o teste de contrato (cada método do SDK é chamado, e nenhuma operação pode ficar de fora) e os exemplos.
