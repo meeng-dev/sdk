@@ -16,9 +16,24 @@ sealed class WebhookEvent {
     required this.id,
     required this.type,
     required this.createdAt,
+    this.version,
+    this.teamId,
+    this.attempt,
   });
 
-  /// The event's id.
+  /// The version of the payload's shape, such as `2026-01-18`; null when an
+  /// older server sent none.
+  final String? version;
+
+  /// The team the event belongs to; null when an older server sent none.
+  final int? teamId;
+
+  /// Which delivery attempt this is, from 1 to 6; null when an older server
+  /// sent none.
+  final int? attempt;
+
+  /// The id of the delivery: the same on every attempt, so a receiver can
+  /// deduplicate by it.
   final String id;
 
   /// What happened, such as `email.delivered`.
@@ -34,6 +49,9 @@ final class {{.Name}}WebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -54,6 +72,9 @@ final class UnknownWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -146,12 +167,20 @@ class Webhooks {
       final type = readString(event['type']);
       final createdAt = readString(event['createdAt']);
       final data = event['data'];
+      final version = event['version'] is String
+          ? event['version'] as String
+          : null;
+      final teamId = event['teamId'] is int ? event['teamId'] as int : null;
+      final attempt = event['attempt'] is int ? event['attempt'] as int : null;
 {{- range .Webhooks}}
       if ({{.Name}}WebhookEvent.types.contains(type)) {
         return {{.Name}}WebhookEvent(
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: {{.Data.Model}}.fromJson(readObject(data)),
         );
       }
@@ -160,6 +189,9 @@ class Webhooks {
         id: id,
         type: type,
         createdAt: createdAt,
+        version: version,
+        teamId: teamId,
+        attempt: attempt,
         data: data,
       );
     } on FormatException catch (error) {

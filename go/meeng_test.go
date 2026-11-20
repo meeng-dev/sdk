@@ -251,7 +251,7 @@ func TestAnAnswerIsNeverFollowedToARedirect(t *testing.T) {
 }
 
 const webhookSecret = "whsec_test"
-const webhookBody = `{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}`
+const webhookBody = `{"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}`
 
 func sign(timestamp, body, secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
@@ -270,7 +270,8 @@ func TestASignedWebhookIsVerifiedAndReadAsATypedEvent(t *testing.T) {
 	}
 	event, err := webhooks.ConstructEvent([]byte(webhookBody), header)
 	delivered, ok := event.(*EmailWebhookEvent)
-	if err != nil || !ok || delivered.Type != "email.delivered" || delivered.ID != "evt_1" || delivered.Data.To[0] != "a@x.com" || delivered.Data.Status != EmailBasePayloadStatusDelivered {
+	if err != nil || !ok || delivered.Type != "email.delivered" || delivered.ID != "evt_1" || delivered.Data.To[0] != "a@x.com" || delivered.Data.Status != EmailBasePayloadStatusDelivered ||
+		delivered.Version != "2026-01-18" || delivered.TeamID != 7 || delivered.Attempt != 2 {
 		t.Fatalf("event %#v, %v", event, err)
 	}
 }

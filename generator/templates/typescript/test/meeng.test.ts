@@ -167,7 +167,7 @@ test("the address must be https, except to localhost", () => {
 });
 
 const secret = "whsec_test";
-const body = JSON.stringify({ id: "evt_1", type: "email.delivered", createdAt: "2026-11-20T12:00:00Z", data: { id: "em_1", status: "DELIVERED", from: "h@acme.com", to: ["a@x.com"], occurredAt: "2026-11-20T12:00:00Z" } });
+const body = JSON.stringify({ id: "evt_1", type: "email.delivered", version: "2026-01-18", createdAt: "2026-11-20T12:00:00Z", teamId: 7, attempt: 2, data: { id: "em_1", status: "DELIVERED", from: "h@acme.com", to: ["a@x.com"], occurredAt: "2026-11-20T12:00:00Z" } });
 const sign = (timestamp: string, text = body, key = secret) => `v1=${createHmac("sha256", key).update(`${timestamp}.${text}`).digest("hex")}`;
 
 test("a signed webhook is verified and read as a typed event", () => {
@@ -179,6 +179,7 @@ test("a signed webhook is verified and read as a typed event", () => {
   assert.equal(webhooks.verify(Buffer.from(body), { headers: new Headers(headers) }), true);
   const event = webhooks.constructEvent(body, { headers });
   assert.equal(event.type, "email.delivered");
+  assert.deepEqual([event.version, event.teamId, event.attempt], ["2026-01-18", 7, 2]);
   if (event.type === "email.delivered") {
     assert.deepEqual(event.data.to, ["a@x.com"]);
   }

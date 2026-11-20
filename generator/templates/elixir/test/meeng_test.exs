@@ -288,7 +288,7 @@ defmodule MeengTest do
   end
 
   @secret "whsec_test"
-  @body ~s({"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}})
+  @body ~s({"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}})
 
   defp sign(timestamp, body \\ @body, secret \\ @secret) do
     "v1=" <>
@@ -301,6 +301,7 @@ defmodule MeengTest do
     assert Meeng.Webhooks.verify(@secret, headers, @body)
     assert {:ok, event} = Meeng.Webhooks.construct_event(@secret, headers, @body)
     assert event["type"] == "email.delivered"
+    assert {event["version"], event["teamId"], event["attempt"]} == {"2026-01-18", 7, 2}
     assert event["data"]["to"] == ["a@x.com"]
   end
 

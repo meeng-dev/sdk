@@ -15,7 +15,7 @@ namespace Meeng;
  *         echo implode(',', $event['data']['to']);
  *     }
  *
- * @phpstan-type WebhookEvent {{range $i, $g := .Webhooks}}{{if $i}}|{{end}}array{'id': string, 'type': {{range $j, $t := .Types}}{{if $j}}|{{end}}'{{$t}}'{{end}}, 'createdAt': string, 'data': {{phpData .Data}}}{{end}}
+ * @phpstan-type WebhookEvent {{range $i, $g := .Webhooks}}{{if $i}}|{{end}}array{'id': string, 'type': {{range $j, $t := .Types}}{{if $j}}|{{end}}'{{$t}}'{{end}}, 'createdAt': string, 'data': {{phpData .Data}}, 'version'?: string, 'teamId'?: int, 'attempt'?: int}{{end}}
 
  */
 final class Webhooks

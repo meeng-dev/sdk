@@ -9,7 +9,7 @@ import json
 import math
 import time
 from collections.abc import Mapping
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from . import models
 from ._errors import WebhookVerificationError, WebhookVerificationErrorCode
@@ -40,6 +40,9 @@ class ContactWebhookEvent(TypedDict):
     type: Literal["contact.created", "contact.updated", "contact.deleted"]
     createdAt: str
     data: models.ContactPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class DomainWebhookEvent(TypedDict):
@@ -49,6 +52,9 @@ class DomainWebhookEvent(TypedDict):
     type: Literal["domain.created", "domain.verified", "domain.updated", "domain.deleted"]
     createdAt: str
     data: models.DomainPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class EmailWebhookEvent(TypedDict):
@@ -58,6 +64,9 @@ class EmailWebhookEvent(TypedDict):
     type: Literal["email.queued", "email.sent", "email.delivery_delayed", "email.delivered", "email.rejected", "email.rendering_failure", "email.complained", "email.cancelled"]
     createdAt: str
     data: models.EmailBasePayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class EmailBouncedWebhookEvent(TypedDict):
@@ -67,6 +76,9 @@ class EmailBouncedWebhookEvent(TypedDict):
     type: Literal["email.bounced"]
     createdAt: str
     data: models.EmailBouncedPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class EmailClickedWebhookEvent(TypedDict):
@@ -76,6 +88,9 @@ class EmailClickedWebhookEvent(TypedDict):
     type: Literal["email.clicked"]
     createdAt: str
     data: models.EmailClickedPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class EmailFailedWebhookEvent(TypedDict):
@@ -85,6 +100,9 @@ class EmailFailedWebhookEvent(TypedDict):
     type: Literal["email.failed"]
     createdAt: str
     data: models.EmailFailedPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class EmailOpenedWebhookEvent(TypedDict):
@@ -94,6 +112,9 @@ class EmailOpenedWebhookEvent(TypedDict):
     type: Literal["email.opened"]
     createdAt: str
     data: models.EmailOpenedPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class EmailSuppressedWebhookEvent(TypedDict):
@@ -103,6 +124,9 @@ class EmailSuppressedWebhookEvent(TypedDict):
     type: Literal["email.suppressed"]
     createdAt: str
     data: models.EmailSuppressedPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 class TestWebhookEvent(TypedDict):
@@ -112,6 +136,9 @@ class TestWebhookEvent(TypedDict):
     type: Literal["webhook.test"]
     createdAt: str
     data: models.WebhookTestPayload
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 
 
 WebhookEvent = ContactWebhookEvent | DomainWebhookEvent | EmailWebhookEvent | EmailBouncedWebhookEvent | EmailClickedWebhookEvent | EmailFailedWebhookEvent | EmailOpenedWebhookEvent | EmailSuppressedWebhookEvent | TestWebhookEvent

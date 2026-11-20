@@ -163,34 +163,32 @@ public final class Webhooks {
             if (data == null) {
                 data = Map.of();
             }
+            String version = Json.optional(event, "version", Json::asString);
+            Long teamId = Json.optional(event, "teamId", Json::asLong);
+            Long attempt = Json.optional(event, "attempt", Json::asLong);
+            WebhookEvent read;
             if (ContactWebhookEvent.TYPES.contains(type)) {
-                return ContactWebhookEvent.fromJson(id, type, createdAt, data);
+                read = ContactWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (DomainWebhookEvent.TYPES.contains(type)) {
+                read = DomainWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (EmailWebhookEvent.TYPES.contains(type)) {
+                read = EmailWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (EmailBouncedWebhookEvent.TYPES.contains(type)) {
+                read = EmailBouncedWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (EmailClickedWebhookEvent.TYPES.contains(type)) {
+                read = EmailClickedWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (EmailFailedWebhookEvent.TYPES.contains(type)) {
+                read = EmailFailedWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (EmailOpenedWebhookEvent.TYPES.contains(type)) {
+                read = EmailOpenedWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (EmailSuppressedWebhookEvent.TYPES.contains(type)) {
+                read = EmailSuppressedWebhookEvent.fromJson(id, type, createdAt, data);
+            } else if (TestWebhookEvent.TYPES.contains(type)) {
+                read = TestWebhookEvent.fromJson(id, type, createdAt, data);
+            } else {
+                read = new UnknownWebhookEvent(id, type, createdAt, data);
             }
-            if (DomainWebhookEvent.TYPES.contains(type)) {
-                return DomainWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            if (EmailWebhookEvent.TYPES.contains(type)) {
-                return EmailWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            if (EmailBouncedWebhookEvent.TYPES.contains(type)) {
-                return EmailBouncedWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            if (EmailClickedWebhookEvent.TYPES.contains(type)) {
-                return EmailClickedWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            if (EmailFailedWebhookEvent.TYPES.contains(type)) {
-                return EmailFailedWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            if (EmailOpenedWebhookEvent.TYPES.contains(type)) {
-                return EmailOpenedWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            if (EmailSuppressedWebhookEvent.TYPES.contains(type)) {
-                return EmailSuppressedWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            if (TestWebhookEvent.TYPES.contains(type)) {
-                return TestWebhookEvent.fromJson(id, type, createdAt, data);
-            }
-            return new UnknownWebhookEvent(id, type, createdAt, data);
+            return read.withEnvelope(version, teamId, attempt == null ? null : Integer.valueOf(attempt.intValue()));
         } catch (IllegalStateException e) {
             throw new WebhookVerificationException("INVALID_JSON", "Webhook payload is not valid JSON: " + e.getMessage());
         }

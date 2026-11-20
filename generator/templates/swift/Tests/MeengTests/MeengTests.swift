@@ -260,7 +260,7 @@ final class MeengTests: XCTestCase {
     #if canImport(CryptoKit)
         static let secret = "whsec_test"
         static let body = Data(
-            #"{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}"#
+            #"{"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}"#
                 .utf8)
 
         static func sign(_ timestamp: String, _ body: Data = body, _ secret: String = secret) -> String {
@@ -279,6 +279,9 @@ final class MeengTests: XCTestCase {
                 return XCTFail("not an email event")
             }
             XCTAssertEqual(event.type, "email.delivered")
+            XCTAssertEqual(event.version, "2026-01-18")
+            XCTAssertEqual(event.teamID, 7)
+            XCTAssertEqual(event.attempt, 2)
             XCTAssertEqual(event.data.to, ["a@x.com"])
             XCTAssertEqual(event.data.status, EmailBasePayloadStatus.delivered)
         }

@@ -97,43 +97,91 @@ public sealed class Webhooks
             var createdAt = root.GetProperty("createdAt").GetString()!;
             var data = root.GetProperty("data");
             var json = data.GetRawText();
+            var version = root.TryGetProperty("version", out var versionElement) && versionElement.ValueKind == JsonValueKind.String ? versionElement.GetString() : null;
+            long? teamId = root.TryGetProperty("teamId", out var teamElement) && teamElement.ValueKind == JsonValueKind.Number ? teamElement.GetInt64() : null;
+            int? attempt = root.TryGetProperty("attempt", out var attemptElement) && attemptElement.ValueKind == JsonValueKind.Number ? attemptElement.GetInt32() : null;
             if (ContactWebhookEvent.Types.Contains(type))
             {
-                return new ContactWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.ContactPayload)!);
+                return new ContactWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.ContactPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (DomainWebhookEvent.Types.Contains(type))
             {
-                return new DomainWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.DomainPayload)!);
+                return new DomainWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.DomainPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (EmailWebhookEvent.Types.Contains(type))
             {
-                return new EmailWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailBasePayload)!);
+                return new EmailWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailBasePayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (EmailBouncedWebhookEvent.Types.Contains(type))
             {
-                return new EmailBouncedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailBouncedPayload)!);
+                return new EmailBouncedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailBouncedPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (EmailClickedWebhookEvent.Types.Contains(type))
             {
-                return new EmailClickedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailClickedPayload)!);
+                return new EmailClickedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailClickedPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (EmailFailedWebhookEvent.Types.Contains(type))
             {
-                return new EmailFailedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailFailedPayload)!);
+                return new EmailFailedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailFailedPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (EmailOpenedWebhookEvent.Types.Contains(type))
             {
-                return new EmailOpenedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailOpenedPayload)!);
+                return new EmailOpenedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailOpenedPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (EmailSuppressedWebhookEvent.Types.Contains(type))
             {
-                return new EmailSuppressedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailSuppressedPayload)!);
+                return new EmailSuppressedWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.EmailSuppressedPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
             if (TestWebhookEvent.Types.Contains(type))
             {
-                return new TestWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.WebhookTestPayload)!);
+                return new TestWebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.WebhookTestPayload)!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
-            return new UnknownWebhookEvent(id, type, createdAt, data.Clone());
+            return new UnknownWebhookEvent(id, type, createdAt, data.Clone()) { Version = version, TeamId = teamId, Attempt = attempt };
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException)
         {

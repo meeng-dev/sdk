@@ -15,12 +15,21 @@ import (
 	"time"
 )
 
-// WebhookMessage is what every webhook carries besides its data: the event's
-// id, its type, and when it was created, in RFC 3339.
+// WebhookMessage is what every webhook carries besides its data: the id of the
+// delivery, the event's type, when it was created (RFC 3339), and the version,
+// team and attempt of the delivery -- each zero when an older server sent none.
 type WebhookMessage struct {
+	// ID is the id of the delivery: the same on every attempt, so a receiver
+	// can deduplicate by it.
 	ID        string `json:"id"`
 	Type      string `json:"type"`
 	CreatedAt string `json:"createdAt"`
+	// Version is the version of the payload's shape, such as 2026-01-18.
+	Version string `json:"version"`
+	// TeamID is the team the event belongs to.
+	TeamID int64 `json:"teamId"`
+	// Attempt is which delivery attempt this is, from 1 to 6.
+	Attempt int `json:"attempt"`
 }
 
 // Message answers the id, type and creation time of an event.

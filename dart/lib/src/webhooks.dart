@@ -16,9 +16,24 @@ sealed class WebhookEvent {
     required this.id,
     required this.type,
     required this.createdAt,
+    this.version,
+    this.teamId,
+    this.attempt,
   });
 
-  /// The event's id.
+  /// The version of the payload's shape, such as `2026-01-18`; null when an
+  /// older server sent none.
+  final String? version;
+
+  /// The team the event belongs to; null when an older server sent none.
+  final int? teamId;
+
+  /// Which delivery attempt this is, from 1 to 6; null when an older server
+  /// sent none.
+  final int? attempt;
+
+  /// The id of the delivery: the same on every attempt, so a receiver can
+  /// deduplicate by it.
   final String id;
 
   /// What happened, such as `email.delivered`.
@@ -34,6 +49,9 @@ final class ContactWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -54,6 +72,9 @@ final class DomainWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -75,6 +96,9 @@ final class EmailWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -100,6 +124,9 @@ final class EmailBouncedWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -116,6 +143,9 @@ final class EmailClickedWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -132,6 +162,9 @@ final class EmailFailedWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -148,6 +181,9 @@ final class EmailOpenedWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -164,6 +200,9 @@ final class EmailSuppressedWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -180,6 +219,9 @@ final class TestWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -196,6 +238,9 @@ final class UnknownWebhookEvent extends WebhookEvent {
     required super.id,
     required super.type,
     required super.createdAt,
+    super.version,
+    super.teamId,
+    super.attempt,
     required this.data,
   });
 
@@ -288,11 +333,19 @@ class Webhooks {
       final type = readString(event['type']);
       final createdAt = readString(event['createdAt']);
       final data = event['data'];
+      final version = event['version'] is String
+          ? event['version'] as String
+          : null;
+      final teamId = event['teamId'] is int ? event['teamId'] as int : null;
+      final attempt = event['attempt'] is int ? event['attempt'] as int : null;
       if (ContactWebhookEvent.types.contains(type)) {
         return ContactWebhookEvent(
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: ContactPayload.fromJson(readObject(data)),
         );
       }
@@ -301,6 +354,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: DomainPayload.fromJson(readObject(data)),
         );
       }
@@ -309,6 +365,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: EmailBasePayload.fromJson(readObject(data)),
         );
       }
@@ -317,6 +376,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: EmailBouncedPayload.fromJson(readObject(data)),
         );
       }
@@ -325,6 +387,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: EmailClickedPayload.fromJson(readObject(data)),
         );
       }
@@ -333,6 +398,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: EmailFailedPayload.fromJson(readObject(data)),
         );
       }
@@ -341,6 +409,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: EmailOpenedPayload.fromJson(readObject(data)),
         );
       }
@@ -349,6 +420,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: EmailSuppressedPayload.fromJson(readObject(data)),
         );
       }
@@ -357,6 +431,9 @@ class Webhooks {
           id: id,
           type: type,
           createdAt: createdAt,
+          version: version,
+          teamId: teamId,
+          attempt: attempt,
           data: WebhookTestPayload.fromJson(readObject(data)),
         );
       }
@@ -364,6 +441,9 @@ class Webhooks {
         id: id,
         type: type,
         createdAt: createdAt,
+        version: version,
+        teamId: teamId,
+        attempt: attempt,
         data: data,
       );
     } on FormatException catch (error) {

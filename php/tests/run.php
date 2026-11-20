@@ -173,7 +173,7 @@ $tests['the address must be https, except to localhost'] = static function (): v
 };
 
 const WEBHOOK_SECRET = 'whsec_test';
-const WEBHOOK_BODY = '{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}';
+const WEBHOOK_BODY = '{"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}';
 
 function sign(string $timestamp, string $body = WEBHOOK_BODY, string $secret = WEBHOOK_SECRET): string
 {
@@ -187,6 +187,7 @@ $tests['a signed webhook is verified and read as an event'] = static function ()
     check($webhooks->verify(WEBHOOK_BODY, $headers), 'verify');
     $event = $webhooks->constructEvent(WEBHOOK_BODY, $headers);
     check($event['type'] === 'email.delivered' && $event['data']['to'] === ['a@x.com'], 'event');
+    check($event['version'] === '2026-01-18' && $event['teamId'] === 7 && $event['attempt'] === 2, 'envelope');
 };
 
 $tests['the useSend headers are accepted as well, in any case'] = static function (): void {

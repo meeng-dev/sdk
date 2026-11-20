@@ -177,7 +177,7 @@ class MeengTest < Minitest::Test
   end
 
   SECRET = "whsec_test"
-  BODY = '{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}'
+  BODY = '{"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}'
 
   def sign(timestamp, text = BODY, secret = SECRET)
     "v1=#{OpenSSL::HMAC.hexdigest("SHA256", secret, "#{timestamp}.#{text}")}"
@@ -190,6 +190,7 @@ class MeengTest < Minitest::Test
     assert webhooks.verify(BODY, headers: headers)
     event = webhooks.construct_event(BODY, headers: headers)
     assert_equal "email.delivered", event[:type]
+    assert_equal ["2026-01-18", 7, 2], event.values_at(:version, :teamId, :attempt)
     assert_equal ["a@x.com"], event[:data][:to]
   end
 

@@ -97,13 +97,21 @@ public sealed class Webhooks
             var createdAt = root.GetProperty("createdAt").GetString()!;
             var data = root.GetProperty("data");
             var json = data.GetRawText();
+            var version = root.TryGetProperty("version", out var versionElement) && versionElement.ValueKind == JsonValueKind.String ? versionElement.GetString() : null;
+            long? teamId = root.TryGetProperty("teamId", out var teamElement) && teamElement.ValueKind == JsonValueKind.Number ? teamElement.GetInt64() : null;
+            int? attempt = root.TryGetProperty("attempt", out var attemptElement) && attemptElement.ValueKind == JsonValueKind.Number ? attemptElement.GetInt32() : null;
 {{- range .Webhooks}}
             if ({{.Name}}WebhookEvent.Types.Contains(type))
             {
-                return new {{.Name}}WebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.{{csTypeInfo .Data}})!);
+                return new {{.Name}}WebhookEvent(id, type, createdAt, JsonSerializer.Deserialize(json, MeengJson.Default.{{csTypeInfo .Data}})!)
+                {
+                    Version = version,
+                    TeamId = teamId,
+                    Attempt = attempt,
+                };
             }
 {{- end}}
-            return new UnknownWebhookEvent(id, type, createdAt, data.Clone());
+            return new UnknownWebhookEvent(id, type, createdAt, data.Clone()) { Version = version, TeamId = teamId, Attempt = attempt };
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException)
         {

@@ -336,7 +336,7 @@ fn the_standard_http_transport_sends_a_body_on_a_delete_and_never_follows_a_redi
 }
 
 const SECRET: &str = "whsec_test";
-const BODY: &str = r#"{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}"#;
+const BODY: &str = r#"{"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}"#;
 
 fn sign(timestamp: &str, body: &str, secret: &str) -> String {
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
@@ -369,6 +369,10 @@ fn a_signed_webhook_is_verified_and_read_as_a_typed_event() {
     match webhooks.construct_event(BODY.as_bytes(), headers).unwrap() {
         WebhookEvent::Email(event) => {
             assert_eq!(event.type_, "email.delivered");
+            assert_eq!(
+                (event.version.as_deref(), event.team_id, event.attempt),
+                (Some("2026-01-18"), Some(7), Some(2))
+            );
             assert_eq!(event.data.to, vec!["a@x.com".to_owned()]);
             assert_eq!(event.data.status.as_str(), "DELIVERED");
         }

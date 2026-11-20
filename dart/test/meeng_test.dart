@@ -350,7 +350,7 @@ void main() {
 
   const secret = 'whsec_test';
   const body =
-      '{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}';
+      '{"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}';
   String sign(String timestamp, [String text = body, String key = secret]) =>
       'v1=${Hmac(sha256, utf8.encode(key)).convert(utf8.encode('$timestamp.$text'))}';
 
@@ -365,6 +365,7 @@ void main() {
     final event = webhooks.constructEvent(body, headers);
     expect(event, isA<EmailWebhookEvent>());
     expect(event.type, 'email.delivered');
+    expect([event.version, event.teamId, event.attempt], ['2026-01-18', 7, 2]);
     expect((event as EmailWebhookEvent).data.to, ['a@x.com']);
     expect(event.data.status, 'DELIVERED');
   });

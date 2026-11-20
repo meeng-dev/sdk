@@ -6,8 +6,9 @@ import Foundation
     import CryptoKit
 #endif
 
-/// What every webhook carries: the event's id, its type, when it was created
-/// and its data.
+/// What every webhook carries: the id of the delivery (the same on every attempt,
+/// so a receiver can deduplicate by it), the event's type, when it was created,
+/// the version, team and attempt of the delivery, and its data.
 public struct WebhookMessage<Payload: Codable & Sendable & Hashable>: Codable, Sendable, Hashable {
     /// The event's id.
     public let id: String
@@ -15,14 +16,28 @@ public struct WebhookMessage<Payload: Codable & Sendable & Hashable>: Codable, S
     public let type: String
     /// When the event was created, in RFC 3339.
     public let createdAt: String
+    /// The version of the payload's shape, such as `2026-01-18`; nil when an older server sent none.
+    public let version: String?
+    /// The team the event belongs to; nil when an older server sent none.
+    public let teamID: Int?
+    /// Which delivery attempt this is, from 1 to 6; nil when an older server sent none.
+    public let attempt: Int?
     /// What the event carries.
     public let data: Payload
 
-    public init(id: String, type: String, createdAt: String, data: Payload) {
+    public init(id: String, type: String, createdAt: String, version: String? = nil, teamID: Int? = nil, attempt: Int? = nil, data: Payload) {
         self.id = id
         self.type = type
         self.createdAt = createdAt
+        self.version = version
+        self.teamID = teamID
+        self.attempt = attempt
         self.data = data
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, createdAt, version, attempt, data
+        case teamID = "teamId"
     }
 }
 {{range .Webhooks}}
@@ -37,6 +52,12 @@ public struct UnknownWebhookEvent: Sendable, Hashable {
     public let createdAt: String
     /// The whole body, as JSON.
     public let body: Data
+    /// The version of the payload's shape; nil when an older server sent none.
+    public let version: String?
+    /// The team the event belongs to; nil when an older server sent none.
+    public let teamID: Int?
+    /// Which delivery attempt this is, from 1 to 6; nil when an older server sent none.
+    public let attempt: Int?
 }
 
 /// A webhook meeng sent, verified: one case a kind of data, the event's type
@@ -84,6 +105,9 @@ public enum WebhookEvent: Sendable, Hashable {
         let id: String
         let type: String
         let createdAt: String
+        let version: String?
+        let teamId: Int?
+        let attempt: Int?
     }
 
     /// Reads a verified body into the event its type names.
@@ -95,7 +119,10 @@ public enum WebhookEvent: Sendable, Hashable {
             return .{{swLower .Name}}(try JSONDecoder().decode({{.Name}}WebhookEvent.self, from: body))
 {{- end}}
         default:
-            return .unknown(UnknownWebhookEvent(id: header.id, type: header.type, createdAt: header.createdAt, body: body))
+            return .unknown(
+                UnknownWebhookEvent(
+                    id: header.id, type: header.type, createdAt: header.createdAt, body: body, version: header.version,
+                    teamID: header.teamId, attempt: header.attempt))
         }
     }
 }

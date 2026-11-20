@@ -235,7 +235,7 @@ public class MeengTests
     }
 
     private const string Secret = "whsec_test";
-    private const string Body = """{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}""";
+    private const string Body = """{"id":"evt_1","type":"email.delivered","version":"2026-01-18","createdAt":"2026-11-20T12:00:00Z","teamId":7,"attempt":2,"data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}""";
 
     private static string Sign(string timestamp, string text = Body, string secret = Secret) =>
         "v1=" + Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes($"{timestamp}.{text}"))).ToLowerInvariant();
@@ -249,6 +249,7 @@ public class MeengTests
         Assert.True(webhooks.Verify(Body, headers));
         var delivered = Assert.IsType<EmailWebhookEvent>(webhooks.ConstructEvent(Body, headers));
         Assert.Equal("email.delivered", delivered.Type);
+        Assert.Equal(("2026-01-18", 7L, 2), (delivered.Version, delivered.TeamId, delivered.Attempt));
         Assert.Equal(["a@x.com"], delivered.Data.To);
         Assert.Equal(EmailBasePayload.StatusDelivered, delivered.Data.Status);
     }

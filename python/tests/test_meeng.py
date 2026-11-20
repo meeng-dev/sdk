@@ -170,7 +170,7 @@ class MeengTest(unittest.TestCase):
 
 
 SECRET = "whsec_test"
-BODY = json.dumps({"id": "evt_1", "type": "email.delivered", "createdAt": "2026-11-20T12:00:00Z", "data": {"id": "em_1", "status": "DELIVERED", "from": "h@acme.com", "to": ["a@x.com"], "occurredAt": "2026-11-20T12:00:00Z"}})
+BODY = json.dumps({"id": "evt_1", "type": "email.delivered", "version": "2026-01-18", "createdAt": "2026-11-20T12:00:00Z", "teamId": 7, "attempt": 2, "data": {"id": "em_1", "status": "DELIVERED", "from": "h@acme.com", "to": ["a@x.com"], "occurredAt": "2026-11-20T12:00:00Z"}})
 
 
 def sign(timestamp, text=BODY, secret=SECRET):
@@ -186,6 +186,7 @@ class WebhookTest(unittest.TestCase):
         self.assertTrue(webhooks.verify(BODY.encode(), headers=headers))
         event = webhooks.construct_event(BODY, headers=headers)
         self.assertEqual(event["type"], "email.delivered")
+        self.assertEqual((event["version"], event["teamId"], event["attempt"]), ("2026-01-18", 7, 2))
         self.assertEqual(event["data"]["to"], ["a@x.com"])
 
     def test_the_usesend_headers_are_accepted_as_well_in_any_case(self):

@@ -4,12 +4,18 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { ContactPayload, DomainPayload, EmailBasePayload, EmailBouncedPayload, EmailClickedPayload, EmailFailedPayload, EmailOpenedPayload, EmailSuppressedPayload, WebhookTestPayload } from "./models.ts";
 
-/** What every webhook carries: the event's id, its type, when it was created and its data. */
+/** What every webhook carries: the id of the delivery (the same on every attempt, so a receiver can deduplicate by it), the event's type, when it was created and its data. */
 export interface WebhookMessage<Type extends string, Data> {
   id: string;
   type: Type;
   createdAt: string;
   data: Data;
+  /** The version of the payload's shape, such as "2026-01-18". */
+  version?: string;
+  /** The team the event belongs to. */
+  teamId?: number;
+  /** Which delivery attempt this is, from 1 to 6; the id is the same on every attempt. */
+  attempt?: number;
 }
 
 /** The events that carry a ContactPayload. */

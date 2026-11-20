@@ -214,7 +214,7 @@ class MeengTest {
     }
 
     private static final String SECRET = "whsec_test";
-    private static final String BODY = "{\"id\":\"evt_1\",\"type\":\"email.delivered\",\"createdAt\":\"2026-11-20T12:00:00Z\",\"data\":{\"id\":\"em_1\",\"status\":\"DELIVERED\",\"from\":\"h@acme.com\",\"to\":[\"a@x.com\"],\"occurredAt\":\"2026-11-20T12:00:00Z\"}}";
+    private static final String BODY = "{\"id\":\"evt_1\",\"type\":\"email.delivered\",\"version\":\"2026-01-18\",\"createdAt\":\"2026-11-20T12:00:00Z\",\"teamId\":7,\"attempt\":2,\"data\":{\"id\":\"em_1\",\"status\":\"DELIVERED\",\"from\":\"h@acme.com\",\"to\":[\"a@x.com\"],\"occurredAt\":\"2026-11-20T12:00:00Z\"}}";
 
     private static String sign(String timestamp, String text, String secret) {
         try {
@@ -239,6 +239,9 @@ class MeengTest {
         WebhookEvent event = webhooks.constructEvent(BODY, headers);
         EmailWebhookEvent delivered = assertInstanceOf(EmailWebhookEvent.class, event);
         assertEquals("email.delivered", delivered.getType());
+        assertEquals("2026-01-18", delivered.getVersion());
+        assertEquals(7L, delivered.getTeamId());
+        assertEquals(2, delivered.getAttempt());
         assertEquals(List.of("a@x.com"), delivered.getData().getTo());
     }
 

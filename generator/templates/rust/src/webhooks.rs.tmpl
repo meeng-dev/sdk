@@ -29,8 +29,9 @@ const SIGNATURE_PREFIX: &str = "v1=";
 /// How far from now, in milliseconds, a webhook's timestamp may be by default.
 pub const WEBHOOK_TOLERANCE_MS: i64 = 5 * 60 * 1000;
 
-/// What every webhook carries: the event's id, its type, when it was created
-/// and its data.
+/// What every webhook carries: the id of the delivery (the same on every
+/// attempt, so a receiver can deduplicate by it), the event's type, when it was
+/// created, the version, team and attempt of the delivery, and its data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct WebhookMessage<T> {
@@ -42,6 +43,16 @@ pub struct WebhookMessage<T> {
     /// When the event was created, in RFC 3339.
     #[serde(rename = "createdAt")]
     pub created_at: String,
+    /// The version of the payload's shape, such as `2026-01-18`; `None` when an
+    /// older server sent none.
+    #[serde(default)]
+    pub version: Option<String>,
+    /// The team the event belongs to.
+    #[serde(default, rename = "teamId")]
+    pub team_id: Option<i64>,
+    /// Which delivery attempt this is, from 1 to 6.
+    #[serde(default)]
+    pub attempt: Option<u32>,
     /// What the event carries.
     pub data: T,
 }

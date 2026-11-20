@@ -35,7 +35,9 @@ defmodule Meeng.Webhooks do
   and `X-Meeng-Call` the id of the delivery attempt. The app also sends the
   `X-UseSend-*` ones, which are read when the meeng ones are missing.
 
-  The events, by `type` (the data of each is a map with the API's own names):
+  An event is a map with `"id"` (the id of the delivery, the same on every attempt),
+  `"type"`, `"version"`, `"createdAt"`, `"teamId"`, `"attempt"` (1 to 6) and `"data"`. The
+  events, by `type` (the data of each is a map with the API's own names):
 {{range .Webhooks}}
     * {{range $i, $t := .Types}}{{if $i}}, {{end}}`{{$t}}`{{end}}: {{if eq .Data.Kind "model"}}{{article .Data.Model}}{{else}}the event's identifiers{{end}}
 {{- end}}

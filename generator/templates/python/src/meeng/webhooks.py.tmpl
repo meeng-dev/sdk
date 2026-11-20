@@ -9,7 +9,7 @@ import json
 import math
 import time
 from collections.abc import Mapping
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from . import models
 from ._errors import WebhookVerificationError, WebhookVerificationErrorCode
@@ -40,6 +40,9 @@ class {{.Name}}WebhookEvent(TypedDict):
     type: Literal[{{range $i, $t := .Types}}{{if $i}}, {{end}}{{quote $t}}{{end}}]
     createdAt: str
     data: models.{{.Data.Model}}
+    version: NotRequired[str]
+    teamId: NotRequired[int]
+    attempt: NotRequired[int]
 {{end}}
 
 WebhookEvent = {{range $i, $g := .Webhooks}}{{if $i}} | {{end}}{{.Name}}WebhookEvent{{end}}
