@@ -2,52 +2,63 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
 import 'core.dart';
+import 'env_stub.dart' if (dart.library.io) 'env_io.dart';
 import 'errors.dart';
 import 'services.dart';
 import 'version.dart';
+import 'webhooks.dart';
 
 /// A browser sets the User-Agent itself and refuses one from a script.
 const _web = bool.fromEnvironment('dart.library.js_interop');
 
-/// meeng's API with one organization's API key.
-///
-/// The key says the organization and the environment: `prk_test_…` is the
-/// test environment, `prk_live_…` the live one.
+/// meeng's API with one team's API key. Without a key it is read from
+/// `MEENG_API_KEY`, and the address of the app from `MEENG_BASE_URL`.
 ///
 /// ```dart
-/// final meeng = Meeng(apiKey);
-/// final product = await meeng.products.create(
-///   const ProductsCreateParams(name: 'Curso'),
+/// final meeng = Meeng(apiKey: 'mg_123');
+/// final sent = await meeng.emails.send(
+///   const EmailsSendParams(
+///     from: 'hello@acme.com',
+///     to: ['customer@example.com'],
+///     subject: 'Hello',
+///     html: '<p>Hello</p>',
+///   ),
 /// );
-/// await for (final product in meeng.products.listIter()) { … }
 /// meeng.close();
 /// ```
 class Meeng implements Requester {
-  /// A client for the organization [apiKey] belongs to.
+  /// A client for the team [apiKey] belongs to.
   ///
-  /// [baseUrl] points it at another address, such as a local server; it
-  /// must be https, or http only for localhost, 127.0.0.0/8 and ::1, and any
-  /// other throws an [ArgumentError];
-  /// [httpClient] sends the requests, a new `http.Client` by default;
-  /// [timeout] is how long a call may take, 30 seconds by default.
-  Meeng(
-    String apiKey, {
-    String baseUrl = defaultBaseUrl,
+  /// [baseUrl] points it at another app, such as a self-hosted one: the
+  /// address of the app, without `/api/v1`. It must be https, or http only for
+  /// localhost, 127.0.0.0/8 and ::1, and any other throws an [ArgumentError].
+  /// [httpClient] sends the requests, a new `http.Client` by default; [timeout]
+  /// is how long a call may take, 30 seconds by default.
+  Meeng({
+    String? apiKey,
+    String? baseUrl,
     http.Client? httpClient,
     Duration timeout = const Duration(seconds: 30),
-  }) : _apiKey = apiKey,
-       _baseUrl = _checkedBaseUrl(baseUrl.replaceFirst(RegExp(r'/+$'), '')),
+  }) : key = _requiredKey(apiKey),
+       url =
+           _checkedBaseUrl(
+             (baseUrl ?? environment('MEENG_BASE_URL') ?? defaultBaseUrl)
+                 .replaceFirst(RegExp(r'/+$'), ''),
+           ) +
+           apiPrefix,
        _http = httpClient ?? http.Client(),
        _ownsHttp = httpClient == null,
        _timeout = timeout;
 
-  final String _apiKey;
-  final String _baseUrl;
+  /// The API key.
+  final String key;
+
+  /// The address every call goes to, with the API prefix.
+  final String url;
   final http.Client _http;
   final bool _ownsHttp;
   final Duration _timeout;
@@ -55,6 +66,9 @@ class Meeng implements Requester {
   /// The API's {{.Name}}.
   late final {{dartName .Name}} = {{pascal .Name}}Service(this);
 {{end}}
+  /// Checks and reads the webhooks a team's endpoint receives.
+  Webhooks webhooks(String secret) => Webhooks(secret);
+
   /// Closes the HTTP client, unless it was given to this one.
   void close() {
     if (_ownsHttp) {
@@ -62,39 +76,38 @@ class Meeng implements Requester {
     }
   }
 
-  /// Calls the API and answers what it wrapped in `data`.
+  /// Calls the API and answers its JSON, decoded.
   ///
   /// A refusal throws [MeengException]; a call that takes longer than the
   /// timeout, a [TimeoutException].
   @override
-  Future<Map<String, Object?>> request(
+  Future<Object?> request(
     String method,
     String path, {
     Map<String, Object?> query = const {},
-    Map<String, Object?>? body,
+    Object? body,
     String? idempotencyKey,
-    String? apiKey,
   }) async {
-    final parameters = <String, String>{};
+    final pairs = <MapEntry<String, String>>[];
     for (final MapEntry(:key, :value) in query.entries) {
-      if (value is Map<String, String>) {
-        // A map filter is one pair a key: metadata[pedido]=123, the keys
-        // sorted.
-        for (final each in value.keys.toList()..sort()) {
-          if (value[each] != '') {
-            parameters['$key[$each]'] = value[each]!;
-          }
+      // A list is sent once for each value: name=a&name=b.
+      for (final each in value is List<Object?> ? value : [value]) {
+        if (each != null && each != '') {
+          pairs.add(MapEntry(key, '$each'));
         }
-      } else if (value != null && value != '') {
-        parameters[key] = '$value';
       }
     }
-    final url = Uri.parse('$_baseUrl$path');
-    final request = http.Request(
-      method,
-      parameters.isEmpty ? url : url.replace(queryParameters: parameters),
-    )..followRedirects = false;
-    request.headers['Authorization'] = 'Bearer ${apiKey ?? _apiKey}';
+    final target = StringBuffer('$url$path');
+    var separator = '?';
+    for (final MapEntry(:key, :value) in pairs) {
+      target.write(
+        '$separator${Uri.encodeQueryComponent(key)}=${Uri.encodeQueryComponent(value)}',
+      );
+      separator = '&';
+    }
+    final request = http.Request(method, Uri.parse(target.toString()))
+      ..followRedirects = false;
+    request.headers['Authorization'] = 'Bearer $key';
     request.headers['Accept'] = 'application/json';
     if (!_web) {
       request.headers['User-Agent'] = 'meeng-dart/$sdkVersion';
@@ -103,13 +116,8 @@ class Meeng implements Requester {
       request.headers['Content-Type'] = 'application/json';
       request.bodyBytes = utf8.encode(jsonEncode(body));
     }
-    // A POST is sent with a key of its own, one a call, unless the caller
-    // gave one.
-    final key = idempotencyKey != null && idempotencyKey.isNotEmpty
-        ? idempotencyKey
-        : (method == 'POST' ? _uuid() : null);
-    if (key != null) {
-      request.headers['Idempotency-Key'] = key;
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      request.headers['Idempotency-Key'] = idempotencyKey;
     }
     final response = await _send(request).timeout(_timeout);
     if (response.statusCode >= 300) {
@@ -119,14 +127,19 @@ class Meeng implements Requester {
         response.bodyBytes,
       );
     }
-    if (response.statusCode == 204) {
-      return const {};
+    return jsonDecode(utf8.decode(response.bodyBytes));
+  }
+
+  static String _requiredKey(String? apiKey) {
+    final key = apiKey != null && apiKey.isNotEmpty
+        ? apiKey
+        : environment('MEENG_API_KEY');
+    if (key == null) {
+      throw ArgumentError(
+        'Missing API key. Pass it as `Meeng(apiKey: "mg_123")` or set MEENG_API_KEY',
+      );
     }
-    final envelope = jsonDecode(utf8.decode(response.bodyBytes));
-    if (envelope case {'data': final Map<String, Object?> data}) {
-      return data;
-    }
-    throw const FormatException('meeng: the answer has no data object');
+    return key;
   }
 
   /// [baseUrl] if it is https, or http to localhost, 127.0.0.0/8 or ::1.
@@ -150,19 +163,6 @@ class Meeng implements Requester {
       'baseUrl',
       'meeng: the base URL must be https (http is accepted only for localhost, 127.0.0.0/8 and ::1), so the API key is never sent in clear text',
     );
-  }
-
-  /// A random UUID (version 4).
-  static String _uuid() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    String hex(int from, int to) => bytes
-        .sublist(from, to)
-        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
-        .join();
-    return '${hex(0, 4)}-${hex(4, 6)}-${hex(6, 8)}-${hex(8, 10)}-${hex(10, 16)}';
   }
 
   Future<http.Response> _send(http.Request request) async =>

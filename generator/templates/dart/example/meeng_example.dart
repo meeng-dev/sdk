@@ -2,32 +2,24 @@ import 'dart:io';
 
 import 'package:meeng_sdk/meeng_sdk.dart';
 
-/// Creates a product and lists every product of the organization whose key
-/// is in MEENG_API_KEY. With MEENG_PRODUCT_ID and MEENG_PRICE_ID set, it
-/// also opens a checkout session, the server's half of the embedded checkout:
-/// only the client secret goes to the buyer's browser.
+/// Sends an email and lists the domains of the team whose key is in
+/// MEENG_API_KEY.
 Future<void> main() async {
-  final meeng = Meeng(Platform.environment['MEENG_API_KEY']!);
+  final meeng = Meeng();
   try {
-    final product = await meeng.products.create(
-      const ProductsCreateParams(name: 'Curso'),
-      idempotencyKey: 'produto-curso',
+    final sent = await meeng.emails.send(
+      const EmailsSendParams(
+        from: 'hello@acme.com',
+        to: ['customer@example.com'],
+        subject: 'Hello',
+        html: '<p>Hello</p>',
+      ),
+      idempotencyKey: 'welcome-1',
     );
-    stdout.writeln('created ${product.id}');
+    stdout.writeln('sent ${sent.emailId}');
 
-    await for (final product in meeng.products.listIter()) {
-      stdout.writeln(product.name);
-    }
-
-    final productId = Platform.environment['MEENG_PRODUCT_ID'];
-    final priceId = Platform.environment['MEENG_PRICE_ID'];
-    if (productId != null && priceId != null) {
-      final checkout = await meeng.checkouts.create(
-        CheckoutsCreateParams(productId: productId, priceId: priceId),
-      );
-      stdout.writeln('hosted checkout ${checkout.url}');
-      stdout.writeln('client secret for the browser ${checkout.clientSecret}');
-      stdout.writeln('status key ${checkout.statusKey}');
+    for (final domain in await meeng.domains.list()) {
+      stdout.writeln('${domain.name} ${domain.status}');
     }
   } on MeengException catch (error) {
     stderr.writeln(error);

@@ -1,0 +1,27 @@
+name: meeng_sdk
+version: 0.1.0
+description: >-
+  meeng's SDK for Dart and Flutter: emails, domains, contacts, contact books,
+  campaigns, analytics and webhook verification, with the same shape as
+  useSend's.
+homepage: https://meeng.dev
+repository: https://github.com/meeng-dev/sdk
+issue_tracker: https://github.com/meeng-dev/sdk/issues
+# Not published until the names are confirmed.
+publish_to: none
+topics:
+  - email
+  - api
+  - sdk
+  - webhooks
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  crypto: ^3.0.3
+  http: ^1.2.0
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.25.0

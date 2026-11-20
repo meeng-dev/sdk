@@ -6,6 +6,10 @@ const sdkVersion = {{quote .Version}};
 /// The contract this SDK was generated from.
 const apiVersion = {{quote .APIVersion}};
 
-/// Peráta's API. The environment, test or live, is the API key's:
-/// `prk_test_…` or `prk_live_…`.
+/// Where meeng's API lives. The client appends `{{.APIPrefix}}/v1` to it, so
+/// `MEENG_BASE_URL`, like the `baseUrl` argument, is the address of the app and
+/// nothing more.
 const defaultBaseUrl = {{quote .BaseURL}};
+
+/// What every path starts with, after the base URL.
+const apiPrefix = {{quote .APIPrefix}};

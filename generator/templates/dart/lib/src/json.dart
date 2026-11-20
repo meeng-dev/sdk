@@ -13,6 +13,9 @@ int readInt(Object? value) => value as int;
 /// [value] as a number.
 double readDouble(Object? value) => (value as num).toDouble();
 
+/// [value] as it is: free-form JSON.
+Object? readAny(Object? value) => value;
+
 /// [value] as a boolean.
 bool readBool(Object? value) => value as bool;
 
@@ -31,3 +34,7 @@ T? readOptional<T extends Object>(
   Object? value,
   T Function(Object? value) read,
 ) => value == null ? null : read(value);
+
+/// [value] as a list of strings that the API may write as one string.
+List<String> readStringList(Object? value) =>
+    value is String ? List.unmodifiable([value]) : readList(value, readString);

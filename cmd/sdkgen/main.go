@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -55,6 +56,27 @@ func main() {
 			fail(err)
 		}
 		fmt.Println("sdkgen: wrote", filepath.Join(*out, name))
+		if name == "dart" {
+			formatDart(filepath.Join(*out, name))
+		}
+	}
+}
+
+// formatDart runs `dart format` over the generated Dart, which is written
+// unformatted: the formatter's output is the one the committed files and the
+// gate (`dart format --set-exit-if-changed`) agree on. Without the Dart SDK on
+// the PATH the files are left as written, and the gate will say so.
+func formatDart(dir string) {
+	dart, err := exec.LookPath("dart")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "sdkgen: dart is not on the PATH, so the Dart SDK is left unformatted")
+		return
+	}
+	cmd := exec.Command(dart, "format", "--language-version=3.8", dir)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fail("sdkgen: dart format:", err)
 	}
 }
 

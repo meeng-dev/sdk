@@ -17,25 +17,21 @@ var dartKeywords = map[string]bool{
 
 // dartLocals are the names a service method gives its own parameters and
 // variables, which a path parameter or a filter cannot take.
-var dartLocals = map[string]bool{"at": true, "data": true, "page": true, "limit": true, "apiKey": true, "idempotencyKey": true, "params": true}
+var dartLocals = map[string]bool{"data": true, "idempotencyKey": true, "params": true, "query": true}
 
 func init() {
 	register(Language{Name: "dart", Funcs: template.FuncMap{
 		// quote writes a string literal, escaped the way dart reads it.
-		"quote":      dartQuote,
-		"dartType":   dartFieldType,
-		"dartBase":   dartBase,
-		"dartName":   dartName,
-		"dartParam":  dartParam,
-		"dartRead":   dartRead,
-		"dartWrite":  dartWrite,
-		"dartPath":   dartPath,
-		"dartParams": dartParams,
-		"dartText":   dartText,
-		// dartReadEntry and dartWriteEntry are a model's fromJson argument
-		// and toJson entry, wrapped as dart format wraps them.
-		"dartReadEntry":  func(f *Field) string { return dartEntry(6, dartName(f.Wire), dartRead(f)) },
-		"dartWriteEntry": func(f *Field) string { return dartEntry(4, dartQuote(f.Wire), dartWriteValue(f)) },
+		"quote":          dartQuote,
+		"dartType":       dartFieldType,
+		"dartBase":       dartBase,
+		"dartName":       dartName,
+		"dartParam":      dartParam,
+		"dartRead":       dartRead,
+		"dartPath":       dartPath,
+		"dartParams":     dartParams,
+		"dartText":       dartText,
+		"dartWriteValue": dartWriteValue,
 		"dartDoc":        dartDoc,
 		// dartDocBlock writes text as the lines of a doc comment, wrapped.
 		"dartDocBlock": func(prefix, text string) string { return docBlock(prefix, text, dartText) },
@@ -160,11 +156,14 @@ func dartReader(t *TypeRef) string {
 	case "model":
 		return "(value) => " + t.Model + ".fromJson(readObject(value))"
 	case "array":
+		if t.OrScalar {
+			return "readStringList"
+		}
 		return "(value) => readList(value, " + dartReader(t.Items) + ")"
 	case "map":
 		return "(value) => readMap(value, " + dartReader(t.Items) + ")"
 	}
-	return "(value) => value"
+	return "readAny"
 }
 
 // dartRead is the expression that reads a field out of a model's JSON. A
@@ -179,6 +178,9 @@ func dartRead(f *Field) string {
 		}
 		return value + " as " + dartBase(f.Type)
 	}
+	if f.Type.Kind == "any" {
+		return value
+	}
 	if optional {
 		return "readOptional(" + value + ", " + dartReader(f.Type) + ")"
 	}
@@ -188,17 +190,14 @@ func dartRead(f *Field) string {
 	case "model":
 		return f.Type.Model + ".fromJson(readObject(" + value + "))"
 	case "array":
+		if f.Type.OrScalar {
+			return "readStringList(" + value + ")"
+		}
 		return "readList(" + value + ", " + dartReader(f.Type.Items) + ")"
 	case "map":
 		return "readMap(" + value + ", " + dartReader(f.Type.Items) + ")"
 	}
 	return value
-}
-
-// dartWrite is a field's entry in a model's JSON. A field that is null and
-// may be left out is: the entry is null-aware.
-func dartWrite(f *Field) string {
-	return dartQuote(f.Wire) + ": " + dartWriteValue(f)
 }
 
 // dartWriteValue is the value of a field's toJson entry.
@@ -251,152 +250,44 @@ func dartPath(m *Method) string {
 	return b.String()
 }
 
-// dartParams is a service method's parameter list, split one a line as
-// dart format writes it: the path parameters and the body positional, the
-// rest named. variant is "list" for a page, "iter" for the walk over every
-// page, and "call" for any other method.
-func dartParams(m *Method, variant string) string {
+// dartParams is a service method's parameter list: the path parameters and
+// the body positional, the filters and the idempotency key named.
+func dartParams(m *Method) string {
 	var positional, named []string
 	for _, param := range m.PathParams {
 		positional = append(positional, "String "+dartParam(param))
 	}
-	switch variant {
-	case "list", "iter":
-		if variant == "iter" {
-			named = append(named, "int page = 1")
+	if m.Body != nil {
+		if m.BodyList {
+			positional = append(positional, "List<"+m.Body.Name+"> params")
 		} else {
-			named = append(named, "int? page")
-		}
-		named = append(named, "int? limit")
-		for _, query := range m.Query {
-			if query.Map {
-				named = append(named, "Map<String, String>? "+dartParam(query.Name))
-			} else {
-				named = append(named, "String? "+dartParam(query.Name))
-			}
-		}
-	default:
-		if m.Body != nil {
 			positional = append(positional, m.Body.Name+" params")
 		}
-		if m.Write {
-			named = append(named, "String? idempotencyKey")
+	}
+	for _, query := range m.Query {
+		switch query.Kind {
+		case "integer":
+			named = append(named, "int? "+dartParam(query.Name))
+		case "stringlist":
+			named = append(named, "List<String>? "+dartParam(query.Name))
+		default:
+			named = append(named, "String? "+dartParam(query.Name))
 		}
 	}
-	named = append(named, "String? apiKey")
+	if m.Idempotent {
+		named = append(named, "String? idempotencyKey")
+	}
 	var b strings.Builder
 	b.WriteString("(")
-	if len(positional) == 0 {
-		b.WriteString("{")
-	}
-	b.WriteString("\n")
-	for i, param := range positional {
-		b.WriteString("    " + param + ",")
-		if i == len(positional)-1 {
-			b.WriteString(" {")
+	b.WriteString(strings.Join(positional, ", "))
+	if len(named) > 0 {
+		if len(positional) > 0 {
+			b.WriteString(", ")
 		}
-		b.WriteString("\n")
+		b.WriteString("{" + strings.Join(named, ", ") + "}")
 	}
-	for _, param := range named {
-		b.WriteString("    " + param + ",\n")
-	}
-	b.WriteString("  })")
+	b.WriteString(")")
 	return b.String()
-}
-
-// dartLimit is the width dart format wraps lines at.
-const dartLimit = 80
-
-// splitTop splits text at the top-level occurrences of sep: those outside any
-// bracket or quote.
-func splitTop(text string, sep byte) []string {
-	var parts []string
-	depth, start := 0, 0
-	var quote byte
-	for i := 0; i < len(text); i++ {
-		c := text[i]
-		switch {
-		case quote != 0:
-			if c == '\\' {
-				i++
-			} else if c == quote {
-				quote = 0
-			}
-		case c == '\'' || c == '"':
-			quote = c
-		case c == '(' || c == '[' || c == '{':
-			depth++
-		case c == ')' || c == ']' || c == '}':
-			depth--
-		case c == sep && depth == 0:
-			parts = append(parts, text[start:i])
-			start = i + 1
-		}
-	}
-	return append(parts, text[start:])
-}
-
-// dartEntry is "key: value" as dart format lays it out at indent, without
-// the trailing comma: on one line when it fits, otherwise a call with its
-// arguments one a line, or a method chain one call a line.
-func dartEntry(indent int, key, value string) string {
-	line := key + ": " + value
-	pad := strings.Repeat(" ", indent)
-	if indent+len(line)+1 <= dartLimit {
-		return line
-	}
-	if open := strings.IndexByte(value, '('); open > 0 && strings.HasSuffix(value, ")") && !strings.Contains(value[:open], " ") {
-		// A chain of calls: the target, then one call a line.
-		chain := splitTop(value, '.')
-		if len(chain) > 2 {
-			lines := []string{key + ": " + strings.TrimSuffix(chain[0], "?")}
-			dot := "."
-			if strings.HasSuffix(chain[0], "?") {
-				dot = "?."
-			}
-			for i, call := range chain[1:] {
-				lines = append(lines, pad+"    "+dot+call)
-				dot = "."
-				if strings.HasSuffix(chain[i+1], "?") {
-					dot = "?."
-				}
-				lines[len(lines)-1] = strings.TrimSuffix(lines[len(lines)-1], "?")
-			}
-			return strings.Join(lines, "\n")
-		}
-		if close := strings.LastIndexByte(value, ')'); close == len(value)-1 {
-			callee := value[:open]
-			var out []string
-			out = append(out, key+": "+callee+"(")
-			for _, arg := range splitTop(value[open+1:close], ',') {
-				out = append(out, dartArg(indent+2, strings.TrimSpace(arg))+",")
-			}
-			out = append(out, pad+")")
-			return strings.Join(out, "\n")
-		}
-	}
-	return line
-}
-
-// dartArg is one argument of a wrapped call at indent, as dart format lays it
-// out: on one line when it fits, otherwise a closure whose body is a call has
-// that call's arguments one a line.
-func dartArg(indent int, arg string) string {
-	pad := strings.Repeat(" ", indent)
-	const closure = "(value) => "
-	if indent+len(arg)+1 <= dartLimit || !strings.HasPrefix(arg, closure) {
-		return pad + arg
-	}
-	body := arg[len(closure):]
-	open := strings.IndexByte(body, '(')
-	if open <= 0 || !strings.HasSuffix(body, ")") || strings.Contains(body[:open], " ") {
-		return pad + arg
-	}
-	lines := []string{pad + closure + body[:open] + "("}
-	for _, inner := range splitTop(body[open+1:len(body)-1], ',') {
-		lines = append(lines, dartArg(indent+2, strings.TrimSpace(inner))+",")
-	}
-	return strings.Join(append(lines, pad+")"), "\n")
 }
 
 // dartText escapes the angle brackets of a description, which dartdoc would

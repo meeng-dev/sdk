@@ -4,36 +4,28 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import 'json.dart';
 import 'models.dart';
 
 /// A webhook meeng sent, verified: one subclass a kind of data
-/// ([OrderWebhookEvent] carries a [WebhookOrder]…), or [UnknownWebhookEvent] for a
-/// type this SDK does not know yet. Within a class, [type] says what happened.
+/// ([EmailWebhookEvent] carries an [EmailBasePayload]…), or
+/// [UnknownWebhookEvent] for a type this SDK does not know yet. Within a class,
+/// [type] says what happened.
 sealed class WebhookEvent {
   const WebhookEvent({
     required this.id,
     required this.type,
-    required this.timestamp,
-    this.environment = '',
-    this.showcaseId = '',
+    required this.createdAt,
   });
 
-  /// The message's id, the same as the `webhook-id` header.
+  /// The event's id.
   final String id;
 
-  /// What happened, such as `order.paid`.
+  /// What happened, such as `email.delivered`.
   final String type;
 
-  /// When it happened, in RFC 3339.
-  final String timestamp;
-
-  /// The environment it happened in, `test` or `live`; empty when an older
-  /// server did not send it.
-  final String environment;
-
-  /// The showcase of the sale, the same `showcase_id` the API's objects carry;
-  /// empty when an older server did not send it.
-  final String showcaseId;
+  /// When the event was created, in RFC 3339.
+  final String createdAt;
 }
 {{range .Webhooks}}
 /// The events that carry {{if eq .Data.Kind "model"}}{{article .Data.Model}}{{else}}the event's identifiers{{end}}.
@@ -41,9 +33,7 @@ final class {{.Name}}WebhookEvent extends WebhookEvent {
   const {{.Name}}WebhookEvent({
     required super.id,
     required super.type,
-    required super.timestamp,
-    super.environment,
-    super.showcaseId,
+    required super.createdAt,
     required this.data,
   });
 
@@ -63,188 +53,206 @@ final class UnknownWebhookEvent extends WebhookEvent {
   const UnknownWebhookEvent({
     required super.id,
     required super.type,
-    required super.timestamp,
-    super.environment,
-    super.showcaseId,
+    required super.createdAt,
     required this.data,
   });
 
-  /// What the event carries, as it was sent.
-  final Map<String, Object?> data;
+  /// The event's data, as JSON.
+  final Object? data;
 }
 
-/// A request meeng did not sign, or signed too long ago.
+/// A request meeng did not sign, signed too long ago, or that is not an event.
+///
+/// [code] is `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`,
+/// `INVALID_SIGNATURE_FORMAT`, `INVALID_TIMESTAMP`, `TIMESTAMP_OUT_OF_RANGE`,
+/// `SIGNATURE_MISMATCH`, `INVALID_BODY` or `INVALID_JSON`.
 class WebhookVerificationException implements Exception {
-  const WebhookVerificationException([
-    this.message = 'meeng: webhook signature does not verify',
-  ]);
+  const WebhookVerificationException(this.code, this.message);
 
+  /// Why the webhook was refused.
+  final String code;
+
+  /// What is wrong.
   final String message;
 
   @override
-  String toString() => message;
+  String toString() => '$code: $message';
 }
 
-/// How far from now a webhook's timestamp may be.
-const webhookTolerance = Duration(minutes: 5);
-
-final _digits = RegExp(r'^\d+$');
-final _spaces = RegExp(r'\s+');
-
-/// Checks a webhook meeng sent, as Standard Webhooks signs it, and answers
-/// its event.
+/// Checks and reads the webhooks a team's endpoint receives. Make one with
+/// `meeng.webhooks(secret)`.
 ///
-/// The signature is an HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}`
-/// under the key the endpoint's `whsec_` [secret] encodes, one of the
-/// signatures in the `webhook-signature` header, which carries more than one
-/// while a secret is rotated. [headers] are the request's, in any case; [body]
-/// is a `String` or the bytes (`List<int>`), exactly as they arrived, before
-/// parsing them. Throws [WebhookVerificationException] when the signature does
-/// not verify.
-WebhookEvent verifyWebhook(
-  String secret,
-  Map<String, String> headers,
-  Object body, {
-  DateTime? now,
-}) => _event(_verified(secret, headers, body, now));
+/// The signature header, `X-Meeng-Signature`, is `v1=` and the HMAC-SHA256 of
+/// `{timestamp}.{body}`, in hex; `X-Meeng-Timestamp` is the time the webhook was
+/// sent, in milliseconds since the epoch; `X-Meeng-Event` carries the event's
+/// type and `X-Meeng-Call` the id of the delivery attempt. The app also sends
+/// the `X-UseSend-*` ones, which are read when the meeng ones are missing.
+class Webhooks {
+  const Webhooks(this._secret);
 
-/// Checks a webhook's signature as [verifyWebhook] does, without reading its
-/// body.
-void verifyWebhookSignature(
-  String secret,
-  Map<String, String> headers,
-  Object body, {
-  DateTime? now,
-}) {
-  _verified(secret, headers, body, now);
-}
+  /// The header that carries the signature.
+  static const signatureHeader = 'X-Meeng-Signature';
 
-/// The body's bytes, once its signature verifies.
-List<int> _verified(
-  String secret,
-  Map<String, String> headers,
-  Object body,
-  DateTime? now,
-) {
-  final key = _base64(
-    secret.startsWith('whsec_') ? secret.substring(6) : secret,
-  );
-  if (key == null || key.isEmpty) {
-    throw ArgumentError.value(
-      secret,
-      'secret',
-      'meeng: the webhook secret is whsec_ and a base64 key',
-    );
-  }
-  final List<int> raw = switch (body) {
-    String text => utf8.encode(text),
-    List<int> bytes => bytes,
-    _ => throw ArgumentError.value(body, 'body', 'a String or a List<int>'),
-  };
-  final id = _header(headers, 'webhook-id');
-  final stamp = _header(headers, 'webhook-timestamp');
-  final seconds = _digits.hasMatch(stamp) && stamp.length <= 18
-      ? int.tryParse(stamp)
-      : null;
-  if (id.isEmpty || seconds == null) {
-    throw const WebhookVerificationException();
-  }
-  final at = DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
-  if ((now ?? DateTime.now()).difference(at).abs() > webhookTolerance) {
-    throw const WebhookVerificationException();
-  }
-  final expected = Hmac(
-    sha256,
-    key,
-  ).convert([...utf8.encode('$id.$stamp.'), ...raw]).bytes;
-  final signatures = _header(headers, 'webhook-signature').split(_spaces);
-  for (final signature in signatures) {
-    final comma = signature.indexOf(',');
-    if (comma < 0 || signature.substring(0, comma) != 'v1') {
-      continue;
-    }
-    final decoded = _base64(signature.substring(comma + 1));
-    if (decoded != null && _equal(decoded, expected)) {
-      return raw;
-    }
-  }
-  throw const WebhookVerificationException();
-}
+  /// The header that carries the time the webhook was sent, in milliseconds.
+  static const timestampHeader = 'X-Meeng-Timestamp';
 
-WebhookEvent _event(List<int> raw) {
-  final json = jsonDecode(utf8.decode(raw));
-  if (json case {
-    'id': final String id,
-    'type': final String type,
-    'timestamp': final String timestamp,
+  /// The header that carries the event's type.
+  static const eventHeader = 'X-Meeng-Event';
+
+  /// The header that carries the id of the delivery attempt.
+  static const callHeader = 'X-Meeng-Call';
+
+  /// How far from now a webhook's timestamp may be, by default.
+  static const defaultTolerance = Duration(minutes: 5);
+
+  static const _prefix = 'v1=';
+
+  final String _secret;
+
+  /// Checks the signature without reading the event; true when it is valid.
+  /// Pass the body exactly as it arrived, before parsing it.
+  ///
+  /// [secret] replaces the handler's, [tolerance] is how far from now the
+  /// timestamp may be (a negative duration turns the check off) and [now] is the
+  /// current time, for tests.
+  bool verify(
+    String body,
+    Map<String, String> headers, {
+    String? secret,
+    Duration? tolerance,
+    DateTime? now,
   }) {
-    final environment = switch (json['environment']) {
-      final String environment => environment,
-      _ => '',
-    };
-    final showcaseId = switch (json['showcase_id']) {
-      final String showcaseId => showcaseId,
-      _ => '',
-    };
-    final data = switch (json['data']) {
-      final Map<String, Object?> data => data,
-      _ => const <String, Object?>{},
-    };
+    try {
+      _check(body, headers, secret, tolerance, now);
+      return true;
+    } on WebhookVerificationException {
+      return false;
+    }
+  }
+
+  /// Checks the signature and reads the event; throws
+  /// [WebhookVerificationException] when the request is not one meeng signed.
+  WebhookEvent constructEvent(
+    String body,
+    Map<String, String> headers, {
+    String? secret,
+    Duration? tolerance,
+    DateTime? now,
+  }) {
+    _check(body, headers, secret, tolerance, now);
+    try {
+      final event = readObject(jsonDecode(body));
+      final id = readString(event['id']);
+      final type = readString(event['type']);
+      final createdAt = readString(event['createdAt']);
+      final data = event['data'];
 {{- range .Webhooks}}
-    if ({{.Name}}WebhookEvent.types.contains(type)) {
-      return {{.Name}}WebhookEvent(
+      if ({{.Name}}WebhookEvent.types.contains(type)) {
+        return {{.Name}}WebhookEvent(
+          id: id,
+          type: type,
+          createdAt: createdAt,
+          data: {{.Data.Model}}.fromJson(readObject(data)),
+        );
+      }
+{{- end}}
+      return UnknownWebhookEvent(
         id: id,
         type: type,
-        timestamp: timestamp,
-        environment: environment,
-        showcaseId: showcaseId,
-{{- if eq .Data.Kind "model"}}
-        data: {{.Data.Model}}.fromJson(data),
-{{- else}}
-        data: Map.unmodifiable(
-          data.map((key, value) => MapEntry(key, '$value')),
-        ),
-{{- end}}
+        createdAt: createdAt,
+        data: data,
+      );
+    } on FormatException catch (error) {
+      throw WebhookVerificationException(
+        'INVALID_JSON',
+        'Webhook payload is not valid JSON: ${error.message}',
+      );
+    } on TypeError {
+      throw const WebhookVerificationException(
+        'INVALID_JSON',
+        'Webhook payload is not an event',
       );
     }
-{{- end}}
-    return UnknownWebhookEvent(
-      id: id,
-      type: type,
-      timestamp: timestamp,
-      environment: environment,
-      showcaseId: showcaseId,
-      data: data,
-    );
   }
-  throw const FormatException('meeng: the webhook body is not an event');
-}
 
-String _header(Map<String, String> headers, String name) {
-  for (final MapEntry(:key, :value) in headers.entries) {
-    if (key.toLowerCase() == name) {
-      return value.trim();
+  void _check(
+    String body,
+    Map<String, String> headers,
+    String? secret,
+    Duration? tolerance,
+    DateTime? now,
+  ) {
+    var signature = _header(headers, signatureHeader);
+    if (signature.isEmpty) {
+      signature = _header(headers, 'X-UseSend-Signature');
+    }
+    var timestamp = _header(headers, timestampHeader);
+    if (timestamp.isEmpty) {
+      timestamp = _header(headers, 'X-UseSend-Timestamp');
+    }
+    if (signature.isEmpty) {
+      throw const WebhookVerificationException(
+        'MISSING_SIGNATURE',
+        'Missing $signatureHeader header',
+      );
+    }
+    if (timestamp.isEmpty) {
+      throw const WebhookVerificationException(
+        'MISSING_TIMESTAMP',
+        'Missing $timestampHeader header',
+      );
+    }
+    if (!signature.startsWith(_prefix)) {
+      throw const WebhookVerificationException(
+        'INVALID_SIGNATURE_FORMAT',
+        'Signature header must start with v1=',
+      );
+    }
+    final sent = double.tryParse(timestamp.trim());
+    if (sent == null || sent.isNaN || sent.isInfinite) {
+      throw const WebhookVerificationException(
+        'INVALID_TIMESTAMP',
+        'Timestamp header must be a number (milliseconds since epoch)',
+      );
+    }
+    final toleranceMs = (tolerance ?? defaultTolerance).inMilliseconds;
+    final nowMs = (now ?? DateTime.now()).millisecondsSinceEpoch;
+    if (toleranceMs >= 0 && (nowMs - sent).abs() > toleranceMs) {
+      throw const WebhookVerificationException(
+        'TIMESTAMP_OUT_OF_RANGE',
+        'Webhook timestamp is outside the allowed tolerance',
+      );
+    }
+    final mac = Hmac(sha256, utf8.encode(secret ?? _secret));
+    final expected = '$_prefix${mac.convert(utf8.encode('$timestamp.$body'))}';
+    if (!_constantTimeEquals(expected, signature)) {
+      throw const WebhookVerificationException(
+        'SIGNATURE_MISMATCH',
+        'Webhook signature does not match',
+      );
     }
   }
-  return '';
-}
 
-List<int>? _base64(String text) {
-  try {
-    return base64.decode(text);
-  } on FormatException {
-    return null;
+  static String _header(Map<String, String> headers, String name) {
+    final lower = name.toLowerCase();
+    for (final MapEntry(:key, :value) in headers.entries) {
+      if (key.toLowerCase() == lower) {
+        return value;
+      }
+    }
+    return '';
   }
-}
 
-/// Compares two digests in constant time.
-bool _equal(List<int> a, List<int> b) {
-  if (a.length != b.length) {
-    return false;
+  static bool _constantTimeEquals(String a, String b) {
+    final left = utf8.encode(a);
+    final right = utf8.encode(b);
+    if (left.length != right.length) {
+      return false;
+    }
+    var difference = 0;
+    for (var i = 0; i < left.length; i++) {
+      difference |= left[i] ^ right[i];
+    }
+    return difference == 0;
   }
-  var difference = 0;
-  for (var i = 0; i < a.length; i++) {
-    difference |= a[i] ^ b[i];
-  }
-  return difference == 0;
 }
