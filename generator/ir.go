@@ -4,11 +4,11 @@
 // language renders it. The SDKs under sdk/<language> are output and are never
 // edited by hand; what is hand-written lives in this package's templates.
 //
-// The contract is the useSend v1 contract with the brand swapped, and it
-// carries no operationId, no tag and no named schema: every shape is written
-// where it is used. The names the SDKs give to services, methods and models
-// therefore live in surface.go, and the webhook events, which the contract does
-// not describe, in webhooks.go.
+// The contract is the one the app exports (docs/contracts/api.openapi.json),
+// which names its schemas and gives each operation an operationId of the app's
+// own routing. The names the SDKs give to services, methods and models are
+// written once in surface.go instead, the same in every language, and the
+// webhook events, which the contract does not describe, in webhooks.go.
 package generator
 
 import (
@@ -134,7 +134,7 @@ type Method struct {
 	// Write says the verb is not GET.
 	Write bool
 	// EmptyBody says the call is a POST or a PUT with no body of its own, which
-	// useSend's SDKs send as {}: the SDKs do the same.
+	// the SDKs send as {}.
 	EmptyBody bool
 }
 

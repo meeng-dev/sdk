@@ -15,6 +15,10 @@ struct Requester: Sendable {
     let baseURL: String
     let timeout: TimeInterval
     let transport: MeengTransport
+    /// How many times a call that may be repeated is repeated after the first attempt.
+    var maxRetries = 2
+    /// The wait before the first repetition, in seconds.
+    var retryDelay: TimeInterval = 0.5
     /// Why the client cannot call (no key, an insecure address); every call throws it before sending anything.
     var setupError: MeengError?
 
@@ -65,11 +69,42 @@ struct Requester: Sendable {
         if let idempotencyKey, !idempotencyKey.isEmpty {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
         }
-        let (data, response) = try await transport(request)
-        if response.statusCode >= 300 {
-            throw MeengError(response: response, body: data)
+        let mayRepeat = ["GET", "HEAD", "PUT", "DELETE"].contains(method.uppercased()) || !(idempotencyKey ?? "").isEmpty
+        var attempt = 0
+        while true {
+            let data: Data
+            let response: HTTPURLResponse
+            do {
+                (data, response) = try await transport(request)
+            } catch let failure as URLError where mayRepeat && attempt < maxRetries && failure.code != .cancelled {
+                // The connection failed or timed out: the call may or may not have arrived.
+                try await pause(attempt: attempt, retryAfter: nil)
+                attempt += 1
+                continue
+            }
+            let status = response.statusCode
+            let again = status == 429 || (mayRepeat && [500, 502, 503, 504].contains(status))
+            if again && attempt < maxRetries {
+                try await pause(attempt: attempt, retryAfter: response.value(forHTTPHeaderField: "Retry-After"))
+                attempt += 1
+                continue
+            }
+            if status >= 300 {
+                throw MeengError(response: response, body: data)
+            }
+            return data
         }
-        return data
+    }
+
+    /// Sleeps before repetition number `attempt` + 1: the API's Retry-After, or the
+    /// base delay doubled each time and spread over its upper half.
+    private func pause(attempt: Int, retryAfter: String?) async throws {
+        var seconds = retryAfter.flatMap { Double($0.trimmingCharacters(in: .whitespaces)) } ?? 0
+        if seconds <= 0 {
+            let delay = min(retryDelay * Double(1 << min(attempt, 10)), MeengClient.maxRetryDelay)
+            seconds = delay / 2 + Double.random(in: 0...(delay / 2))
+        }
+        try await Task.sleep(nanoseconds: UInt64(min(seconds, MeengClient.maxRetryDelay) * 1_000_000_000))
     }
 
     /// A session that refuses redirects: the API never redirects, and a
@@ -104,7 +139,7 @@ extension MeengError {
 }
 
 /// A body with nothing in it, which a POST or PUT with no body of its own sends
-/// as `{}`, as useSend's SDKs do.
+/// as `{}`.
 struct EmptyBody: Encodable, Sendable {}
 
 private let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")

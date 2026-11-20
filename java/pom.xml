@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>meeng SDK for Java</name>
-    <description>meeng's SDK for Java: emails, domains, contacts, contact books, campaigns, analytics and webhooks, with the same shape as useSend's.</description>
+    <description>Meeng.dev SDK for Java: emails, domains, contacts, contact books, campaigns, analytics and webhooks.</description>
     <url>https://meeng.dev</url>
 
     <licenses>

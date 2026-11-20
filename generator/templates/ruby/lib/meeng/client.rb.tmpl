@@ -5,6 +5,9 @@
 require "ipaddr"
 require "json"
 require "net/http"
+require "openssl"
+require "socket"
+require "timeout"
 require "uri"
 
 module Meeng
@@ -31,7 +34,22 @@ module Meeng
   #
   # Answers are hashes with symbol keys, the API's own names (+:emailId+); a
   # refusal raises Meeng::Error.
+  #
+  # A call that may be repeated is repeated up to +max_retries+ times (2 by
+  # default; 0 sends every call once) after the first attempt. It is repeated
+  # when the API answers 429, which means it was not processed, so any call may
+  # be; and when the API answers 500, 502, 503 or 504, or the connection fails,
+  # only if repeating it cannot do the work twice: a read, a PUT, a DELETE, or any
+  # call that carries an idempotency key. Any other refusal, a 409 included, is
+  # never repeated. The first repetition waits +retry_delay+ seconds, each next
+  # one twice as long, and a Retry-After from the API replaces the wait.
   class Client
+    # The longest, in seconds, a call waits before a repetition.
+    MAX_RETRY_DELAY = 30.0
+    TRANSIENT = [500, 502, 503, 504].freeze
+    CONNECTION_FAILURES = [SystemCallError, IOError, SocketError, Timeout::Error, OpenSSL::SSL::SSLError].freeze
+    private_constant :TRANSIENT, :CONNECTION_FAILURES
+
 {{- range .Services}}
     # @return [{{pascal .Name}}Service]
     attr_reader :{{snake .Name}}
@@ -40,7 +58,7 @@ module Meeng
     # The base URL is the address of the app, without +{{.APIPrefix}}/v1+. It must be
     # https; http is accepted only for localhost, 127.0.0.0/8 and ::1, and any
     # other raises ArgumentError.
-    def initialize(api_key = nil, base_url = nil, timeout: 30, transport: NetHTTPTransport.new)
+    def initialize(api_key = nil, base_url = nil, timeout: 30, transport: NetHTTPTransport.new, max_retries: 2, retry_delay: 0.5)
       key = api_key.nil? || api_key.empty? ? ENV.fetch("MEENG_API_KEY", nil) : api_key
       raise ArgumentError, "Missing API key. Pass it to Meeng::Client.new(\"mg_123\") or set MEENG_API_KEY" if key.nil? || key.empty?
 
@@ -51,6 +69,8 @@ module Meeng
       @url = base + API_PREFIX
       @timeout = timeout
       @transport = transport
+      @max_retries = [max_retries.to_i, 0].max
+      @retry_delay = [retry_delay.to_f, 0.0].max
 {{- range .Services}}
       @{{snake .Name}} = {{pascal .Name}}Service.new(self)
 {{- end}}
@@ -87,13 +107,44 @@ module Meeng
         headers["Content-Type"] = "application/json"
       end
       headers["Idempotency-Key"] = idempotency_key if idempotency_key && !idempotency_key.empty?
-      status, response_headers, raw = @transport.call(method, full, headers, data, @timeout)
+      may_repeat = %w[GET HEAD PUT DELETE].include?(method.to_s.upcase) || !(idempotency_key.nil? || idempotency_key.empty?)
+      attempt = 0
+      status = response_headers = raw = nil
+      loop do
+        begin
+          status, response_headers, raw = @transport.call(method, full, headers, data, @timeout)
+        rescue *CONNECTION_FAILURES
+          # The connection failed or timed out: the call may or may not have arrived.
+          raise if !may_repeat || attempt >= @max_retries
+
+          pause(attempt, nil)
+          attempt += 1
+          next
+        end
+        if (status == 429 || (may_repeat && TRANSIENT.include?(status))) && attempt < @max_retries
+          pause(attempt, response_headers["retry-after"])
+          attempt += 1
+          next
+        end
+        break
+      end
       raise Error.from_response(status, response_headers, raw) if status >= 300
 
       JSON.parse(raw, symbolize_names: true)
     end
 
     private
+
+    # Sleeps before repetition number attempt + 1: the API's Retry-After, or the
+    # base delay doubled each time and spread over its upper half.
+    def pause(attempt, retry_after)
+      seconds = retry_after.to_f
+      if seconds <= 0
+        delay = [@retry_delay * (2**[attempt, 10].min), MAX_RETRY_DELAY].min
+        seconds = (delay / 2) + (rand * delay / 2)
+      end
+      sleep([seconds, MAX_RETRY_DELAY].min)
+    end
 
     def check_base_url!(base_url)
       uri = begin

@@ -23,8 +23,153 @@ fn client(answer: impl Fn(&HttpRequest) -> HttpResponse + Send + Sync + 'static)
     let client = Client::builder("mg_test_key")
         .base_url("https://meeng.test/")
         .transport(transport)
+        .max_retries(0)
         .build();
     (client, seen)
+}
+
+/// A client that waits a millisecond between attempts; `answer` gets the
+/// number of the attempt and answers a response, or fails the connection.
+fn retrying(
+    answer: impl Fn(usize) -> Result<HttpResponse, BoxError> + Send + Sync + 'static,
+    max_retries: u32,
+) -> (Client, Seen) {
+    let seen: Seen = Arc::default();
+    let record = Arc::clone(&seen);
+    let transport = move |request: HttpRequest| -> Result<HttpResponse, BoxError> {
+        let mut seen = record.lock().unwrap();
+        seen.push(request);
+        answer(seen.len())
+    };
+    let client = Client::builder("mg_test_key")
+        .base_url("https://meeng.test/")
+        .transport(transport)
+        .max_retries(max_retries)
+        .retry_delay(std::time::Duration::from_millis(1))
+        .build();
+    (client, seen)
+}
+
+fn limited() -> Result<HttpResponse, BoxError> {
+    Ok(HttpResponse::new(
+        429,
+        r#"{"error":{"code":"RATE_LIMITED","message":"slow down"}}"#,
+    )
+    .with_header("Retry-After", "0"))
+}
+
+fn busy() -> Result<HttpResponse, BoxError> {
+    Ok(HttpResponse::new(
+        503,
+        r#"{"error":{"code":"INTERNAL_SERVER_ERROR","message":"busy"}}"#,
+    ))
+}
+
+fn ok(body: serde_json::Value) -> Result<HttpResponse, BoxError> {
+    Ok(HttpResponse::new(200, body.to_string()))
+}
+
+#[test]
+fn a_too_many_requests_answer_is_repeated_for_any_call() {
+    let (client, seen) = retrying(
+        |n| {
+            if n < 3 {
+                limited()
+            } else {
+                ok(serde_json::json!({"emailId": "em_1"}))
+            }
+        },
+        2,
+    );
+    let params = EmailsSendParams::new(vec!["a@x.com".to_owned()], "h@acme.com");
+    let sent = client.emails().send(&params).unwrap();
+    assert_eq!(sent.email_id, "em_1");
+    assert_eq!(seen.lock().unwrap().len(), 3);
+}
+
+#[test]
+fn a_server_failure_is_repeated_only_when_repeating_cannot_do_the_work_twice() {
+    let answer = |n: usize| {
+        if n == 1 {
+            busy()
+        } else {
+            ok(serde_json::json!({"emailId": "em_1"}))
+        }
+    };
+    let params = EmailsSendParams::new(vec!["a@x.com".to_owned()], "h@acme.com");
+
+    let (client, seen) = retrying(
+        |n| {
+            if n == 1 {
+                busy()
+            } else {
+                ok(serde_json::json!([]))
+            }
+        },
+        2,
+    );
+    client.domains().list().unwrap();
+    assert_eq!(seen.lock().unwrap().len(), 2);
+
+    let (client, seen) = retrying(answer, 2);
+    assert!(matches!(client.emails().send(&params), Err(Error::Api(_))));
+    assert_eq!(seen.lock().unwrap().len(), 1);
+
+    let (client, seen) = retrying(answer, 2);
+    client
+        .emails()
+        .idempotency_key("order-1")
+        .send(&params)
+        .unwrap();
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 2);
+    assert_eq!(seen[1].header("Idempotency-Key"), Some("order-1"));
+}
+
+#[test]
+fn other_refusals_are_never_repeated_retries_can_be_turned_off_and_the_last_answer_is_the_error() {
+    let (client, seen) = retrying(
+        |_| {
+            Ok(HttpResponse::new(
+                409,
+                r#"{"error":{"code":"NOT_UNIQUE","message":"in progress"}}"#,
+            ))
+        },
+        2,
+    );
+    assert!(matches!(client.domains().list(), Err(Error::Api(e)) if e.code == "NOT_UNIQUE"));
+    assert_eq!(seen.lock().unwrap().len(), 1);
+
+    let (client, seen) = retrying(|_| limited(), 0);
+    assert!(client.domains().list().is_err());
+    assert_eq!(seen.lock().unwrap().len(), 1);
+
+    let (client, seen) = retrying(|_| limited(), 2);
+    assert!(matches!(client.domains().list(), Err(Error::Api(e)) if e.code == "RATE_LIMITED"));
+    assert_eq!(seen.lock().unwrap().len(), 3);
+}
+
+#[test]
+fn a_connection_that_fails_is_repeated_for_a_read_only() {
+    let (client, seen) = retrying(
+        |n| {
+            if n == 1 {
+                Err("connection reset".into())
+            } else {
+                ok(serde_json::json!([]))
+            }
+        },
+        2,
+    );
+    client.domains().list().unwrap();
+    assert_eq!(seen.lock().unwrap().len(), 2);
+
+    let (client, seen) = retrying(|_| Err("connection reset".into()), 2);
+    assert!(matches!(
+        client.emails().cancel("em_1"),
+        Err(Error::Transport(_))
+    ));
+    assert_eq!(seen.lock().unwrap().len(), 1);
 }
 
 fn json(status: u16, body: serde_json::Value) -> HttpResponse {
@@ -378,11 +523,11 @@ fn a_signed_webhook_is_verified_and_read_as_a_typed_event() {
 }
 
 #[test]
-fn the_usesend_headers_are_accepted_as_well_in_any_case() {
+fn the_headers_are_accepted_in_any_case() {
     let timestamp = now_ms().to_string();
     let headers = [
-        ("x-usesend-signature", sign(&timestamp, BODY, SECRET)),
-        ("X-UseSend-Timestamp", timestamp),
+        ("x-meeng-signature", sign(&timestamp, BODY, SECRET)),
+        ("X-Meeng-Timestamp", timestamp),
     ];
     assert!(Webhooks::new(SECRET).verify(BODY.as_bytes(), headers));
 }

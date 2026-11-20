@@ -25,7 +25,7 @@ func method(ir *IR, id string) *Method {
 	return nil
 }
 
-// The surface is the contract's 33 routes, under the names useSend's SDKs use.
+// The surface is the contract's 33 routes, under the names the SDKs give them.
 func TestTheSurfaceIsEveryRouteOfTheContract(t *testing.T) {
 	ir := loadContract(t)
 	var got []string

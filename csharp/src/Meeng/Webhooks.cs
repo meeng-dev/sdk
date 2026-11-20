@@ -30,8 +30,7 @@ public sealed record WebhookOptions
 /// <para>The signature header, <c>X-Meeng-Signature</c>, is <c>v1=</c> and the HMAC-SHA256 of
 /// <c>{timestamp}.{body}</c>, in hex; <c>X-Meeng-Timestamp</c> is the time the webhook was sent,
 /// in milliseconds since the epoch; <c>X-Meeng-Event</c> carries the event's type and
-/// <c>X-Meeng-Call</c> the id of the delivery attempt. The app also sends the <c>X-UseSend-*</c>
-/// ones, which are read when the meeng ones are missing.</para>
+/// <c>X-Meeng-Call</c> the id of the delivery attempt.</para>
 /// </remarks>
 public sealed class Webhooks
 {
@@ -195,15 +194,7 @@ public sealed class Webhooks
         ArgumentNullException.ThrowIfNull(headers);
         var key = options.Secret ?? secret;
         var signature = Header(headers, SignatureHeader);
-        if (signature.Length == 0)
-        {
-            signature = Header(headers, "X-UseSend-Signature");
-        }
         var timestamp = Header(headers, TimestampHeader);
-        if (timestamp.Length == 0)
-        {
-            timestamp = Header(headers, "X-UseSend-Timestamp");
-        }
         if (signature.Length == 0)
         {
             throw new WebhookVerificationException("MISSING_SIGNATURE", "Missing " + SignatureHeader + " header");

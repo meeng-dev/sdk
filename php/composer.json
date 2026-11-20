@@ -1,6 +1,6 @@
 {
     "name": "meeng-dev/sdk",
-    "description": "meeng's SDK for PHP: emails, domains, contacts, contact books, campaigns, analytics and webhooks, with the same shape as useSend's.",
+    "description": "Meeng.dev SDK for PHP: emails, domains, contacts, contact books, campaigns, analytics and webhooks.",
     "type": "library",
     "license": "MIT",
     "homepage": "https://meeng.dev",

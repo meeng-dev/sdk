@@ -189,10 +189,10 @@ class WebhookTest(unittest.TestCase):
         self.assertEqual((event["version"], event["teamId"], event["attempt"]), ("2026-01-18", 7, 2))
         self.assertEqual(event["data"]["to"], ["a@x.com"])
 
-    def test_the_usesend_headers_are_accepted_as_well_in_any_case(self):
+    def test_the_headers_are_accepted_in_any_case(self):
         timestamp = str(int(time.time() * 1000))
         webhooks = Meeng("k", "https://meeng.test").webhooks(SECRET)
-        self.assertTrue(webhooks.verify(BODY, headers={"x-usesend-signature": sign(timestamp), "x-usesend-timestamp": timestamp}))
+        self.assertTrue(webhooks.verify(BODY, headers={"x-meeng-signature": sign(timestamp), "x-meeng-timestamp": timestamp}))
 
     def test_a_webhook_is_refused_with_the_code_that_says_why(self):
         now = 1_800_000_000_000
@@ -221,6 +221,78 @@ class WebhookTest(unittest.TestCase):
         self.assertEqual(refused(good, text=BODY.replace("em_1", "em_2")), "SIGNATURE_MISMATCH")
         self.assertEqual(refused({"X-Meeng-Signature": sign(timestamp, "not json"), "X-Meeng-Timestamp": timestamp}, text="not json"), "INVALID_JSON")
         self.assertEqual(refused(good, text=b"\xff"), "INVALID_BODY")
+
+
+def retrying(answer, **options):
+    """A client that waits a millisecond between attempts; answer gets the number of the attempt."""
+    seen = []
+
+    def transport(method, url, headers, body, timeout):
+        seen.append({"method": method, "headers": headers})
+        result = answer(len(seen))
+        if isinstance(result, Exception):
+            raise result
+        status, payload = result
+        return status, {"retry-after": "0"}, json.dumps(payload).encode()
+
+    options.setdefault("retry_delay", 0.001)
+    return Meeng("mg_test_key", "https://meeng.test/", transport=transport, **options), seen
+
+
+LIMITED = (429, {"error": {"code": "RATE_LIMITED", "message": "slow down"}})
+BUSY = (503, {"error": {"code": "INTERNAL_SERVER_ERROR", "message": "busy"}})
+
+
+class RetryTest(unittest.TestCase):
+    def test_a_too_many_requests_answer_is_repeated_for_any_call(self):
+        meeng, seen = retrying(lambda n: LIMITED if n < 3 else (200, {"emailId": "em_1"}))
+        data, error = meeng.emails.send({"from": "h@acme.com", "to": "a@x.com"})
+        self.assertIsNone(error)
+        self.assertEqual(data["emailId"], "em_1")
+        self.assertEqual(len(seen), 3)
+
+    def test_a_server_failure_is_repeated_only_when_repeating_cannot_do_the_work_twice(self):
+        answer = lambda n: BUSY if n == 1 else (200, [])
+        meeng, seen = retrying(answer)
+        meeng.domains.list()
+        self.assertEqual(len(seen), 2)
+
+        meeng, seen = retrying(answer)
+        with self.assertRaises(MeengHTTPError):
+            meeng.emails.send({"from": "h@acme.com", "to": "a@x.com"})
+        self.assertEqual(len(seen), 1)
+
+        meeng, seen = retrying(answer)
+        meeng.emails.send({"from": "h@acme.com", "to": "a@x.com"}, options={"idempotency_key": "order-1"})
+        self.assertEqual(len(seen), 2)
+        self.assertEqual(seen[1]["headers"]["Idempotency-Key"], "order-1")
+
+    def test_other_refusals_are_never_repeated_retries_can_be_turned_off_and_the_last_answer_is_the_error(self):
+        meeng, seen = retrying(lambda n: (409, {"error": {"code": "NOT_UNIQUE", "message": "in progress"}}))
+        with self.assertRaises(MeengHTTPError):
+            meeng.domains.list()
+        self.assertEqual(len(seen), 1)
+
+        meeng, seen = retrying(lambda n: LIMITED, max_retries=0)
+        with self.assertRaises(MeengHTTPError):
+            meeng.domains.list()
+        self.assertEqual(len(seen), 1)
+
+        meeng, seen = retrying(lambda n: LIMITED, max_retries=2)
+        with self.assertRaises(MeengHTTPError) as raised:
+            meeng.domains.list()
+        self.assertEqual(raised.exception.error["code"], "RATE_LIMITED")
+        self.assertEqual(len(seen), 3)
+
+    def test_a_connection_that_fails_is_repeated_for_a_read_only(self):
+        meeng, seen = retrying(lambda n: ConnectionResetError("reset") if n == 1 else (200, []))
+        meeng.domains.list()
+        self.assertEqual(len(seen), 2)
+
+        meeng, seen = retrying(lambda n: ConnectionResetError("reset"))
+        with self.assertRaises(ConnectionResetError):
+            meeng.emails.cancel("em_1")
+        self.assertEqual(len(seen), 1)
 
 
 if __name__ == "__main__":

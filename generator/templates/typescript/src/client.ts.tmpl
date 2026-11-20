@@ -32,14 +32,49 @@ function environment(name: string): string | undefined {
 export interface ClientOptions {
   /** The fetch the calls go through; the global one by default. Calls are made with `redirect: "manual"`, so the key never follows a redirect. */
   fetch?: typeof fetch;
-  /** Milliseconds before a call gives up; 30 000 by default. */
+  /** Milliseconds before an attempt gives up; 30 000 by default. */
   timeoutMs?: number;
+  /**
+   * How many times a call that may be repeated is repeated after the first
+   * attempt; 2 by default, and 0 sends every call once. A call is repeated when
+   * the API answers 429 (it was not processed, so any call may be repeated),
+   * and when it answers 500, 502, 503 or 504 or the connection fails, only if
+   * repeating it cannot do the work twice: a read, a PUT, a DELETE, or any call
+   * that carries an `idempotencyKey`. A 409 or any other refusal never is.
+   */
+  maxRetries?: number;
+  /** Milliseconds before the first repetition (500 by default); each repetition waits twice as long, up to 30 000, and a `Retry-After` replaces the wait. */
+  retryDelayMs?: number;
+}
+
+const MAX_RETRY_DELAY_MS = 30_000;
+const TRANSIENT = new Set([500, 502, 503, 504]);
+
+/** A call that cannot do its work twice: a read, a PUT, a DELETE, or one with an idempotency key. */
+function repeatable(method: string, idempotencyKey: string | undefined): boolean {
+  return ["GET", "HEAD", "PUT", "DELETE"].includes(method.toUpperCase()) || Boolean(idempotencyKey);
+}
+
+/** Waits ms milliseconds, or until the caller's signal aborts. */
+function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve) => {
+    if (ms <= 0 || signal?.aborted) {
+      resolve();
+      return;
+    }
+    const done = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener("abort", done, { once: true });
+  });
 }
 
 /**
  * meeng's API with one team's API key. Every call answers `{ data, error }`:
- * the data when it worked, the error when the API refused it, as useSend's SDK
- * does.
+ * the data when it worked, the error when the API refused it.
  *
  *     const meeng = new Meeng("mg_123");
  *     const { data, error } = await meeng.emails.send({
@@ -59,10 +94,12 @@ export class Meeng implements Requester {
 
   /** The API key. */
   readonly key: string;
-  /** The address every call goes to, with the API prefix: https://app.meeng.dev/api/v1. */
+  /** The address every call goes to, with the API prefix: https://meeng.dev/api. */
   readonly url: string;
   readonly #fetch: typeof fetch;
   readonly #timeoutMs: number;
+  readonly #maxRetries: number;
+  readonly #retryDelayMs: number;
 
   /**
    * @param key The API key; MEENG_API_KEY when left out.
@@ -79,6 +116,8 @@ export class Meeng implements Requester {
     this.url = `${base}${API_PREFIX}`;
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#timeoutMs = options.timeoutMs ?? 30_000;
+    this.#maxRetries = Math.max(0, Math.floor(options.maxRetries ?? 2));
+    this.#retryDelayMs = Math.max(0, options.retryDelayMs ?? 500);
 {{- range .Services}}
     this.{{camel .Name}} = new {{pascal .Name}}Service(this);
 {{- end}}
@@ -122,15 +161,40 @@ export class Meeng implements Requester {
     if (spec.options?.idempotencyKey) {
       headers["Idempotency-Key"] = spec.options.idempotencyKey;
     }
-    const signals = [AbortSignal.timeout(this.#timeoutMs)];
-    if (spec.options?.signal) {
-      signals.push(spec.options.signal);
+    const mayRepeat = repeatable(method, spec.options?.idempotencyKey);
+    for (let attempt = 0; ; attempt++) {
+      const signals = [AbortSignal.timeout(this.#timeoutMs)];
+      if (spec.options?.signal) {
+        signals.push(spec.options.signal);
+      }
+      let response: Response;
+      try {
+        response = await this.#fetch(url, { method, headers, body, signal: AbortSignal.any(signals), redirect: "manual" });
+      } catch (failure) {
+        // The connection failed or timed out: the call may or may not have arrived.
+        if (!mayRepeat || attempt >= this.#maxRetries || spec.options?.signal?.aborted) {
+          throw failure;
+        }
+        await sleep(this.#backoff(attempt), spec.options?.signal);
+        continue;
+      }
+      if (response.ok) {
+        return { data: (await response.json()) as T, error: null };
+      }
+      const again = response.status === 429 || (mayRepeat && TRANSIENT.has(response.status));
+      if (!again || attempt >= this.#maxRetries || spec.options?.signal?.aborted) {
+        return { data: null, error: await errorOf(response) };
+      }
+      const seconds = Number(response.headers.get("Retry-After"));
+      await response.body?.cancel();
+      await sleep(seconds > 0 ? Math.min(seconds * 1000, MAX_RETRY_DELAY_MS) : this.#backoff(attempt), spec.options?.signal);
     }
-    const response = await this.#fetch(url, { method, headers, body, signal: AbortSignal.any(signals), redirect: "manual" });
-    if (!response.ok) {
-      return { data: null, error: await errorOf(response) };
-    }
-    return { data: (await response.json()) as T, error: null };
+  }
+
+  /** The wait before repetition number attempt + 1: the base delay doubled each time, spread over its upper half. */
+  #backoff(attempt: number): number {
+    const delay = Math.min(this.#retryDelayMs * 2 ** Math.min(attempt, 10), MAX_RETRY_DELAY_MS);
+    return delay / 2 + Math.random() * (delay / 2);
   }
 }
 

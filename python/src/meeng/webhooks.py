@@ -23,11 +23,6 @@ WEBHOOK_EVENT_HEADER = "X-Meeng-Event"
 WEBHOOK_CALL_HEADER = "X-Meeng-Call"
 """The header that carries the id of the delivery attempt."""
 
-# The app sends both families of headers, so an integration written for useSend
-# keeps working; the meeng ones are read first.
-_LEGACY_SIGNATURE_HEADER = "X-UseSend-Signature"
-_LEGACY_TIMESTAMP_HEADER = "X-UseSend-Timestamp"
-
 _SIGNATURE_PREFIX = "v1="
 DEFAULT_TOLERANCE_MS = 5 * 60 * 1000
 """How far from now, in milliseconds, a webhook's timestamp may be."""
@@ -209,8 +204,8 @@ class Webhooks:
 
     def _verify(self, body: str | bytes, headers: Mapping[str, Any], secret: str | None, tolerance: int | None, now: float | None) -> None:
         key = secret if secret is not None else self._secret
-        signature = _header(headers, WEBHOOK_SIGNATURE_HEADER) or _header(headers, _LEGACY_SIGNATURE_HEADER)
-        timestamp = _header(headers, WEBHOOK_TIMESTAMP_HEADER) or _header(headers, _LEGACY_TIMESTAMP_HEADER)
+        signature = _header(headers, WEBHOOK_SIGNATURE_HEADER)
+        timestamp = _header(headers, WEBHOOK_TIMESTAMP_HEADER)
         if not signature:
             raise WebhookVerificationError("MISSING_SIGNATURE", f"Missing {WEBHOOK_SIGNATURE_HEADER} header")
         if not timestamp:

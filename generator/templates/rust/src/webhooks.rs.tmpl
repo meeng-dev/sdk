@@ -20,10 +20,6 @@ pub const WEBHOOK_EVENT_HEADER: &str = "X-Meeng-Event";
 /// The header that carries the id of the delivery attempt.
 pub const WEBHOOK_CALL_HEADER: &str = "X-Meeng-Call";
 
-// The app sends both families of headers, so an integration written for
-// useSend keeps working; the meeng ones are read first.
-const LEGACY_SIGNATURE_HEADER: &str = "X-UseSend-Signature";
-const LEGACY_TIMESTAMP_HEADER: &str = "X-UseSend-Timestamp";
 const SIGNATURE_PREFIX: &str = "v1=";
 
 /// How far from now, in milliseconds, a webhook's timestamp may be by default.
@@ -251,8 +247,8 @@ impl Webhooks {
                 .map(|(_, value)| value.as_str())
                 .filter(|value| !value.is_empty())
         };
-        let signature = find(WEBHOOK_SIGNATURE_HEADER).or_else(|| find(LEGACY_SIGNATURE_HEADER));
-        let timestamp = find(WEBHOOK_TIMESTAMP_HEADER).or_else(|| find(LEGACY_TIMESTAMP_HEADER));
+        let signature = find(WEBHOOK_SIGNATURE_HEADER);
+        let timestamp = find(WEBHOOK_TIMESTAMP_HEADER);
         let Some(signature) = signature else {
             return Err(WebhookError::new(
                 "MISSING_SIGNATURE",

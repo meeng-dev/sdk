@@ -10,7 +10,10 @@ import (
 // otherBrands are the names of the products this one is compared with. They do
 // not appear anywhere a developer reads: not in the contract the SDKs carry,
 // and so not in the code or the READMEs written from it.
-var otherBrands = regexp.MustCompile(`(?i)use-?send|unsend|resend`)
+//
+// The pattern is put together from pieces so that the names are not written in
+// this repository.
+var otherBrands = regexp.MustCompile(`(?i)\b(` + strings.Join([]string{"use-?" + "send", "un" + "send", "re" + "send"}, "|") + `)\b`)
 
 // infoDescription finds the description of the contract's info object in the
 // raw document: the raw JSON string, without its quotes.

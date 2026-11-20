@@ -145,8 +145,7 @@ public struct WebhookVerificationError: Error, Sendable, Hashable, CustomStringC
 /// The signature header, `X-Meeng-Signature`, is `v1=` and the HMAC-SHA256 of
 /// `{timestamp}.{body}`, in hex; `X-Meeng-Timestamp` is the time the webhook was
 /// sent, in milliseconds since the epoch; `X-Meeng-Event` carries the event's type
-/// and `X-Meeng-Call` the id of the delivery attempt. The app also sends the
-/// `X-UseSend-*` ones, which are read when the meeng ones are missing.
+/// and `X-Meeng-Call` the id of the delivery attempt.
 public struct Webhooks: Sendable {
     /// The header that carries the signature.
     public static let signatureHeader = "X-Meeng-Signature"
@@ -199,10 +198,10 @@ public struct Webhooks: Sendable {
         func header(_ name: String) -> String? {
             headers.first { $0.key.lowercased() == name.lowercased() }.map(\.value).flatMap { $0.isEmpty ? nil : $0 }
         }
-        guard let signature = header(Webhooks.signatureHeader) ?? header("X-UseSend-Signature") else {
+        guard let signature = header(Webhooks.signatureHeader) else {
             throw WebhookVerificationError(code: "MISSING_SIGNATURE", message: "Missing \(Webhooks.signatureHeader) header")
         }
-        guard let timestamp = header(Webhooks.timestampHeader) ?? header("X-UseSend-Timestamp") else {
+        guard let timestamp = header(Webhooks.timestampHeader) else {
             throw WebhookVerificationError(code: "MISSING_TIMESTAMP", message: "Missing \(Webhooks.timestampHeader) header")
         }
         guard signature.hasPrefix(Webhooks.prefix) else {

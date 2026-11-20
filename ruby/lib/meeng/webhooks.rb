@@ -47,12 +47,8 @@ module Meeng
     # How far from now, in milliseconds, a timestamp may be.
     DEFAULT_TOLERANCE_MS = 5 * 60 * 1000
 
-    # The app sends both families of headers, so an integration written for
-    # useSend keeps working; the meeng ones are read first.
-    LEGACY_SIGNATURE_HEADER = "X-UseSend-Signature"
-    LEGACY_TIMESTAMP_HEADER = "X-UseSend-Timestamp"
     SIGNATURE_PREFIX = "v1="
-    private_constant :LEGACY_SIGNATURE_HEADER, :LEGACY_TIMESTAMP_HEADER, :SIGNATURE_PREFIX
+    private_constant :SIGNATURE_PREFIX
 
     def initialize(secret)
       @secret = secret
@@ -85,8 +81,8 @@ module Meeng
 
     def check(body, headers, secret, tolerance, now)
       key = secret || @secret
-      signature = header(headers, SIGNATURE_HEADER) || header(headers, LEGACY_SIGNATURE_HEADER)
-      timestamp = header(headers, TIMESTAMP_HEADER) || header(headers, LEGACY_TIMESTAMP_HEADER)
+      signature = header(headers, SIGNATURE_HEADER)
+      timestamp = header(headers, TIMESTAMP_HEADER)
       raise WebhookVerificationError.new("MISSING_SIGNATURE", "Missing #{SIGNATURE_HEADER} header") if signature.nil? || signature.empty?
       raise WebhookVerificationError.new("MISSING_TIMESTAMP", "Missing #{TIMESTAMP_HEADER} header") if timestamp.nil? || timestamp.empty?
       raise WebhookVerificationError.new("INVALID_SIGNATURE_FORMAT", "Signature header must start with v1=") unless signature.start_with?(SIGNATURE_PREFIX)

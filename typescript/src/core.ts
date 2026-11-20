@@ -1,4 +1,4 @@
-/** What an error answer says, as useSend's SDKs read it. */
+/** What an error answer says. */
 export interface ErrorResponse {
   /** The API's code, such as `NOT_UNIQUE` or `FORBIDDEN`; `INTERNAL_SERVER_ERROR` when the answer had none. */
   code: string;

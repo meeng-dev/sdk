@@ -272,8 +272,7 @@ class WebhookVerificationException implements Exception {
 /// The signature header, `X-Meeng-Signature`, is `v1=` and the HMAC-SHA256 of
 /// `{timestamp}.{body}`, in hex; `X-Meeng-Timestamp` is the time the webhook was
 /// sent, in milliseconds since the epoch; `X-Meeng-Event` carries the event's
-/// type and `X-Meeng-Call` the id of the delivery attempt. The app also sends
-/// the `X-UseSend-*` ones, which are read when the meeng ones are missing.
+/// type and `X-Meeng-Call` the id of the delivery attempt.
 class Webhooks {
   const Webhooks(this._secret);
 
@@ -467,13 +466,7 @@ class Webhooks {
     DateTime? now,
   ) {
     var signature = _header(headers, signatureHeader);
-    if (signature.isEmpty) {
-      signature = _header(headers, 'X-UseSend-Signature');
-    }
     var timestamp = _header(headers, timestampHeader);
-    if (timestamp.isEmpty) {
-      timestamp = _header(headers, 'X-UseSend-Timestamp');
-    }
     if (signature.isEmpty) {
       throw const WebhookVerificationException(
         'MISSING_SIGNATURE',

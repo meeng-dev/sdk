@@ -29,7 +29,68 @@ class MeengTest < Minitest::Test
 
   def client(&answer)
     recorder = Recorder.new(&answer)
-    [Meeng::Client.new("mg_test_key", "https://meeng.test/", transport: recorder), recorder]
+    [Meeng::Client.new("mg_test_key", "https://meeng.test/", transport: recorder, max_retries: 0), recorder]
+  end
+
+  # A client that waits a millisecond between attempts; the block gets the number
+  # of the attempt and answers [status, payload] or raises.
+  def retrying(max_retries: 2, &answer)
+    seen = []
+    transport = lambda do |method, _url, headers, _body, _timeout|
+      seen << { method: method, headers: headers }
+      status, payload = answer.call(seen.size)
+      [status, { "retry-after" => "0" }, JSON.generate(payload)]
+    end
+    [Meeng::Client.new("mg_test_key", "https://meeng.test/", transport: transport, max_retries: max_retries, retry_delay: 0.001), seen]
+  end
+
+  LIMITED = [429, { "error" => { "code" => "RATE_LIMITED", "message" => "slow down" } }].freeze
+  BUSY = [503, { "error" => { "code" => "INTERNAL_SERVER_ERROR", "message" => "busy" } }].freeze
+
+  def test_a_too_many_requests_answer_is_repeated_for_any_call
+    meeng, seen = retrying { |n| n < 3 ? LIMITED : [200, { "emailId" => "em_1" }] }
+    assert_equal "em_1", meeng.emails.send({ from: "h@acme.com", to: "a@x.com" })[:emailId]
+    assert_equal 3, seen.size
+  end
+
+  def test_a_server_failure_is_repeated_only_when_repeating_cannot_do_the_work_twice
+    answer = ->(n) { n == 1 ? BUSY : [200, []] }
+    meeng, seen = retrying(&answer)
+    meeng.domains.list
+    assert_equal 2, seen.size
+
+    meeng, seen = retrying(&answer)
+    assert_raises(Meeng::Error) { meeng.emails.send({ from: "h@acme.com", to: "a@x.com" }) }
+    assert_equal 1, seen.size
+
+    meeng, seen = retrying(&answer)
+    meeng.emails.send({ from: "h@acme.com", to: "a@x.com" }, idempotency_key: "order-1")
+    assert_equal 2, seen.size
+    assert_equal "order-1", seen[1][:headers]["Idempotency-Key"]
+  end
+
+  def test_other_refusals_are_never_repeated_retries_can_be_turned_off_and_the_last_answer_is_the_error
+    meeng, seen = retrying { [409, { "error" => { "code" => "NOT_UNIQUE", "message" => "in progress" } }] }
+    assert_equal "NOT_UNIQUE", assert_raises(Meeng::Error) { meeng.domains.list }.code
+    assert_equal 1, seen.size
+
+    meeng, seen = retrying(max_retries: 0) { LIMITED }
+    assert_raises(Meeng::Error) { meeng.domains.list }
+    assert_equal 1, seen.size
+
+    meeng, seen = retrying(max_retries: 2) { LIMITED }
+    assert_equal "RATE_LIMITED", assert_raises(Meeng::Error) { meeng.domains.list }.code
+    assert_equal 3, seen.size
+  end
+
+  def test_a_connection_that_fails_is_repeated_for_a_read_only
+    meeng, seen = retrying { |n| n == 1 ? raise(Errno::ECONNRESET) : [200, []] }
+    meeng.domains.list
+    assert_equal 2, seen.size
+
+    meeng, seen = retrying { raise Errno::ECONNRESET }
+    assert_raises(Errno::ECONNRESET) { meeng.emails.cancel("em_1") }
+    assert_equal 1, seen.size
   end
 
   def test_sending_an_email_carries_the_key_the_body_and_the_idempotency_key
@@ -194,10 +255,10 @@ class MeengTest < Minitest::Test
     assert_equal ["a@x.com"], event[:data][:to]
   end
 
-  def test_the_usesend_headers_are_accepted_as_well_in_any_case
+  def test_the_headers_are_accepted_in_any_case
     timestamp = (Time.now.to_f * 1000).to_i.to_s
     webhooks = Meeng::Webhooks.new(SECRET)
-    assert webhooks.verify(BODY, headers: { "x-usesend-signature" => sign(timestamp), "x-usesend-timestamp" => timestamp })
+    assert webhooks.verify(BODY, headers: { "x-meeng-signature" => sign(timestamp), "x-meeng-timestamp" => timestamp })
   end
 
   def test_a_webhook_is_refused_with_the_code_that_says_why

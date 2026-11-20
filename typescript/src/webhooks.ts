@@ -97,11 +97,6 @@ export const WEBHOOK_EVENT_HEADER = "X-Meeng-Event";
 /** The header that carries the id of the delivery attempt. */
 export const WEBHOOK_CALL_HEADER = "X-Meeng-Call";
 
-// The app sends both families of headers, so that an integration written for
-// useSend keeps working; the meeng ones are read first.
-const LEGACY_SIGNATURE_HEADER = "X-UseSend-Signature";
-const LEGACY_TIMESTAMP_HEADER = "X-UseSend-Timestamp";
-
 const SIGNATURE_PREFIX = "v1=";
 const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000;
 
@@ -159,8 +154,8 @@ export class Webhooks {
 
   #verify(body: RawBody, options: VerifyOptions): void {
     const secret = options.secret ?? this.#secret;
-    const signature = getHeader(options.headers, WEBHOOK_SIGNATURE_HEADER) ?? getHeader(options.headers, LEGACY_SIGNATURE_HEADER);
-    const timestamp = getHeader(options.headers, WEBHOOK_TIMESTAMP_HEADER) ?? getHeader(options.headers, LEGACY_TIMESTAMP_HEADER);
+    const signature = getHeader(options.headers, WEBHOOK_SIGNATURE_HEADER);
+    const timestamp = getHeader(options.headers, WEBHOOK_TIMESTAMP_HEADER);
 
     if (!signature) {
       throw new WebhookVerificationError("MISSING_SIGNATURE", `Missing ${WEBHOOK_SIGNATURE_HEADER} header`);

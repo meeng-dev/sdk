@@ -19,9 +19,42 @@ typedef Answer = http.Response Function(http.Request request);
     apiKey: 'mg_test_key',
     baseUrl: 'https://meeng.test/',
     httpClient: fake,
+    maxRetries: 0,
   );
   return (meeng, seen);
 }
+
+/// A client that waits a millisecond between attempts; [answer] gets the
+/// number of the attempt and answers a response, or throws.
+(Meeng, List<http.Request>) retrying(
+  http.Response Function(int attempt) answer, {
+  int maxRetries = 2,
+}) {
+  final seen = <http.Request>[];
+  final fake = MockClient((request) async {
+    seen.add(request);
+    return answer(seen.length);
+  });
+  final meeng = Meeng(
+    apiKey: 'mg_test_key',
+    baseUrl: 'https://meeng.test/',
+    httpClient: fake,
+    maxRetries: maxRetries,
+    retryDelay: const Duration(milliseconds: 1),
+  );
+  return (meeng, seen);
+}
+
+http.Response limited() => http.Response(
+  '{"error":{"code":"RATE_LIMITED","message":"slow down"}}',
+  429,
+  headers: {'retry-after': '0'},
+);
+
+http.Response busy() => http.Response(
+  '{"error":{"code":"INTERNAL_SERVER_ERROR","message":"busy"}}',
+  503,
+);
 
 http.Response json(int status, Object? body) => http.Response(
   body is String ? body : jsonEncode(body),
@@ -30,6 +63,93 @@ http.Response json(int status, Object? body) => http.Response(
 );
 
 void main() {
+  test('a too many requests answer is repeated for any call', () async {
+    final (meeng, seen) = retrying(
+      (n) => n < 3 ? limited() : json(200, {'emailId': 'em_1'}),
+    );
+    final sent = await meeng.emails.send(
+      const EmailsSendParams(from: 'h@acme.com', to: ['a@x.com']),
+    );
+    expect(sent.emailId, 'em_1');
+    expect(seen, hasLength(3));
+  });
+
+  test(
+    'a server failure is repeated only when repeating cannot do the work twice',
+    () async {
+      http.Response answer(int n) => n == 1 ? busy() : json(200, <Object?>[]);
+      var (meeng, seen) = retrying(answer);
+      await meeng.domains.list();
+      expect(seen, hasLength(2));
+
+      (meeng, seen) = retrying(answer);
+      await expectLater(
+        meeng.emails.send(
+          const EmailsSendParams(from: 'h@acme.com', to: ['a@x.com']),
+        ),
+        throwsA(isA<MeengException>()),
+      );
+      expect(seen, hasLength(1));
+
+      (meeng, seen) = retrying(
+        (n) => n == 1 ? busy() : json(200, {'emailId': 'em_1'}),
+      );
+      await meeng.emails.send(
+        const EmailsSendParams(from: 'h@acme.com', to: ['a@x.com']),
+        idempotencyKey: 'order-1',
+      );
+      expect(seen, hasLength(2));
+      expect(seen[1].headers['Idempotency-Key'], 'order-1');
+    },
+  );
+
+  test(
+    'other refusals are never repeated, retries can be turned off, and the last answer is the error',
+    () async {
+      var (meeng, seen) = retrying(
+        (_) => json(409, {
+          'error': {'code': 'NOT_UNIQUE', 'message': 'in progress'},
+        }),
+      );
+      await expectLater(
+        meeng.domains.list(),
+        throwsA(
+          isA<MeengException>().having((e) => e.code, 'code', 'NOT_UNIQUE'),
+        ),
+      );
+      expect(seen, hasLength(1));
+
+      (meeng, seen) = retrying((_) => limited(), maxRetries: 0);
+      await expectLater(meeng.domains.list(), throwsA(isA<MeengException>()));
+      expect(seen, hasLength(1));
+
+      (meeng, seen) = retrying((_) => limited());
+      await expectLater(
+        meeng.domains.list(),
+        throwsA(
+          isA<MeengException>().having((e) => e.code, 'code', 'RATE_LIMITED'),
+        ),
+      );
+      expect(seen, hasLength(3));
+    },
+  );
+
+  test('a connection that fails is repeated for a read only', () async {
+    var (meeng, seen) = retrying(
+      (n) =>
+          n == 1 ? throw http.ClientException('reset') : json(200, <Object?>[]),
+    );
+    await meeng.domains.list();
+    expect(seen, hasLength(2));
+
+    (meeng, seen) = retrying((_) => throw http.ClientException('reset'));
+    await expectLater(
+      meeng.emails.cancel('em_1'),
+      throwsA(isA<http.ClientException>()),
+    );
+    expect(seen, hasLength(1));
+  });
+
   test(
     'sending an email carries the key, the body and the idempotency key',
     () async {
@@ -377,11 +497,11 @@ void main() {
     expect(event.data.status, 'DELIVERED');
   });
 
-  test('the useSend headers are accepted as well, in any case', () {
+  test('the headers are accepted in any case', () {
     final timestamp = '${DateTime.now().millisecondsSinceEpoch}';
     final headers = {
-      'x-usesend-signature': sign(timestamp),
-      'X-UseSend-Timestamp': timestamp,
+      'x-meeng-signature': sign(timestamp),
+      'X-Meeng-Timestamp': timestamp,
     };
     expect(Webhooks(secret).verify(body, headers), isTrue);
   });

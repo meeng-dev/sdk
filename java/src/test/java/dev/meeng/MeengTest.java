@@ -43,7 +43,7 @@ class MeengTest {
     }
 
     private static Meeng client(Recorder recorder) {
-        return Meeng.builder("mg_test_key").baseUrl("https://meeng.test/").transport(recorder).build();
+        return Meeng.builder("mg_test_key").baseUrl("https://meeng.test/").transport(recorder).maxRetries(0).build();
     }
 
     private static Transport.Response json(int status, Object payload) {
@@ -106,6 +106,96 @@ class MeengTest {
         assertEquals("em_2", got.getData().get(1).getEmailId());
         assertEquals("https://meeng.test/api/v1/emails/batch", recorder.seen.get(0).getUrl());
         assertEquals(2, ((List<?>) Json.parse(new String(recorder.seen.get(0).getBody(), StandardCharsets.UTF_8))).size());
+    }
+
+    /** Answers by the number of the attempt, or fails the connection; counts what it was asked. */
+    private static final class Attempts implements Transport {
+        final List<Request> seen = new ArrayList<>();
+        private final java.util.function.IntFunction<Object> answer;
+
+        Attempts(java.util.function.IntFunction<Object> answer) {
+            this.answer = answer;
+        }
+
+        @Override
+        public Response send(Request request) throws IOException {
+            seen.add(request);
+            Object result = answer.apply(seen.size());
+            if (result instanceof IOException) {
+                throw (IOException) result;
+            }
+            return (Response) result;
+        }
+    }
+
+    /** A client that waits a millisecond between attempts. */
+    private static Meeng retrying(Transport transport, int maxRetries) {
+        return Meeng.builder("mg_test_key").baseUrl("https://meeng.test/").transport(transport).maxRetries(maxRetries).retryDelay(Duration.ofMillis(1)).build();
+    }
+
+    private static Transport.Response limited() {
+        return new Transport.Response(429, Map.of("retry-after", "0"), Json.write(map("error", map("code", "RATE_LIMITED", "message", "slow down"))).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static Transport.Response busy() {
+        return new Transport.Response(503, Map.of(), Json.write(map("error", map("code", "INTERNAL_SERVER_ERROR", "message", "busy"))).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static Transport.Response ok(Object payload) {
+        return new Transport.Response(200, Map.of(), Json.write(payload).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static EmailsService.SendParams anEmail() {
+        return EmailsService.SendParams.builder().from("h@acme.com").to(List.of("a@x.com")).build();
+    }
+
+    @Test
+    void aTooManyRequestsAnswerIsRepeatedForAnyCall() {
+        Attempts attempts = new Attempts(n -> n < 3 ? limited() : ok(map("emailId", "em_1")));
+        assertEquals("em_1", retrying(attempts, 2).emails().send(anEmail()).getEmailId());
+        assertEquals(3, attempts.seen.size());
+    }
+
+    @Test
+    void aServerFailureIsRepeatedOnlyWhenRepeatingCannotDoTheWorkTwice() {
+        Attempts read = new Attempts(n -> n == 1 ? busy() : ok(List.of()));
+        retrying(read, 2).domains().list();
+        assertEquals(2, read.seen.size());
+
+        Attempts send = new Attempts(n -> n == 1 ? busy() : ok(map("emailId", "em_1")));
+        assertThrows(MeengException.class, () -> retrying(send, 2).emails().send(anEmail()));
+        assertEquals(1, send.seen.size());
+
+        Attempts keyed = new Attempts(n -> n == 1 ? busy() : ok(map("emailId", "em_1")));
+        retrying(keyed, 2).emails().send(anEmail(), RequestOptions.builder().idempotencyKey("order-1").build());
+        assertEquals(2, keyed.seen.size());
+        assertEquals("order-1", keyed.seen.get(1).getHeaders().get("Idempotency-Key"));
+    }
+
+    @Test
+    void otherRefusalsAreNeverRepeatedRetriesCanBeTurnedOffAndTheLastAnswerIsTheError() {
+        Attempts conflict = new Attempts(n -> json(409, map("error", map("code", "NOT_UNIQUE", "message", "in progress"))));
+        assertEquals("NOT_UNIQUE", assertThrows(MeengException.class, () -> retrying(conflict, 2).domains().list()).getCode());
+        assertEquals(1, conflict.seen.size());
+
+        Attempts off = new Attempts(n -> limited());
+        assertThrows(MeengException.class, () -> retrying(off, 0).domains().list());
+        assertEquals(1, off.seen.size());
+
+        Attempts giveUp = new Attempts(n -> limited());
+        assertEquals("RATE_LIMITED", assertThrows(MeengException.class, () -> retrying(giveUp, 2).domains().list()).getCode());
+        assertEquals(3, giveUp.seen.size());
+    }
+
+    @Test
+    void aConnectionThatFailsIsRepeatedForAReadOnly() {
+        Attempts read = new Attempts(n -> n == 1 ? new IOException("reset") : ok(List.of()));
+        retrying(read, 2).domains().list();
+        assertEquals(2, read.seen.size());
+
+        Attempts write = new Attempts(n -> new IOException("reset"));
+        assertThrows(java.io.UncheckedIOException.class, () -> retrying(write, 2).emails().cancel("em_1"));
+        assertEquals(1, write.seen.size());
     }
 
     @Test
@@ -246,9 +336,9 @@ class MeengTest {
     }
 
     @Test
-    void theUseSendHeadersAreAcceptedAsWellInAnyCase() {
+    void theHeadersAreAcceptedInAnyCase() {
         String timestamp = Long.toString(System.currentTimeMillis());
-        Map<String, String> headers = Map.of("x-usesend-signature", sign(timestamp, BODY, SECRET), "X-UseSend-Timestamp", timestamp);
+        Map<String, String> headers = Map.of("x-meeng-signature", sign(timestamp, BODY, SECRET), "X-Meeng-Timestamp", timestamp);
         assertTrue(new Meeng("k").webhooks(SECRET).verify(BODY, headers));
     }
 

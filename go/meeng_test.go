@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -290,13 +291,13 @@ func TestASignedWebhookIsVerifiedAndReadAsATypedEvent(t *testing.T) {
 	}
 }
 
-func TestTheUseSendHeadersAreAcceptedAsWell(t *testing.T) {
+func TestTheHeadersAreAcceptedInAnyCase(t *testing.T) {
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	header := http.Header{}
-	header.Set("x-usesend-signature", sign(timestamp, webhookBody, webhookSecret))
-	header.Set("x-usesend-timestamp", timestamp)
+	header.Set("x-meeng-signature", sign(timestamp, webhookBody, webhookSecret))
+	header.Set("x-meeng-timestamp", timestamp)
 	if !NewWebhooks(webhookSecret).Verify([]byte(webhookBody), header) {
-		t.Fatal("a webhook signed with the useSend headers was refused")
+		t.Fatal("a webhook signed with the headers in another case was refused")
 	}
 }
 
@@ -345,5 +346,114 @@ func TestAWebhookIsRefusedWithTheCodeThatSaysWhy(t *testing.T) {
 		case c.want != "" && (!errors.As(err, &refusal) || refusal.Code != c.want):
 			t.Errorf("%s: answered %v, want %s", c.name, err, c.want)
 		}
+	}
+}
+
+// retrying returns a client that waits a millisecond between attempts, and the
+// number of requests the handler has seen.
+func retrying(t *testing.T, handle func(n int, w http.ResponseWriter, r *http.Request), opts ...Option) (*Client, *atomic.Int32) {
+	t.Helper()
+	var seen atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handle(int(seen.Add(1)), w, r)
+	}))
+	t.Cleanup(srv.Close)
+	opts = append([]Option{WithBaseURL(srv.URL), WithRetryDelay(time.Millisecond)}, opts...)
+	return New("mg_test_key", opts...), &seen
+}
+
+func TestATooManyRequestsAnswerIsRepeatedForAnyCall(t *testing.T) {
+	client, seen := retrying(t, func(n int, w http.ResponseWriter, r *http.Request) {
+		if n < 3 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(429)
+			fmt.Fprint(w, `{"error":{"code":"RATE_LIMITED","message":"slow down"}}`)
+			return
+		}
+		fmt.Fprint(w, `{"emailId":"em_1"}`)
+	})
+	sent, err := client.Emails.Send(context.Background(), EmailsSendParams{From: "h@acme.com", To: StringList{"a@x.com"}})
+	if err != nil || sent.EmailID != "em_1" || seen.Load() != 3 {
+		t.Fatalf("sent %+v after %d requests, %v", sent, seen.Load(), err)
+	}
+}
+
+func TestAServerFailureIsRepeatedOnlyWhenRepeatingCannotDoTheWorkTwice(t *testing.T) {
+	fail := func(n int, w http.ResponseWriter, r *http.Request) {
+		if n == 1 {
+			w.WriteHeader(503)
+			fmt.Fprint(w, `{"error":{"code":"INTERNAL_SERVER_ERROR","message":"busy"}}`)
+			return
+		}
+		if r.Method == http.MethodGet {
+			fmt.Fprint(w, `[]`)
+			return
+		}
+		fmt.Fprint(w, `{"emailId":"em_1"}`)
+	}
+	client, seen := retrying(t, fail)
+	if _, err := client.Domains.List(context.Background()); err != nil || seen.Load() != 2 {
+		t.Errorf("a read: %d requests, %v", seen.Load(), err)
+	}
+	client, seen = retrying(t, fail)
+	if _, err := client.Emails.Send(context.Background(), EmailsSendParams{From: "h@acme.com", To: StringList{"a@x.com"}}); err == nil || seen.Load() != 1 {
+		t.Errorf("a send with no key: %d requests, %v", seen.Load(), err)
+	}
+	client, seen = retrying(t, fail)
+	if _, err := client.Emails.Send(context.Background(), EmailsSendParams{From: "h@acme.com", To: StringList{"a@x.com"}}, WithIdempotencyKey("order-1")); err != nil || seen.Load() != 2 {
+		t.Errorf("a send with a key: %d requests, %v", seen.Load(), err)
+	}
+}
+
+func TestOtherRefusalsAreNeverRepeatedAndRetriesCanBeTurnedOff(t *testing.T) {
+	client, seen := retrying(t, func(n int, w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(409)
+		fmt.Fprint(w, `{"error":{"code":"NOT_UNIQUE","message":"in progress"}}`)
+	})
+	if _, err := client.Domains.List(context.Background()); err == nil || seen.Load() != 1 {
+		t.Errorf("a 409: %d requests, %v", seen.Load(), err)
+	}
+	client, seen = retrying(t, func(n int, w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(429)
+		fmt.Fprint(w, `{"error":{"code":"RATE_LIMITED","message":"slow down"}}`)
+	}, WithMaxRetries(0))
+	if _, err := client.Domains.List(context.Background()); err == nil || seen.Load() != 1 {
+		t.Errorf("retries off: %d requests, %v", seen.Load(), err)
+	}
+	client, seen = retrying(t, func(n int, w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(429)
+		fmt.Fprint(w, `{"error":{"code":"RATE_LIMITED","message":"slow down"}}`)
+	}, WithMaxRetries(2))
+	_, err := client.Domains.List(context.Background())
+	var refusal *Error
+	if !errors.As(err, &refusal) || refusal.Code != "RATE_LIMITED" || seen.Load() != 3 {
+		t.Errorf("giving up: %d requests, %v", seen.Load(), err)
+	}
+}
+
+func TestAConnectionThatFailsIsRepeatedForAReadOnly(t *testing.T) {
+	var reads, writes atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hijacker := w.(http.Hijacker)
+		if r.Method == http.MethodGet {
+			if reads.Add(1) == 1 {
+				conn, _, _ := hijacker.Hijack()
+				conn.Close()
+				return
+			}
+			fmt.Fprint(w, `[]`)
+			return
+		}
+		writes.Add(1)
+		conn, _, _ := hijacker.Hijack()
+		conn.Close()
+	}))
+	t.Cleanup(srv.Close)
+	client := New("mg_test_key", WithBaseURL(srv.URL), WithRetryDelay(time.Millisecond))
+	if _, err := client.Domains.List(context.Background()); err != nil || reads.Load() != 2 {
+		t.Errorf("a read: %d requests, %v", reads.Load(), err)
+	}
+	if _, err := client.Emails.Cancel(context.Background(), "em_1"); err == nil || writes.Load() != 1 {
+		t.Errorf("a write: %d requests, %v", writes.Load(), err)
 	}
 }

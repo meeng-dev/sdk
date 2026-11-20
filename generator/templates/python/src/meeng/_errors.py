@@ -4,7 +4,7 @@ from typing import Any, Literal, TypedDict
 
 
 class ErrorResponse(TypedDict):
-    """What an error answer says, as useSend's SDKs read it."""
+    """What an error answer says."""
 
     code: str
     message: str

@@ -12,8 +12,13 @@ defmodule Meeng.Client do
     :api_key,
     base_url: nil,
     timeout: 30_000,
+    max_retries: 2,
+    retry_delay: 500,
     transport: &Meeng.Client.httpc/5
   ]
+
+  # The longest, in milliseconds, a call waits before a repetition.
+  @max_retry_delay 30_000
 
   @typedoc """
   Sends one request: `(method, url, headers, body, timeout_ms)` answers
@@ -27,6 +32,8 @@ defmodule Meeng.Client do
           api_key: String.t(),
           base_url: String.t(),
           timeout: timeout(),
+          max_retries: non_neg_integer(),
+          retry_delay: non_neg_integer(),
           transport: transport()
         }
 
@@ -36,7 +43,17 @@ defmodule Meeng.Client do
   Options: `:base_url` (the address of the app, without `/api/v1`, such as a
   self-hosted one; `MEENG_BASE_URL` when left out. It must be https, or http only
   for localhost, 127.0.0.0/8 and ::1, or `ArgumentError`), `:timeout` in
-  milliseconds (30 seconds) and `:transport` (see `t:transport/0`).
+  milliseconds (30 seconds), `:transport` (see `t:transport/0`), `:max_retries`
+  and `:retry_delay`.
+
+  A call that may be repeated is repeated up to `:max_retries` times (2 by
+  default; 0 sends every call once) after the first attempt. It is repeated when
+  the API answers 429, which means it was not processed, so any call may be; and
+  when the API answers 500, 502, 503 or 504, or the connection fails, only if
+  repeating it cannot do the work twice: a read, a PUT, a DELETE, or any call that
+  carries an idempotency key. Any other refusal, a 409 included, is never
+  repeated. The first repetition waits `:retry_delay` milliseconds (500), each
+  next one twice as long, and a Retry-After from the API replaces the wait.
   """
   @spec new(String.t() | nil, keyword()) :: t()
   def new(api_key \\ nil, opts \\ []) do
@@ -58,6 +75,8 @@ defmodule Meeng.Client do
       api_key: api_key,
       base_url: base_url <> Meeng.api_prefix(),
       timeout: Keyword.get(opts, :timeout, 30_000),
+      max_retries: max(Keyword.get(opts, :max_retries, 2), 0),
+      retry_delay: max(Keyword.get(opts, :retry_delay, 500), 0),
       transport: Keyword.get(opts, :transport, &__MODULE__.httpc/5)
     }
   end
@@ -82,7 +101,21 @@ defmodule Meeng.Client do
     body = if opts[:body], do: JSON.encode!(body(opts[:body]))
     url = client.base_url <> path <> query(opts[:query])
 
+    may_repeat? =
+      method in ["GET", "HEAD", "PUT", "DELETE"] or opts[:idempotency_key] not in [nil, ""]
+
+    send_request(client, {method, url, headers, body}, may_repeat?, 0)
+  end
+
+  defp send_request(client, {method, url, headers, body} = request, may_repeat?, attempt) do
+    again? = attempt < client.max_retries
+
     case client.transport.(method, url, headers, body, client.timeout) do
+      {:ok, {status, response_headers, _raw}}
+      when again? and (status == 429 or (may_repeat? and status in [500, 502, 503, 504])) ->
+        pause(client, attempt, retry_after(response_headers))
+        send_request(client, request, may_repeat?, attempt + 1)
+
       {:ok, {status, response_headers, raw}} when status >= 300 ->
         {:error, Meeng.Error.from_response(status, response_headers, raw)}
 
@@ -100,8 +133,42 @@ defmodule Meeng.Client do
              }}
         end
 
+      {:error, _reason} when again? and may_repeat? ->
+        # The connection failed or timed out: the call may or may not have arrived.
+        pause(client, attempt, nil)
+        send_request(client, request, may_repeat?, attempt + 1)
+
       {:error, reason} ->
         {:error, %Meeng.Error{status: nil, code: "transport", message: inspect(reason)}}
+    end
+  end
+
+  # Sleeps before repetition number attempt + 1: the API's Retry-After, or the
+  # base delay doubled each time and spread over its upper half.
+  defp pause(client, attempt, retry_after) do
+    millis =
+      case retry_after do
+        seconds when is_number(seconds) and seconds > 0 ->
+          round(seconds * 1000)
+
+        _ ->
+          delay = min(client.retry_delay * Integer.pow(2, min(attempt, 10)), @max_retry_delay)
+          div(delay, 2) + :rand.uniform(div(delay, 2) + 1) - 1
+      end
+
+    Process.sleep(min(millis, @max_retry_delay))
+  end
+
+  defp retry_after(headers) do
+    case List.keyfind(headers, "retry-after", 0) do
+      {_name, value} ->
+        case Float.parse(to_string(value)) do
+          {seconds, _rest} -> seconds
+          :error -> nil
+        end
+
+      nil ->
+        nil
     end
   end
 

@@ -17,6 +17,15 @@ namespace Meeng;
 /// <c>MEENG_API_KEY</c>, and the address of the app from <c>MEENG_BASE_URL</c>.
 /// The client is safe to share between threads.
 /// </summary>
+/// <remarks>
+/// A call that may be repeated is repeated up to <see cref="MeengClientOptions.MaxRetries"/> times
+/// (2 by default; 0 sends every call once) after the first attempt. It is repeated when the API
+/// answers 429, which means it was not processed, so any call may be; and when the API answers
+/// 500, 502, 503 or 504, or the connection fails, only if repeating it cannot do the work twice: a
+/// read, a PUT, a DELETE, or any call that carries an idempotency key. Any other refusal, a 409
+/// included, is never repeated. The first repetition waits <see cref="MeengClientOptions.RetryDelay"/>
+/// (500 ms by default), each next one twice as long, and a Retry-After from the API replaces the wait.
+/// </remarks>
 /// <example>
 /// <code>
 /// var meeng = new MeengClient("mg_123");
@@ -51,6 +60,11 @@ public sealed class MeengClient
     private readonly string baseUrl;
     private readonly TimeSpan timeout;
     private readonly HttpClient http;
+    private readonly int maxRetries;
+    private readonly TimeSpan retryDelay;
+
+    /// <summary>The longest a call waits before a repetition.</summary>
+    public static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
 
     /// <summary>A client for the team <paramref name="apiKey"/> belongs to.</summary>
     /// <param name="apiKey">The team's API key; <c>MEENG_API_KEY</c> when null.</param>
@@ -69,6 +83,8 @@ public sealed class MeengClient
         baseUrl = (string.IsNullOrEmpty(configured) ? DefaultBaseUrl : configured).TrimEnd('/');
         CheckBaseUrl(baseUrl);
         timeout = options.Timeout ?? TimeSpan.FromSeconds(30);
+        maxRetries = Math.Max(0, options.MaxRetries);
+        retryDelay = options.RetryDelay ?? TimeSpan.FromMilliseconds(500);
         http = options.HttpClient
             ?? (options.Handler is null ? SharedHttp : new HttpClient(options.Handler, disposeHandler: false) { Timeout = System.Threading.Timeout.InfiniteTimeSpan });
 {{- range .Services}}
@@ -107,6 +123,43 @@ public sealed class MeengClient
     }
 
     private async Task<byte[]> SendAsync(
+        HttpMethod method,
+        string path,
+        IEnumerable<KeyValuePair<string, string?>>? query,
+        byte[]? body,
+        string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var mayRepeat = method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Put || method == HttpMethod.Delete
+            || !string.IsNullOrEmpty(idempotencyKey);
+        for (var attempt = 0; ; attempt++)
+        {
+            TimeSpan? wait = null;
+            try
+            {
+                return await AttemptAsync(method, path, query, body, idempotencyKey, cancellationToken).ConfigureAwait(false);
+            }
+            catch (MeengException e) when (attempt < maxRetries && (e.Status == 429 || mayRepeat && e.Status is 500 or 502 or 503 or 504))
+            {
+                wait = e.RetryAfter is > 0 ? TimeSpan.FromSeconds(e.RetryAfter.Value) : Backoff(attempt);
+            }
+            catch (Exception e) when (attempt < maxRetries && mayRepeat && !cancellationToken.IsCancellationRequested && e is HttpRequestException or TimeoutException)
+            {
+                // The connection failed or timed out: the call may or may not have arrived.
+                wait = Backoff(attempt);
+            }
+            await Task.Delay(wait.Value < MaxRetryDelay ? wait.Value : MaxRetryDelay, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The wait before repetition number attempt + 1: the base delay doubled each time, spread over its upper half.</summary>
+    private TimeSpan Backoff(int attempt)
+    {
+        var delay = TimeSpan.FromTicks(Math.Min(retryDelay.Ticks << Math.Min(attempt, 10), MaxRetryDelay.Ticks));
+        return delay / 2 + TimeSpan.FromTicks((long)(Random.Shared.NextDouble() * (delay.Ticks / 2)));
+    }
+
+    private async Task<byte[]> AttemptAsync(
         HttpMethod method,
         string path,
         IEnumerable<KeyValuePair<string, string?>>? query,
@@ -187,6 +240,6 @@ public sealed class MeengClient
         return Uri.EscapeDataString(value);
     }
 
-    /// <summary>The body of a call with none of its own, as useSend's SDKs send it.</summary>
+    /// <summary>The body of a call with none of its own: an empty object.</summary>
     internal static readonly byte[] EmptyObject = "{}"u8.ToArray();
 }

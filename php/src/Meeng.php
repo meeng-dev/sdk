@@ -20,6 +20,15 @@ namespace Meeng;
  *     echo $sent['emailId'];
  *
  * A refusal throws MeengException.
+ *
+ * A call that may be repeated is repeated up to $maxRetries times (2 by
+ * default; 0 sends every call once) after the first attempt. It is repeated
+ * when the API answers 429, which means it was not processed, so any call may
+ * be; and when the API answers 500, 502, 503 or 504, or the connection fails,
+ * only if repeating it cannot do the work twice: a read, a PUT, a DELETE, or any
+ * call that carries an idempotency key. Any other refusal, a 409 included, is
+ * never repeated. The first repetition waits $retryDelay seconds, each next one
+ * twice as long, and a Retry-After from the API replaces the wait.
  */
 final class Meeng implements Requester
 {
@@ -29,6 +38,9 @@ final class Meeng implements Requester
     public readonly Services\ContactBooksService $contactBooks;
     public readonly Services\CampaignsService $campaigns;
     public readonly Services\AnalyticsService $analytics;
+
+    /** The longest, in seconds, a call waits before a repetition. */
+    public const MAX_RETRY_DELAY = 30.0;
 
     private readonly string $key;
     private readonly string $url;
@@ -49,6 +61,8 @@ final class Meeng implements Requester
         ?string $baseUrl = null,
         private readonly float $timeout = 30.0,
         ?callable $transport = null,
+        private readonly int $maxRetries = 2,
+        private readonly float $retryDelay = 0.5,
     ) {
         $resolved = $key ?? (getenv('MEENG_API_KEY') ?: null);
         if ($resolved === null || $resolved === '') {
@@ -107,11 +121,42 @@ final class Meeng implements Requester
         if ($idempotencyKey !== null && $idempotencyKey !== '') {
             $headers['Idempotency-Key'] = $idempotencyKey;
         }
-        [$status, $responseHeaders, $raw] = ($this->transport)($method, $url, $headers, $payload, $this->timeout);
+        $mayRepeat = in_array(strtoupper($method), ['GET', 'HEAD', 'PUT', 'DELETE'], true) || ($idempotencyKey !== null && $idempotencyKey !== '');
+        $attempt = 0;
+        while (true) {
+            try {
+                [$status, $responseHeaders, $raw] = ($this->transport)($method, $url, $headers, $payload, $this->timeout);
+            } catch (\RuntimeException $failure) {
+                // The connection failed or timed out: the call may or may not have arrived.
+                if (!$mayRepeat || $attempt >= max(0, $this->maxRetries)) {
+                    throw $failure;
+                }
+                $this->wait($attempt, null);
+                $attempt++;
+                continue;
+            }
+            if (($status === 429 || ($mayRepeat && in_array($status, [500, 502, 503, 504], true))) && $attempt < max(0, $this->maxRetries)) {
+                $this->wait($attempt, $responseHeaders['retry-after'] ?? null);
+                $attempt++;
+                continue;
+            }
+            break;
+        }
         if ($status >= 300) {
             throw MeengException::fromResponse($status, $responseHeaders, $raw);
         }
         return json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    /** Sleeps before repetition number $attempt + 1: the API's Retry-After, or the base delay doubled each time and spread over its upper half. */
+    private function wait(int $attempt, ?string $retryAfter): void
+    {
+        $seconds = is_numeric($retryAfter) ? (float) $retryAfter : 0.0;
+        if ($seconds <= 0) {
+            $delay = min(max(0.0, $this->retryDelay) * (2 ** min($attempt, 10)), self::MAX_RETRY_DELAY);
+            $seconds = $delay / 2 + (mt_rand() / mt_getrandmax()) * $delay / 2;
+        }
+        usleep((int) (min($seconds, self::MAX_RETRY_DELAY) * 1_000_000));
     }
 
     /** Throws unless the base URL is https, or http to localhost, 127.0.0.0/8 or ::1. */

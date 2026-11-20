@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -30,19 +31,35 @@ const _web = bool.fromEnvironment('dart.library.js_interop');
 /// );
 /// meeng.close();
 /// ```
+///
+/// A call that may be repeated is repeated up to `maxRetries` times (2 by
+/// default; 0 sends every call once) after the first attempt. It is repeated
+/// when the API answers 429, which means it was not processed, so any call may
+/// be; and when the API answers 500, 502, 503 or 504, or the connection fails,
+/// only if repeating it cannot do the work twice: a read, a PUT, a DELETE, or
+/// any call that carries an idempotency key. Any other refusal, a 409 included,
+/// is never repeated. The first repetition waits `retryDelay` (500 ms by
+/// default), each next one twice as long, and a Retry-After from the API
+/// replaces the wait.
 class Meeng implements Requester {
+  /// The longest a call waits before a repetition.
+  static const maxRetryDelay = Duration(seconds: 30);
+
   /// A client for the team [apiKey] belongs to.
   ///
   /// [baseUrl] points it at another app, such as a self-hosted one: the
   /// address of the app, without `/api/v1`. It must be https, or http only for
   /// localhost, 127.0.0.0/8 and ::1, and any other throws an [ArgumentError].
   /// [httpClient] sends the requests, a new `http.Client` by default; [timeout]
-  /// is how long a call may take, 30 seconds by default.
+  /// is how long an attempt may take, 30 seconds by default; [maxRetries] and
+  /// [retryDelay] say how a call is repeated.
   Meeng({
     String? apiKey,
     String? baseUrl,
     http.Client? httpClient,
     Duration timeout = const Duration(seconds: 30),
+    int maxRetries = 2,
+    Duration retryDelay = const Duration(milliseconds: 500),
   }) : key = _requiredKey(apiKey),
        url =
            _checkedBaseUrl(
@@ -52,7 +69,9 @@ class Meeng implements Requester {
            apiPrefix,
        _http = httpClient ?? http.Client(),
        _ownsHttp = httpClient == null,
-       _timeout = timeout;
+       _timeout = timeout,
+       _maxRetries = maxRetries < 0 ? 0 : maxRetries,
+       _retryDelay = retryDelay;
 
   /// The API key.
   final String key;
@@ -62,6 +81,8 @@ class Meeng implements Requester {
   final http.Client _http;
   final bool _ownsHttp;
   final Duration _timeout;
+  final int _maxRetries;
+  final Duration _retryDelay;
 
   /// The API's emails.
   late final emails = EmailsService(this);
@@ -93,7 +114,7 @@ class Meeng implements Requester {
 
   /// Calls the API and answers its JSON, decoded.
   ///
-  /// A refusal throws [MeengException]; a call that takes longer than the
+  /// A refusal throws [MeengException]; an attempt that takes longer than the
   /// timeout, a [TimeoutException].
   @override
   Future<Object?> request(
@@ -120,29 +141,78 @@ class Meeng implements Requester {
       );
       separator = '&';
     }
-    final request = http.Request(method, Uri.parse(target.toString()))
-      ..followRedirects = false;
-    request.headers['Authorization'] = 'Bearer $key';
-    request.headers['Accept'] = 'application/json';
-    if (!_web) {
-      request.headers['User-Agent'] = 'meeng-dart/$sdkVersion';
+    final uri = Uri.parse(target.toString());
+    final encoded = body == null ? null : utf8.encode(jsonEncode(body));
+    final mayRepeat =
+        const ['GET', 'HEAD', 'PUT', 'DELETE'].contains(method.toUpperCase()) ||
+        (idempotencyKey != null && idempotencyKey.isNotEmpty);
+    for (var attempt = 0; ; attempt++) {
+      final request = http.Request(method, uri)..followRedirects = false;
+      request.headers['Authorization'] = 'Bearer $key';
+      request.headers['Accept'] = 'application/json';
+      if (!_web) {
+        request.headers['User-Agent'] = 'meeng-dart/$sdkVersion';
+      }
+      if (encoded != null) {
+        request.headers['Content-Type'] = 'application/json';
+        request.bodyBytes = encoded;
+      }
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+        request.headers['Idempotency-Key'] = idempotencyKey;
+      }
+      http.Response response;
+      try {
+        response = await _send(request).timeout(_timeout);
+      } on http.ClientException {
+        // The connection failed: the call may or may not have arrived.
+        if (!mayRepeat || attempt >= _maxRetries) rethrow;
+        await Future<void>.delayed(_backoff(attempt));
+        continue;
+      } on TimeoutException {
+        if (!mayRepeat || attempt >= _maxRetries) rethrow;
+        await Future<void>.delayed(_backoff(attempt));
+        continue;
+      }
+      final status = response.statusCode;
+      final again =
+          status == 429 ||
+          (mayRepeat &&
+              (status == 500 ||
+                  status == 502 ||
+                  status == 503 ||
+                  status == 504));
+      if (again && attempt < _maxRetries) {
+        final seconds = double.tryParse(
+          response.headers['retry-after']?.trim() ?? '',
+        );
+        final wait = seconds != null && seconds > 0
+            ? Duration(milliseconds: (seconds * 1000).round())
+            : _backoff(attempt);
+        await Future<void>.delayed(wait < maxRetryDelay ? wait : maxRetryDelay);
+        continue;
+      }
+      if (status >= 300) {
+        throw MeengException.fromResponse(
+          status,
+          response.headers,
+          response.bodyBytes,
+        );
+      }
+      return jsonDecode(utf8.decode(response.bodyBytes));
     }
-    if (body != null) {
-      request.headers['Content-Type'] = 'application/json';
-      request.bodyBytes = utf8.encode(jsonEncode(body));
-    }
-    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
-      request.headers['Idempotency-Key'] = idempotencyKey;
-    }
-    final response = await _send(request).timeout(_timeout);
-    if (response.statusCode >= 300) {
-      throw MeengException.fromResponse(
-        response.statusCode,
-        response.headers,
-        response.bodyBytes,
-      );
-    }
-    return jsonDecode(utf8.decode(response.bodyBytes));
+  }
+
+  /// The wait before repetition number attempt + 1: the base delay doubled
+  /// each time, spread over its upper half.
+  Duration _backoff(int attempt) {
+    final delay = Duration(
+      microseconds: min(
+        _retryDelay.inMicroseconds << min(attempt, 10),
+        maxRetryDelay.inMicroseconds,
+      ),
+    );
+    final half = delay.inMicroseconds ~/ 2;
+    return Duration(microseconds: half + Random().nextInt(half + 1));
   }
 
   static String _requiredKey(String? apiKey) {

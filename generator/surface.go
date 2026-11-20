@@ -23,8 +23,8 @@ type operationDef struct {
 	// list it is; empty means <Service><Name>Response. Operations that answer
 	// the same shape share a name, and generation fails if two shapes differ.
 	Response string
-	// Aliases are other names the dynamic clients give the same method, as
-	// useSend's SDKs do: emails.create for emails.send.
+	// Aliases are other names the dynamic clients give the same method:
+	// emails.create for emails.send.
 	Aliases []string
 }
 

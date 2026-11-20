@@ -40,7 +40,7 @@ test("sending an email carries the key, the body and the idempotency key", async
   assert.deepEqual(JSON.parse(seen[0]?.body ?? ""), { from: "hello@acme.com", to: ["a@x.com", "b@x.com"], subject: "Hi", html: "<p>Hi</p>", headers: { "X-Order": "1" } });
 });
 
-test("a write with no body of its own sends an empty object, as useSend does", async () => {
+test("a write with no body of its own sends an empty object", async () => {
   const { meeng, seen } = client(() => json(200, { emailId: "em_1" }));
   await meeng.emails.cancel("em_1");
   assert.equal(seen[0]?.method, "POST");
@@ -185,10 +185,10 @@ test("a signed webhook is verified and read as a typed event", () => {
   }
 });
 
-test("the useSend headers are accepted as well, in any case", () => {
+test("the headers are accepted in any case", () => {
   const timestamp = String(Date.now());
   const webhooks = new Meeng("k", "https://meeng.test").webhooks(secret);
-  const headers = { "x-usesend-signature": sign(timestamp), "x-usesend-timestamp": timestamp };
+  const headers = { "x-meeng-signature": sign(timestamp), "x-meeng-timestamp": timestamp };
   assert.equal(webhooks.verify(body, { headers }), true);
 });
 
@@ -220,4 +220,71 @@ test("a webhook is refused with the code that says why", () => {
   const notJson = "not json";
   assert.equal(refused({ "X-Meeng-Signature": sign(timestamp, notJson), "X-Meeng-Timestamp": timestamp }, { text: notJson }), "INVALID_JSON");
   assert.equal(webhooks.verify(123 as unknown as string, { headers: good, now }), false);
+});
+
+function retrying(answer: (n: number, seen: Seen) => Response | Error, options: { maxRetries?: number } = {}): { meeng: Meeng; seen: Seen[] } {
+  const seen: Seen[] = [];
+  const fake: typeof fetch = async (input, init) => {
+    const request = { method: init?.method ?? "GET", url: new URL(String(input)), headers: new Headers(init?.headers), body: init?.body as string | undefined };
+    seen.push(request);
+    const result = answer(seen.length, request);
+    if (result instanceof Error) {
+      throw result;
+    }
+    return result;
+  };
+  return { meeng: new Meeng("mg_test_key", "https://meeng.test/", { fetch: fake, retryDelayMs: 1, ...options }), seen };
+}
+
+const limited = () => new Response(JSON.stringify({ error: { code: "RATE_LIMITED", message: "slow down" } }), { status: 429, headers: { "Retry-After": "0" } });
+const busy = () => json(503, { error: { code: "INTERNAL_SERVER_ERROR", message: "busy" } });
+
+test("a too many requests answer is repeated for any call", async () => {
+  const { meeng, seen } = retrying((n) => (n < 3 ? limited() : json(200, { emailId: "em_1" })));
+  const { data, error } = await meeng.emails.send({ from: "h@acme.com", to: "a@x.com" });
+  assert.equal(error, null);
+  assert.equal(data?.emailId, "em_1");
+  assert.equal(seen.length, 3);
+});
+
+test("a server failure is repeated only when repeating cannot do the work twice", async () => {
+  const answer = (n: number) => (n === 1 ? busy() : json(200, []));
+  const read = retrying(answer);
+  assert.equal((await read.meeng.domains.list()).error, null);
+  assert.equal(read.seen.length, 2);
+
+  const send = retrying(answer);
+  assert.equal((await send.meeng.emails.send({ from: "h@acme.com", to: "a@x.com" })).error?.code, "INTERNAL_SERVER_ERROR");
+  assert.equal(send.seen.length, 1);
+
+  const keyed = retrying(answer);
+  assert.equal((await keyed.meeng.emails.send({ from: "h@acme.com", to: "a@x.com" }, { idempotencyKey: "order-1" })).error, null);
+  assert.equal(keyed.seen.length, 2);
+  assert.equal(keyed.seen[1]?.headers.get("idempotency-key"), "order-1");
+});
+
+test("other refusals are never repeated, retries can be turned off, and the last answer is the error", async () => {
+  const conflict = retrying(() => json(409, { error: { code: "NOT_UNIQUE", message: "in progress" } }));
+  assert.equal((await conflict.meeng.domains.list()).error?.code, "NOT_UNIQUE");
+  assert.equal(conflict.seen.length, 1);
+
+  const off = retrying(() => limited(), { maxRetries: 0 });
+  assert.equal((await off.meeng.domains.list()).error?.code, "RATE_LIMITED");
+  assert.equal(off.seen.length, 1);
+
+  const giveUp = retrying(() => limited(), { maxRetries: 2 });
+  const { error } = await giveUp.meeng.domains.list();
+  assert.equal(error?.code, "RATE_LIMITED");
+  assert.equal(error?.status, 429);
+  assert.equal(giveUp.seen.length, 3);
+});
+
+test("a connection that fails is repeated for a read only", async () => {
+  const read = retrying((n) => (n === 1 ? new TypeError("fetch failed") : json(200, [])));
+  assert.equal((await read.meeng.domains.list()).error, null);
+  assert.equal(read.seen.length, 2);
+
+  const write = retrying(() => new TypeError("fetch failed"));
+  await assert.rejects(write.meeng.emails.cancel("em_1"), TypeError);
+  assert.equal(write.seen.length, 1);
 });

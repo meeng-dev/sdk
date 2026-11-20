@@ -5,6 +5,8 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import random
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -18,6 +20,11 @@ from .webhooks import Webhooks
 
 Transport = Callable[[str, str, dict[str, str], "bytes | None", float], "tuple[int, dict[str, str], bytes]"]
 """Sends one request: (method, url, headers, body, timeout) -> (status, headers in lower case, body)."""
+
+MAX_RETRY_DELAY = 30.0
+"""The longest, in seconds, a call waits before a repetition."""
+
+_TRANSIENT = frozenset({500, 502, 503, 504})
 
 _INSECURE = "meeng: the base URL must be https (http is accepted only for localhost, 127.0.0.0/8 and ::1), so the API key is never sent in clear text"
 
@@ -68,7 +75,7 @@ def _check_base_url(base_url: str) -> None:
 class Meeng:
     """meeng's API with one team's API key.
 
-    Every call answers ``(data, error)``, as useSend's SDK does. By default a
+    Every call answers ``(data, error)``. By default a
     refusal raises ``MeengHTTPError`` and ``error`` is always ``None``; build the
     client with ``raise_on_error=False`` to get ``(None, error)`` instead.
 
@@ -82,6 +89,15 @@ class Meeng:
 
     Without a key it is read from MEENG_API_KEY, and the address of the app from
     MEENG_BASE_URL.
+
+    A call that may be repeated is repeated up to ``max_retries`` times (2 by
+    default; 0 sends every call once) after the first attempt. It is repeated
+    when the API answers 429, which means it was not processed, so any call may
+    be; and when the API answers 500, 502, 503 or 504, or the connection fails,
+    only if repeating it cannot do the work twice: a read, a PUT, a DELETE, or any
+    call that carries an idempotency key. Any other refusal, a 409 included, is
+    never repeated. The first repetition waits ``retry_delay`` seconds, each next
+    one twice as long, and a ``Retry-After`` from the API replaces the wait.
     """
 
     def __init__(
@@ -91,6 +107,8 @@ class Meeng:
         *,
         raise_on_error: bool = True,
         timeout: float = 30.0,
+        max_retries: int = 2,
+        retry_delay: float = 0.5,
         transport: Transport | None = None,
     ) -> None:
         resolved = key or os.environ.get("MEENG_API_KEY")
@@ -102,6 +120,8 @@ class Meeng:
         self.url: str = base + API_PREFIX
         self.raise_on_error = raise_on_error
         self._timeout = timeout
+        self._max_retries = max(0, max_retries)
+        self._retry_delay = max(0.0, retry_delay)
         self._transport = transport or urllib_transport
 {{- range .Services}}
         self.{{snake .Name}} = {{pascal .Name}}Service(self)
@@ -147,7 +167,24 @@ class Meeng:
             headers["Content-Type"] = "application/json"
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
-        status, _, raw = self._transport(method, url, headers, data, self._timeout)
+        may_repeat = method.upper() in ("GET", "HEAD", "PUT", "DELETE") or bool(idempotency_key)
+        attempt = 0
+        while True:
+            try:
+                status, answer_headers, raw = self._transport(method, url, headers, data, self._timeout)
+            except OSError:
+                # The connection failed or timed out: the call may or may not have arrived.
+                if not may_repeat or attempt >= self._max_retries:
+                    raise
+                self._wait(attempt, None)
+                attempt += 1
+                continue
+            if status == 429 or (may_repeat and status in _TRANSIENT):
+                if attempt < self._max_retries:
+                    self._wait(attempt, answer_headers.get("retry-after"))
+                    attempt += 1
+                    continue
+            break
         if status >= 300:
             error = error_of(status, _REASONS.get(status, "Error"), raw)
             if self.raise_on_error:
@@ -160,6 +197,17 @@ class Meeng:
             if self.raise_on_error:
                 raise MeengHTTPError(status, error, method, path) from None
             return None, error
+
+    def _wait(self, attempt: int, retry_after: str | None) -> None:
+        """Sleeps before repetition number attempt + 1: the API's Retry-After, or the base delay doubled each time and spread over its upper half."""
+        try:
+            seconds = float(retry_after) if retry_after is not None else 0.0
+        except ValueError:
+            seconds = 0.0
+        if seconds <= 0:
+            delay = min(self._retry_delay * 2 ** min(attempt, 10), MAX_RETRY_DELAY)
+            seconds = delay / 2 + random.random() * delay / 2
+        time.sleep(min(seconds, MAX_RETRY_DELAY))
 
 
 _REASONS = {

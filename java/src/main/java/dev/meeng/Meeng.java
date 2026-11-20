@@ -30,6 +30,16 @@ import java.util.Objects;
  * <p>A refusal throws {@link MeengException}; a request that could not be
  * sent, {@link UncheckedIOException}. The client is safe to share between
  * threads.
+ *
+ * <p>A call that may be repeated is repeated up to {@link Builder#maxRetries(int)}
+ * times (2 by default; 0 sends every call once) after the first attempt. It is
+ * repeated when the API answers 429, which means it was not processed, so any
+ * call may be; and when the API answers 500, 502, 503 or 504, or the connection
+ * fails, only if repeating it cannot do the work twice: a read, a PUT, a DELETE,
+ * or any call that carries an idempotency key. Any other refusal, a 409
+ * included, is never repeated. The first repetition waits
+ * {@link Builder#retryDelay(Duration)} (500 ms by default), each next one twice
+ * as long, and a Retry-After from the API replaces the wait.
  */
 public final class Meeng {
     /** This SDK's version. */
@@ -45,6 +55,9 @@ public final class Meeng {
      */
     public static final String DEFAULT_BASE_URL = "https://meeng.dev";
 
+    /** The longest a call waits before a repetition. */
+    public static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
+
     /** What every path starts with, after the base URL. */
     public static final String API_PREFIX = "/api";
 
@@ -52,6 +65,8 @@ public final class Meeng {
     private final String baseUrl;
     private final Duration timeout;
     private final Transport transport;
+    private final int maxRetries;
+    private final Duration retryDelay;
     private final EmailsService emails;
     private final DomainsService domains;
     private final ContactsService contacts;
@@ -87,6 +102,8 @@ public final class Meeng {
         checkBaseUrl(this.baseUrl);
         this.timeout = builder.timeout;
         this.transport = builder.transport == null ? new HttpTransport() : builder.transport;
+        this.maxRetries = builder.maxRetries;
+        this.retryDelay = builder.retryDelay;
         this.emails = new EmailsService(this);
         this.domains = new DomainsService(this);
         this.contacts = new ContactsService(this);
@@ -180,19 +197,57 @@ public final class Meeng {
         if (idempotencyKey != null && !idempotencyKey.isEmpty()) {
             headers.put("Idempotency-Key", idempotencyKey);
         }
+        boolean mayRepeat = Arrays.asList("GET", "HEAD", "PUT", "DELETE").contains(method.toUpperCase(Locale.ROOT))
+                || idempotencyKey != null && !idempotencyKey.isEmpty();
         Transport.Response response;
-        try {
-            response = transport.send(new Transport.Request(method, url.toString(), headers, payload, timeout));
-        } catch (IOException e) {
-            throw new UncheckedIOException("meeng: " + method + " " + path + ": " + e.getMessage(), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new UncheckedIOException(new InterruptedIOException("meeng: " + method + " " + path + " was interrupted"));
+        for (int attempt = 0; ; attempt++) {
+            try {
+                response = transport.send(new Transport.Request(method, url.toString(), headers, payload, timeout));
+            } catch (IOException e) {
+                // The connection failed or timed out: the call may or may not have arrived.
+                if (!mayRepeat || attempt >= maxRetries) {
+                    throw new UncheckedIOException("meeng: " + method + " " + path + ": " + e.getMessage(), e);
+                }
+                pause(attempt, null, method, path);
+                continue;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new UncheckedIOException(new InterruptedIOException("meeng: " + method + " " + path + " was interrupted"));
+            }
+            int status = response.getStatus();
+            boolean again = status == 429 || mayRepeat && (status == 500 || status == 502 || status == 503 || status == 504);
+            if (!again || attempt >= maxRetries) {
+                break;
+            }
+            pause(attempt, response.getHeaders().get("retry-after"), method, path);
         }
         if (response.getStatus() >= 300) {
             throw MeengException.of(response);
         }
         return Json.parse(new String(response.getBody(), StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Sleeps before repetition number attempt + 1: the API's Retry-After, or the
+     * base delay doubled each time and spread over its upper half.
+     */
+    private void pause(int attempt, String retryAfter, String method, String path) {
+        long millis = 0;
+        try {
+            millis = retryAfter == null ? 0 : (long) (Double.parseDouble(retryAfter.trim()) * 1000);
+        } catch (NumberFormatException e) {
+            millis = 0;
+        }
+        if (millis <= 0) {
+            long delay = Math.min(retryDelay.toMillis() << Math.min(attempt, 10), MAX_RETRY_DELAY.toMillis());
+            millis = delay / 2 + (long) (Math.random() * (delay / 2 + 1));
+        }
+        try {
+            Thread.sleep(Math.min(millis, MAX_RETRY_DELAY.toMillis()));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new UncheckedIOException(new InterruptedIOException("meeng: " + method + " " + path + " was interrupted"));
+        }
     }
 
     /** Throws unless the base URL is https, or http to localhost, 127.0.0.0/8 or ::1. */
@@ -229,6 +284,8 @@ public final class Meeng {
         private String baseUrl;
         private Duration timeout = Duration.ofSeconds(30);
         private Transport transport;
+        private int maxRetries = 2;
+        private Duration retryDelay = Duration.ofMillis(500);
 
         private Builder(String apiKey) {
             this.apiKey = apiKey;
@@ -267,6 +324,31 @@ public final class Meeng {
          */
         public Builder transport(Transport transport) {
             this.transport = transport;
+            return this;
+        }
+
+        /**
+         * How many times a call that may be repeated is repeated after the
+         * first attempt; 2 by default, and 0 sends every call once.
+         *
+         * @param maxRetries the number of repetitions
+         * @return this builder
+         */
+        public Builder maxRetries(int maxRetries) {
+            this.maxRetries = Math.max(0, maxRetries);
+            return this;
+        }
+
+        /**
+         * The wait before the first repetition; 500 ms by default. Each next
+         * repetition waits twice as long, and a Retry-After the API answers
+         * replaces the wait.
+         *
+         * @param retryDelay the wait
+         * @return this builder
+         */
+        public Builder retryDelay(Duration retryDelay) {
+            this.retryDelay = Objects.requireNonNull(retryDelay, "retryDelay");
             return this;
         }
 

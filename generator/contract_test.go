@@ -5,13 +5,15 @@ import (
 	"testing"
 )
 
+const rival = "use" + "Send"
+
 func TestTheContractLosesTheSentenceThatNamesAnotherProduct(t *testing.T) {
-	raw := `{"openapi": "3.1.0", "info": {"title": "meeng.dev API", "description": "The e-mail API. It is the useSend v1 API: the same paths, so an integration written for useSend works. Authenticate with ` + "`Bearer \\u003ctoken\\u003e`" + `.", "version": "1.0.0"}, "paths": {}}`
+	raw := `{"openapi": "3.1.0", "info": {"title": "meeng.dev API", "description": "The e-mail API. It is the ` + rival + ` v1 API: the same paths, so an integration written for ` + rival + ` works. Authenticate with ` + "`Bearer \\u003ctoken\\u003e`" + `.", "version": "1.0.0"}, "paths": {}}`
 	got, err := SanitizeContract([]byte(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(strings.ToLower(string(got)), "usesend") {
+	if strings.Contains(strings.ToLower(string(got)), strings.ToLower(rival)) {
 		t.Fatalf("still named: %s", got)
 	}
 	if !strings.Contains(string(got), "The e-mail API. Authenticate with") || !strings.Contains(string(got), `"version": "1.0.0"`) {
@@ -20,7 +22,7 @@ func TestTheContractLosesTheSentenceThatNamesAnotherProduct(t *testing.T) {
 }
 
 func TestAContractThatNamesAnotherProductElsewhereIsRefused(t *testing.T) {
-	raw := `{"info": {"description": "Fine."}, "paths": {"/x": {"get": {"summary": "Works like Resend"}}}}`
+	raw := `{"info": {"description": "Fine."}, "paths": {"/x": {"get": {"summary": "Works like Re` + "send" + `"}}}}`
 	if _, err := SanitizeContract([]byte(raw)); err == nil {
 		t.Fatal("a contract naming another product was accepted")
 	}

@@ -16,7 +16,106 @@ defmodule MeengTest do
       {:ok, {status, [{"retry-after", "7"}], raw}}
     end
 
-    Meeng.new("mg_test_key", base_url: "https://meeng.test/", transport: transport)
+    Meeng.new("mg_test_key",
+      base_url: "https://meeng.test/",
+      transport: transport,
+      max_retries: 0
+    )
+  end
+
+  # A client that waits a millisecond between attempts; `answer` gets the number
+  # of the attempt and answers `{status, payload}` or `:error` for a connection that fails.
+  defp retrying(answer, max_retries \\ 2) do
+    test = self()
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    transport = fn method, _url, headers, _body, _timeout ->
+      n = Agent.get_and_update(counter, &{&1 + 1, &1 + 1})
+      send(test, {:attempt, n, method, Map.new(headers)})
+
+      case answer.(n) do
+        :error -> {:error, :econnreset}
+        {status, payload} -> {:ok, {status, [{"retry-after", "0"}], JSON.encode!(payload)}}
+      end
+    end
+
+    meeng =
+      Meeng.new("mg_test_key",
+        base_url: "https://meeng.test/",
+        transport: transport,
+        max_retries: max_retries,
+        retry_delay: 1
+      )
+
+    {meeng, counter}
+  end
+
+  defp attempts(counter), do: Agent.get(counter, & &1)
+
+  @limited {429, %{"error" => %{"code" => "RATE_LIMITED", "message" => "slow down"}}}
+  @busy {503, %{"error" => %{"code" => "INTERNAL_SERVER_ERROR", "message" => "busy"}}}
+
+  test "a too many requests answer is repeated for any call" do
+    {meeng, counter} =
+      retrying(fn n -> if n < 3, do: @limited, else: {200, %{"emailId" => "em_1"}} end)
+
+    assert {:ok, %{"emailId" => "em_1"}} =
+             Meeng.Emails.send(meeng, %{from: "h@acme.com", to: "a@x.com"})
+
+    assert attempts(counter) == 3
+  end
+
+  test "a server failure is repeated only when repeating cannot do the work twice" do
+    answer = fn n -> if n == 1, do: @busy, else: {200, []} end
+
+    {meeng, counter} = retrying(answer)
+    assert {:ok, []} = Meeng.Domains.list(meeng)
+    assert attempts(counter) == 2
+
+    {meeng, counter} = retrying(answer)
+
+    assert {:error, %Meeng.Error{code: "INTERNAL_SERVER_ERROR"}} =
+             Meeng.Emails.send(meeng, %{from: "h@acme.com", to: "a@x.com"})
+
+    assert attempts(counter) == 1
+
+    {meeng, counter} = retrying(answer)
+
+    assert {:ok, []} =
+             Meeng.Emails.send(meeng, %{from: "h@acme.com", to: "a@x.com"},
+               idempotency_key: "order-1"
+             )
+
+    assert attempts(counter) == 2
+    assert_received {:attempt, 2, "POST", %{"Idempotency-Key" => "order-1"}}
+  end
+
+  test "other refusals are never repeated, retries can be turned off, and the last answer is the error" do
+    {meeng, counter} =
+      retrying(fn _ ->
+        {409, %{"error" => %{"code" => "NOT_UNIQUE", "message" => "in progress"}}}
+      end)
+
+    assert {:error, %Meeng.Error{code: "NOT_UNIQUE"}} = Meeng.Domains.list(meeng)
+    assert attempts(counter) == 1
+
+    {meeng, counter} = retrying(fn _ -> @limited end, 0)
+    assert {:error, %Meeng.Error{}} = Meeng.Domains.list(meeng)
+    assert attempts(counter) == 1
+
+    {meeng, counter} = retrying(fn _ -> @limited end, 2)
+    assert {:error, %Meeng.Error{code: "RATE_LIMITED", status: 429}} = Meeng.Domains.list(meeng)
+    assert attempts(counter) == 3
+  end
+
+  test "a connection that fails is repeated for a read only" do
+    {meeng, counter} = retrying(fn n -> if n == 1, do: :error, else: {200, []} end)
+    assert {:ok, []} = Meeng.Domains.list(meeng)
+    assert attempts(counter) == 2
+
+    {meeng, counter} = retrying(fn _ -> :error end)
+    assert {:error, %Meeng.Error{code: "transport"}} = Meeng.Emails.cancel(meeng, "em_1")
+    assert attempts(counter) == 1
   end
 
   test "sending an email carries the key, the body and the idempotency key" do
@@ -305,9 +404,9 @@ defmodule MeengTest do
     assert event["data"]["to"] == ["a@x.com"]
   end
 
-  test "the useSend headers are accepted as well, in any case" do
+  test "the headers are accepted in any case" do
     timestamp = Integer.to_string(System.os_time(:millisecond))
-    headers = [{"x-usesend-signature", sign(timestamp)}, {"X-UseSend-Timestamp", timestamp}]
+    headers = [{"x-meeng-signature", sign(timestamp)}, {"X-Meeng-Timestamp", timestamp}]
     assert Meeng.verify_webhook(@secret, headers, @body)
   end
 

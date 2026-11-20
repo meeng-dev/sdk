@@ -32,8 +32,7 @@ defmodule Meeng.Webhooks do
   The signature header, `X-Meeng-Signature`, is `v1=` and the HMAC-SHA256 of
   `"{timestamp}.{body}"`, in hex; `X-Meeng-Timestamp` is the time the webhook was
   sent, in milliseconds since the epoch. `X-Meeng-Event` carries the event's type
-  and `X-Meeng-Call` the id of the delivery attempt. The app also sends the
-  `X-UseSend-*` ones, which are read when the meeng ones are missing.
+  and `X-Meeng-Call` the id of the delivery attempt.
 
   An event is a map with `"id"` (the id of the delivery, the same on every attempt),
   `"type"`, `"version"`, `"createdAt"`, `"teamId"`, `"attempt"` (1 to 6) and `"data"`. The
@@ -47,8 +46,6 @@ defmodule Meeng.Webhooks do
 
   @signature_header "x-meeng-signature"
   @timestamp_header "x-meeng-timestamp"
-  @legacy_signature_header "x-usesend-signature"
-  @legacy_timestamp_header "x-usesend-timestamp"
   @prefix "v1="
 
   @doc "How far from now, in milliseconds, a webhook's timestamp may be."
@@ -85,8 +82,8 @@ defmodule Meeng.Webhooks do
 
   defp check(secret, headers, body, opts) do
     headers = Map.new(headers, fn {name, value} -> {String.downcase(to_string(name)), value} end)
-    signature = header(headers, @signature_header) || header(headers, @legacy_signature_header)
-    timestamp = header(headers, @timestamp_header) || header(headers, @legacy_timestamp_header)
+    signature = header(headers, @signature_header)
+    timestamp = header(headers, @timestamp_header)
 
     cond do
       signature in [nil, ""] ->

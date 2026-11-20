@@ -31,10 +31,6 @@ final class Webhooks
     /** How far from now, in milliseconds, a timestamp may be. */
     public const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000;
 
-    // The app sends both families of headers, so an integration written for
-    // useSend keeps working; the meeng ones are read first.
-    private const LEGACY_SIGNATURE_HEADER = 'X-UseSend-Signature';
-    private const LEGACY_TIMESTAMP_HEADER = 'X-UseSend-Timestamp';
     private const SIGNATURE_PREFIX = 'v1=';
 
     public function __construct(private readonly string $secret)
@@ -83,8 +79,8 @@ final class Webhooks
     private function check(string $body, array $headers, ?string $secret, ?int $tolerance, ?int $now): void
     {
         $key = $secret ?? $this->secret;
-        $signature = self::header($headers, self::SIGNATURE_HEADER) ?? self::header($headers, self::LEGACY_SIGNATURE_HEADER);
-        $timestamp = self::header($headers, self::TIMESTAMP_HEADER) ?? self::header($headers, self::LEGACY_TIMESTAMP_HEADER);
+        $signature = self::header($headers, self::SIGNATURE_HEADER);
+        $timestamp = self::header($headers, self::TIMESTAMP_HEADER);
         if ($signature === null || $signature === '') {
             throw new WebhookVerificationException('MISSING_SIGNATURE', 'Missing ' . self::SIGNATURE_HEADER . ' header');
         }

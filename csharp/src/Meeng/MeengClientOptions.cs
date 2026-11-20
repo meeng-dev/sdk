@@ -17,6 +17,18 @@ public sealed class MeengClientOptions
     public TimeSpan? Timeout { get; set; }
 
     /// <summary>
+    /// How many times a call that may be repeated is repeated after the first attempt; 2 by
+    /// default, and 0 sends every call once. See <see cref="MeengClient"/> for which calls are repeated.
+    /// </summary>
+    public int MaxRetries { get; set; } = 2;
+
+    /// <summary>
+    /// The wait before the first repetition; 500 ms when null. Each next repetition waits twice as
+    /// long, and a Retry-After the API answers replaces the wait.
+    /// </summary>
+    public TimeSpan? RetryDelay { get; set; }
+
+    /// <summary>
     /// The HttpClient that sends the requests, such as one from
     /// <c>IHttpClientFactory</c>; the SDK's shared one when null. Its own
     /// timeout applies on top of <see cref="Timeout"/>.

@@ -12,7 +12,19 @@ import Foundation
 ///     let meeng = MeengClient(apiKey: "mg_123")
 ///     let sent = try await meeng.emails.send(
 ///         EmailsSendParams(to: ["customer@example.com"], from: "hello@acme.com", subject: "Hello"))
+///
+/// A call that may be repeated is repeated up to `maxRetries` times (2 by default;
+/// 0 sends every call once) after the first attempt. It is repeated when the API
+/// answers 429, which means it was not processed, so any call may be; and when the
+/// API answers 500, 502, 503 or 504, or the connection fails, only if repeating it
+/// cannot do the work twice: a read, a PUT, a DELETE, or any call that carries an
+/// idempotency key. Any other refusal, a 409 included, is never repeated. The first
+/// repetition waits `retryDelay` seconds, each next one twice as long, and a
+/// Retry-After from the API replaces the wait.
 public final class MeengClient: Sendable {
+    /// The longest, in seconds, a call waits before a repetition.
+    public static let maxRetryDelay: TimeInterval = 30
+
 {{- range .Services}}
     /// The API's {{.Name}}.
     public let {{swName .Name}}: {{pascal .Name}}Service
@@ -30,12 +42,16 @@ public final class MeengClient: Sendable {
     ///     `/api/v1`; `MEENG_BASE_URL` when nil. It must be https; http is accepted
     ///     only for localhost, 127.0.0.0/8 and ::1, and any other makes every call
     ///     throw a `MeengError` before sending anything.
-    ///   - timeout: how long a call may take, 30 seconds by default.
+    ///   - timeout: how long an attempt may take, 30 seconds by default.
+    ///   - maxRetries: how many times a call that may be repeated is repeated, 2 by default.
+    ///   - retryDelay: the wait before the first repetition, in seconds; 0.5 by default.
     ///   - transport: what sends the requests; a `URLSession` that refuses redirects by default.
     public init(
         apiKey: String? = nil,
         baseURL: URL? = nil,
         timeout: TimeInterval = 30,
+        maxRetries: Int = 2,
+        retryDelay: TimeInterval = 0.5,
         transport: MeengTransport? = nil
     ) {
         let environment = ProcessInfo.processInfo.environment
@@ -49,6 +65,8 @@ public final class MeengClient: Sendable {
             base.removeLast()
         }
         var requester = Requester(apiKey: key, baseURL: base, timeout: timeout, transport: transport ?? Requester.urlSession)
+        requester.maxRetries = max(0, maxRetries)
+        requester.retryDelay = max(0, retryDelay)
         if key.isEmpty {
             requester.setupError = MeengError(status: 0, code: "missing_api_key", message: "meeng: missing API key: pass it to MeengClient(apiKey:) or set MEENG_API_KEY")
         } else {

@@ -174,13 +174,29 @@ pub struct RequestOptions {
 /// `MEENG_API_KEY`, and the address of the app from `MEENG_BASE_URL`.
 ///
 /// A client is cheap to clone, and its clones share one connection pool.
+///
+/// A call that may be repeated is repeated up to
+/// [`max_retries`](ClientBuilder::max_retries) times (2 by default; 0 sends
+/// every call once) after the first attempt. It is repeated when the API
+/// answers 429, which means it was not processed, so any call may be; and when
+/// the API answers 500, 502, 503 or 504, or the connection fails, only if
+/// repeating it cannot do the work twice: a read, a PUT, a DELETE, or any call
+/// that carries an idempotency key. Any other refusal, a 409 included, is never
+/// repeated. The first repetition waits
+/// [`retry_delay`](ClientBuilder::retry_delay) (500 ms by default), each next
+/// one twice as long, and a Retry-After from the API replaces the wait.
 #[derive(Clone)]
 pub struct Client {
     api_key: Option<String>,
     base_url: String,
     timeout: Duration,
+    max_retries: u32,
+    retry_delay: Duration,
     transport: Arc<dyn Transport>,
 }
+
+/// The longest a call waits before a repetition.
+pub const MAX_RETRY_DELAY: Duration = Duration::from_secs(30);
 
 impl fmt::Debug for Client {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -196,6 +212,8 @@ pub struct ClientBuilder {
     api_key: Option<String>,
     base_url: String,
     timeout: Duration,
+    max_retries: u32,
+    retry_delay: Duration,
     transport: Option<Arc<dyn Transport>>,
 }
 
@@ -218,9 +236,24 @@ impl ClientBuilder {
         self
     }
 
-    /// How long a call may take; 30 seconds by default.
+    /// How long an attempt may take; 30 seconds by default.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
+        self
+    }
+
+    /// How many times a call that may be repeated is repeated after the first
+    /// attempt; 2 by default, and 0 sends every call once.
+    pub fn max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = max_retries;
+        self
+    }
+
+    /// The wait before the first repetition; 500 ms by default. Each next
+    /// repetition waits twice as long, and a Retry-After the API answers
+    /// replaces the wait.
+    pub fn retry_delay(mut self, retry_delay: Duration) -> Self {
+        self.retry_delay = retry_delay;
         self
     }
 
@@ -236,6 +269,8 @@ impl ClientBuilder {
             api_key: self.api_key,
             base_url: self.base_url,
             timeout: self.timeout,
+            max_retries: self.max_retries,
+            retry_delay: self.retry_delay,
             transport: self
                 .transport
                 .unwrap_or_else(|| Arc::new(UreqTransport::new())),
@@ -269,6 +304,8 @@ impl Client {
             api_key: Some(api_key.into()).filter(|key| !key.is_empty()),
             base_url: base_url.trim_end_matches('/').to_owned(),
             timeout: Duration::from_secs(30),
+            max_retries: 2,
+            retry_delay: Duration::from_millis(500),
             transport: None,
         }
     }
@@ -327,6 +364,10 @@ impl Client {
         if let Some(key) = key {
             headers.push(("Idempotency-Key".to_owned(), key));
         }
+        let may_repeat = matches!(
+            method.to_ascii_uppercase().as_str(),
+            "GET" | "HEAD" | "PUT" | "DELETE"
+        ) || headers.iter().any(|(name, _)| name == "Idempotency-Key");
         let request = HttpRequest {
             method: method.to_owned(),
             url,
@@ -334,11 +375,54 @@ impl Client {
             body,
             timeout: self.timeout,
         };
-        let response = self.transport.send(request).map_err(Error::Transport)?;
+        let mut attempt = 0;
+        let response = loop {
+            match self.transport.send(request.clone()) {
+                Ok(response) => {
+                    let status = response.status;
+                    let again =
+                        status == 429 || (may_repeat && matches!(status, 500 | 502 | 503 | 504));
+                    if again && attempt < self.max_retries {
+                        self.pause(attempt, response.header("Retry-After"));
+                        attempt += 1;
+                        continue;
+                    }
+                    break response;
+                }
+                Err(failure) => {
+                    // The connection failed or timed out: the call may or may not have arrived.
+                    if !may_repeat || attempt >= self.max_retries {
+                        return Err(Error::Transport(failure));
+                    }
+                    self.pause(attempt, None);
+                    attempt += 1;
+                }
+            }
+        };
         if response.status >= 300 {
             return Err(Error::Api(ApiError::from_response(&response)));
         }
         serde_json::from_slice(&response.body).map_err(Error::Json)
+    }
+
+    /// Sleeps before repetition number `attempt` + 1: the API's Retry-After, or
+    /// the base delay doubled each time and spread over its upper half.
+    fn pause(&self, attempt: u32, retry_after: Option<&str>) {
+        let wait = match retry_after.and_then(|value| value.trim().parse::<f64>().ok()) {
+            Some(seconds) if seconds > 0.0 => Duration::from_secs_f64(seconds),
+            _ => {
+                let delay = self
+                    .retry_delay
+                    .saturating_mul(1 << attempt.min(10))
+                    .min(MAX_RETRY_DELAY);
+                let half = delay / 2;
+                let jitter = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |elapsed| u64::from(elapsed.subsec_nanos()));
+                half + Duration::from_nanos(jitter % (half.as_nanos().max(1) as u64 + 1))
+            }
+        };
+        std::thread::sleep(wait.min(MAX_RETRY_DELAY));
     }
 }
 

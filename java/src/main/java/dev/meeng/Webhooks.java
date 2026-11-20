@@ -30,8 +30,7 @@ import javax.crypto.spec.SecretKeySpec;
  * HMAC-SHA256 of {@code "{timestamp}.{body}"}, in hex; {@value #TIMESTAMP_HEADER}
  * is the time the webhook was sent, in milliseconds since the epoch;
  * {@value #EVENT_HEADER} carries the event's type and {@value #CALL_HEADER} the
- * id of the delivery attempt. The app also sends the {@code X-UseSend-*}
- * ones, which are read when the meeng ones are missing.
+ * id of the delivery attempt.
  */
 public final class Webhooks {
     /** The header that carries the signature. */
@@ -45,8 +44,6 @@ public final class Webhooks {
     /** How far from now a webhook's timestamp may be, by default. */
     public static final Duration DEFAULT_TOLERANCE = Duration.ofMinutes(5);
 
-    private static final String LEGACY_SIGNATURE_HEADER = "x-usesend-signature";
-    private static final String LEGACY_TIMESTAMP_HEADER = "x-usesend-timestamp";
     private static final String PREFIX = "v1=";
 
     private final String secret;
@@ -197,13 +194,7 @@ public final class Webhooks {
     private void check(String body, Map<String, ?> headers, Options options) {
         String key = options.secret != null ? options.secret : secret;
         String signature = header(headers, SIGNATURE_HEADER);
-        if (signature.isEmpty()) {
-            signature = header(headers, LEGACY_SIGNATURE_HEADER);
-        }
         String timestamp = header(headers, TIMESTAMP_HEADER);
-        if (timestamp.isEmpty()) {
-            timestamp = header(headers, LEGACY_TIMESTAMP_HEADER);
-        }
         if (signature.isEmpty()) {
             throw new WebhookVerificationException("MISSING_SIGNATURE", "Missing " + SIGNATURE_HEADER + " header");
         }

@@ -38,7 +38,7 @@ function client(callable $answer): array
         [$status, $payload] = $answer($request);
         return [$status, ['retry-after' => '7'], is_string($payload) ? $payload : json_encode($payload)];
     };
-    return [new Meeng('mg_test_key', 'https://meeng.test/', transport: $transport), $seen];
+    return [new Meeng('mg_test_key', 'https://meeng.test/', transport: $transport, maxRetries: 0), $seen];
 }
 
 $tests['sending an email carries the key, the body and the idempotency key'] = static function (): void {
@@ -190,10 +190,10 @@ $tests['a signed webhook is verified and read as an event'] = static function ()
     check($event['version'] === '2026-01-18' && $event['teamId'] === 7 && $event['attempt'] === 2, 'envelope');
 };
 
-$tests['the useSend headers are accepted as well, in any case'] = static function (): void {
+$tests['the headers are accepted in any case'] = static function (): void {
     $timestamp = (string) (int) floor(microtime(true) * 1000);
-    $headers = ['x-usesend-signature' => sign($timestamp), 'x-usesend-timestamp' => $timestamp];
-    check((new Webhooks(WEBHOOK_SECRET))->verify(WEBHOOK_BODY, $headers), 'legacy headers');
+    $headers = ['x-meeng-signature' => sign($timestamp), 'x-meeng-timestamp' => $timestamp];
+    check((new Webhooks(WEBHOOK_SECRET))->verify(WEBHOOK_BODY, $headers), 'headers in another case');
 };
 
 $tests['a webhook is refused with the code that says why'] = static function (): void {
@@ -256,6 +256,90 @@ $tests['the real HTTP sends and reads through curl and never follows a redirect'
     } finally {
         proc_terminate($server);
         proc_close($server);
+    }
+};
+
+/**
+ * A client that waits a millisecond between attempts; $answer gets the number of the attempt and answers [status, payload] or throws.
+ *
+ * @param callable(int): array{0: int, 1: mixed} $answer
+ * @return array{0: Meeng, 1: \ArrayObject<int, array{method: string, headers: array<string, string>}>}
+ */
+function retrying(callable $answer, int $maxRetries = 2): array
+{
+    $seen = new \ArrayObject();
+    $transport = static function (string $method, string $url, array $headers, ?string $body, float $timeout) use ($answer, $seen): array {
+        $seen[] = ['method' => $method, 'headers' => $headers];
+        [$status, $payload] = $answer(count($seen));
+        return [$status, ['retry-after' => '0'], json_encode($payload)];
+    };
+    return [new Meeng('mg_test_key', 'https://meeng.test/', transport: $transport, maxRetries: $maxRetries, retryDelay: 0.001), $seen];
+}
+
+$limited = static fn (): array => [429, ['error' => ['code' => 'RATE_LIMITED', 'message' => 'slow down']]];
+$busy = static fn (): array => [503, ['error' => ['code' => 'INTERNAL_SERVER_ERROR', 'message' => 'busy']]];
+
+$tests['a too many requests answer is repeated for any call'] = static function () use ($limited): void {
+    [$meeng, $seen] = retrying(static fn (int $n): array => $n < 3 ? $limited() : [200, ['emailId' => 'em_1']]);
+    $sent = $meeng->emails->send(['from' => 'h@acme.com', 'to' => 'a@x.com']);
+    check($sent['emailId'] === 'em_1' && count($seen) === 3, 'requests ' . count($seen));
+};
+
+$tests['a server failure is repeated only when repeating cannot do the work twice'] = static function () use ($busy): void {
+    $answer = static fn (int $n): array => $n === 1 ? $busy() : [200, []];
+    [$meeng, $seen] = retrying($answer);
+    $meeng->domains->list();
+    check(count($seen) === 2, 'a read: ' . count($seen));
+
+    [$meeng, $seen] = retrying($answer);
+    try {
+        $meeng->emails->send(['from' => 'h@acme.com', 'to' => 'a@x.com']);
+        check(false, 'a send with no key was repeated');
+    } catch (MeengException) {
+        check(count($seen) === 1, 'a send with no key: ' . count($seen));
+    }
+
+    [$meeng, $seen] = retrying($answer);
+    $meeng->emails->send(['from' => 'h@acme.com', 'to' => 'a@x.com'], 'order-1');
+    check(count($seen) === 2 && $seen[1]['headers']['Idempotency-Key'] === 'order-1', 'a send with a key: ' . count($seen));
+};
+
+$tests['other refusals are never repeated, retries can be turned off, and the last answer is the error'] = static function () use ($limited): void {
+    [$meeng, $seen] = retrying(static fn (): array => [409, ['error' => ['code' => 'NOT_UNIQUE', 'message' => 'in progress']]]);
+    try {
+        $meeng->domains->list();
+        check(false, 'a 409 was accepted');
+    } catch (MeengException $e) {
+        check($e->errorCode === 'NOT_UNIQUE' && count($seen) === 1, 'a 409: ' . count($seen));
+    }
+
+    [$meeng, $seen] = retrying(static fn (): array => $limited(), 0);
+    try {
+        $meeng->domains->list();
+    } catch (MeengException) {
+        check(count($seen) === 1, 'retries off: ' . count($seen));
+    }
+
+    [$meeng, $seen] = retrying(static fn (): array => $limited(), 2);
+    try {
+        $meeng->domains->list();
+        check(false, 'a 429 was accepted');
+    } catch (MeengException $e) {
+        check($e->errorCode === 'RATE_LIMITED' && count($seen) === 3, 'giving up: ' . count($seen));
+    }
+};
+
+$tests['a connection that fails is repeated for a read only'] = static function (): void {
+    [$meeng, $seen] = retrying(static fn (int $n): array => $n === 1 ? throw new \RuntimeException('reset') : [200, []]);
+    $meeng->domains->list();
+    check(count($seen) === 2, 'a read: ' . count($seen));
+
+    [$meeng, $seen] = retrying(static fn (): array => throw new \RuntimeException('reset'));
+    try {
+        $meeng->emails->cancel('em_1');
+        check(false, 'a write was accepted');
+    } catch (\RuntimeException $e) {
+        check($e->getMessage() === 'reset' && count($seen) === 1, 'a write: ' . count($seen));
     }
 };
 

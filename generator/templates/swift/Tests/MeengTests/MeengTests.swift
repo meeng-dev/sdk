@@ -39,15 +39,100 @@ func client(_ answer: @escaping Answer) -> (MeengClient, Recorder) {
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Retry-After": "7"])!
         return (data, response)
     }
-    let meeng = MeengClient(apiKey: "mg_test_key", baseURL: URL(string: "https://meeng.test/")!, transport: transport)
+    let meeng = MeengClient(apiKey: "mg_test_key", baseURL: URL(string: "https://meeng.test/")!, maxRetries: 0, transport: transport)
     return (meeng, recorder)
 }
+
+/// A client that waits a millisecond between attempts; `answer` gets the number of
+/// the attempt and answers a status and a body, or throws.
+func retrying(maxRetries: Int = 2, _ answer: @escaping @Sendable (Int) throws -> (status: Int, body: Any?)) -> (MeengClient, Recorder) {
+    let recorder = Recorder()
+    let transport: MeengTransport = { request in
+        recorder.append(request)
+        let (status, body) = try answer(recorder.seen.count)
+        let data = try body.map { try JSONSerialization.data(withJSONObject: $0) } ?? Data()
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Retry-After": "0"])!
+        return (data, response)
+    }
+    let meeng = MeengClient(apiKey: "mg_test_key", baseURL: URL(string: "https://meeng.test/")!, maxRetries: maxRetries, retryDelay: 0.001, transport: transport)
+    return (meeng, recorder)
+}
+
+func limited() -> (status: Int, body: Any?) { (429, ["error": ["code": "RATE_LIMITED", "message": "slow down"]]) }
+func busy() -> (status: Int, body: Any?) { (503, ["error": ["code": "INTERNAL_SERVER_ERROR", "message": "busy"]]) }
 
 func bodyJSON(_ request: URLRequest) -> Any? {
     request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) }
 }
 
 final class MeengTests: XCTestCase {
+    func testATooManyRequestsAnswerIsRepeatedForAnyCall() async throws {
+        let (meeng, recorder) = retrying { n in n < 3 ? limited() : (200, ["emailId": "em_1"]) }
+        let sent = try await meeng.emails.send(EmailsSendParams(to: ["a@x.com"], from: "h@acme.com"))
+        XCTAssertEqual(sent.emailID, "em_1")
+        XCTAssertEqual(recorder.seen.count, 3)
+    }
+
+    func testAServerFailureIsRepeatedOnlyWhenRepeatingCannotDoTheWorkTwice() async throws {
+        var (meeng, recorder) = retrying { n in n == 1 ? busy() : (200, [Any]()) }
+        _ = try await meeng.domains.list()
+        XCTAssertEqual(recorder.seen.count, 2)
+
+        (meeng, recorder) = retrying { n in n == 1 ? busy() : (200, ["emailId": "em_1"]) }
+        do {
+            _ = try await meeng.emails.send(EmailsSendParams(to: ["a@x.com"], from: "h@acme.com"))
+            XCTFail("a send with no key was repeated")
+        } catch is MeengError {
+            XCTAssertEqual(recorder.seen.count, 1)
+        }
+
+        (meeng, recorder) = retrying { n in n == 1 ? busy() : (200, ["emailId": "em_1"]) }
+        _ = try await meeng.emails.send(EmailsSendParams(to: ["a@x.com"], from: "h@acme.com"), idempotencyKey: "order-1")
+        XCTAssertEqual(recorder.seen.count, 2)
+        XCTAssertEqual(recorder.seen[1].value(forHTTPHeaderField: "Idempotency-Key"), "order-1")
+    }
+
+    func testOtherRefusalsAreNeverRepeatedRetriesCanBeTurnedOffAndTheLastAnswerIsTheError() async throws {
+        var (meeng, recorder) = retrying { _ in (409, ["error": ["code": "NOT_UNIQUE", "message": "in progress"]]) }
+        do {
+            _ = try await meeng.domains.list()
+            XCTFail("a 409 was accepted")
+        } catch let refusal as MeengError {
+            XCTAssertEqual(refusal.code, "NOT_UNIQUE")
+        }
+        XCTAssertEqual(recorder.seen.count, 1)
+
+        (meeng, recorder) = retrying(maxRetries: 0) { _ in limited() }
+        do { _ = try await meeng.domains.list() } catch is MeengError {}
+        XCTAssertEqual(recorder.seen.count, 1)
+
+        (meeng, recorder) = retrying(maxRetries: 2) { _ in limited() }
+        do {
+            _ = try await meeng.domains.list()
+            XCTFail("a 429 was accepted")
+        } catch let refusal as MeengError {
+            XCTAssertEqual(refusal.code, "RATE_LIMITED")
+        }
+        XCTAssertEqual(recorder.seen.count, 3)
+    }
+
+    func testAConnectionThatFailsIsRepeatedForAReadOnly() async throws {
+        var (meeng, recorder) = retrying { n in
+            if n == 1 { throw URLError(.networkConnectionLost) }
+            return (200, [Any]())
+        }
+        _ = try await meeng.domains.list()
+        XCTAssertEqual(recorder.seen.count, 2)
+
+        (meeng, recorder) = retrying { _ in throw URLError(.networkConnectionLost) }
+        do {
+            _ = try await meeng.emails.cancel("em_1")
+            XCTFail("a write was accepted")
+        } catch is URLError {
+            XCTAssertEqual(recorder.seen.count, 1)
+        }
+    }
+
     func testSendingAnEmailCarriesTheKeyTheBodyAndTheIdempotencyKey() async throws {
         let (meeng, recorder) = client { _ in (200, ["emailId": "em_1"]) }
         let sent = try await meeng.emails.send(
@@ -286,9 +371,9 @@ final class MeengTests: XCTestCase {
             XCTAssertEqual(event.data.status, EmailBasePayloadStatus.delivered)
         }
 
-        func testTheUseSendHeadersAreAcceptedAsWellInAnyCase() {
+        func testTheHeadersAreAcceptedInAnyCase() {
             let timestamp = String(Int(Date().timeIntervalSince1970 * 1000))
-            let headers = ["x-usesend-signature": Self.sign(timestamp), "X-UseSend-Timestamp": timestamp]
+            let headers = ["x-meeng-signature": Self.sign(timestamp), "X-Meeng-Timestamp": timestamp]
             XCTAssertTrue(Webhooks(secret: Self.secret).verify(Self.body, headers: headers))
         }
 

@@ -20,7 +20,7 @@ public class MeengTests
     private sealed record Answer(HttpStatusCode Status, string? Json);
 
     /// <summary>Answers every request with what answer says, recording what was sent.</summary>
-    private sealed class Recorder(Func<Seen, Answer> answer) : HttpMessageHandler
+    private sealed class Recorder(Func<Seen, Answer> answer, string retryAfter = "7") : HttpMessageHandler
     {
         public List<Seen> Requests { get; } = [];
 
@@ -40,15 +40,100 @@ public class MeengTests
             Requests.Add(seen);
             var reply = answer(seen);
             var response = new HttpResponseMessage(reply.Status) { Content = new StringContent(reply.Json ?? "", Encoding.UTF8, "application/json") };
-            response.Headers.TryAddWithoutValidation("Retry-After", "7");
+            response.Headers.TryAddWithoutValidation("Retry-After", retryAfter);
             return response;
         }
     }
 
     private static MeengClient Client(Recorder recorder) =>
-        new("mg_test_key", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = recorder });
+        new("mg_test_key", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = recorder, MaxRetries = 0 });
 
     private static Recorder Replying(HttpStatusCode status, string json) => new(_ => new Answer(status, json));
+
+    /// <summary>A client that waits a millisecond between attempts.</summary>
+    private static MeengClient Retrying(Recorder recorder, int maxRetries = 2) =>
+        new("mg_test_key", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = recorder, MaxRetries = maxRetries, RetryDelay = TimeSpan.FromMilliseconds(1) });
+
+    private static readonly Answer Limited = new((HttpStatusCode)429, """{"error":{"code":"RATE_LIMITED","message":"slow down"}}""");
+    private static readonly Answer Busy = new(HttpStatusCode.ServiceUnavailable, """{"error":{"code":"INTERNAL_SERVER_ERROR","message":"busy"}}""");
+
+    private sealed class Flaky(Func<int, Answer?> answer) : HttpMessageHandler
+    {
+        public int Count;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var reply = answer(++Count);
+            if (reply is null)
+            {
+                throw new HttpRequestException("connection reset");
+            }
+            return Task.FromResult(new HttpResponseMessage(reply.Status) { Content = new StringContent(reply.Json ?? "", Encoding.UTF8, "application/json") });
+        }
+    }
+
+    [Fact]
+    public async Task ATooManyRequestsAnswerIsRepeatedForAnyCall()
+    {
+        var calls = 0;
+        var recorder = new Recorder(_ => ++calls < 3 ? Limited : new Answer(HttpStatusCode.OK, """{"emailId":"em_1"}"""), "0");
+        var sent = await Retrying(recorder).Emails.SendAsync(new EmailsSendParams { From = "h@acme.com", To = ["a@x.com"] });
+        Assert.Equal("em_1", sent.EmailId);
+        Assert.Equal(3, recorder.Requests.Count);
+    }
+
+    [Fact]
+    public async Task AServerFailureIsRepeatedOnlyWhenRepeatingCannotDoTheWorkTwice()
+    {
+        Recorder Failing(string ok)
+        {
+            var calls = 0;
+            return new Recorder(_ => ++calls == 1 ? Busy : new Answer(HttpStatusCode.OK, ok), "0");
+        }
+        var read = Failing("[]");
+        await Retrying(read).Domains.ListAsync();
+        Assert.Equal(2, read.Requests.Count);
+
+        var send = Failing("""{"emailId":"em_1"}""");
+        await Assert.ThrowsAsync<MeengException>(() => Retrying(send).Emails.SendAsync(new EmailsSendParams { From = "h@acme.com", To = ["a@x.com"] }));
+        Assert.Single(send.Requests);
+
+        var keyed = Failing("""{"emailId":"em_1"}""");
+        await Retrying(keyed).Emails.SendAsync(new EmailsSendParams { From = "h@acme.com", To = ["a@x.com"] }, new RequestOptions { IdempotencyKey = "order-1" });
+        Assert.Equal(2, keyed.Requests.Count);
+        Assert.Equal("order-1", keyed.Requests[1].Headers["Idempotency-Key"]);
+    }
+
+    [Fact]
+    public async Task OtherRefusalsAreNeverRepeatedRetriesCanBeTurnedOffAndTheLastAnswerIsTheError()
+    {
+        var conflict = new Recorder(_ => new Answer(HttpStatusCode.Conflict, """{"error":{"code":"NOT_UNIQUE","message":"in progress"}}"""), "0");
+        var refused = await Assert.ThrowsAsync<MeengException>(() => Retrying(conflict).Domains.ListAsync());
+        Assert.Equal("NOT_UNIQUE", refused.Code);
+        Assert.Single(conflict.Requests);
+
+        var off = new Recorder(_ => Limited, "0");
+        await Assert.ThrowsAsync<MeengException>(() => Retrying(off, 0).Domains.ListAsync());
+        Assert.Single(off.Requests);
+
+        var giveUp = new Recorder(_ => Limited, "0");
+        var last = await Assert.ThrowsAsync<MeengException>(() => Retrying(giveUp, 2).Domains.ListAsync());
+        Assert.Equal("RATE_LIMITED", last.Code);
+        Assert.Equal(3, giveUp.Requests.Count);
+    }
+
+    [Fact]
+    public async Task AConnectionThatFailsIsRepeatedForAReadOnly()
+    {
+        var read = new Flaky(n => n == 1 ? null : new Answer(HttpStatusCode.OK, "[]"));
+        await new MeengClient("mg_test_key", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = read, RetryDelay = TimeSpan.FromMilliseconds(1) }).Domains.ListAsync();
+        Assert.Equal(2, read.Count);
+
+        var write = new Flaky(_ => null);
+        var client = new MeengClient("mg_test_key", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = write, RetryDelay = TimeSpan.FromMilliseconds(1) });
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.Emails.CancelAsync("em_1"));
+        Assert.Equal(1, write.Count);
+    }
 
     [Fact]
     public async Task SendingAnEmailCarriesTheKeyTheBodyAndTheIdempotencyKey()
@@ -255,10 +340,10 @@ public class MeengTests
     }
 
     [Fact]
-    public void TheUseSendHeadersAreAcceptedAsWellInAnyCase()
+    public void TheHeadersAreAcceptedInAnyCase()
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-        var headers = new Dictionary<string, string> { ["x-usesend-signature"] = Sign(timestamp), ["X-UseSend-Timestamp"] = timestamp };
+        var headers = new Dictionary<string, string> { ["x-meeng-signature"] = Sign(timestamp), ["X-Meeng-Timestamp"] = timestamp };
         Assert.True(new MeengClient("k").Webhooks(Secret).Verify(Body, headers));
     }
 

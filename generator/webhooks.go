@@ -1,9 +1,9 @@
 package generator
 
 // The contract does not describe the webhooks the API posts, so their events
-// are written here, from the payloads the API sends (the useSend webhook
-// events, which meeng reproduces): every event is {id, type, createdAt, data},
-// and what data holds depends on the type.
+// are written here, from the payloads the app sends: every event is
+// {id, type, version, createdAt, teamId, data, attempt}, and what data holds
+// depends on the type.
 
 func str(wire string, required bool) *Field {
 	return &Field{Wire: wire, Required: required, Type: &TypeRef{Kind: "string"}}

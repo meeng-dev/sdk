@@ -140,13 +140,6 @@ const (
 	WebhookCallHeader      = "X-Meeng-Call"
 )
 
-// The app sends both families of headers, so an integration written for
-// useSend keeps working; the meeng ones are read first.
-const (
-	legacyWebhookSignatureHeader = "X-UseSend-Signature"
-	legacyWebhookTimestampHeader = "X-UseSend-Timestamp"
-)
-
 const (
 	webhookSignaturePrefix = "v1="
 	// DefaultWebhookTolerance is how far from now a webhook's timestamp may be.
@@ -231,13 +224,7 @@ func (w *Webhooks) check(body []byte, header http.Header, opts []WebhookOption) 
 		opt(&config)
 	}
 	signature := header.Get(WebhookSignatureHeader)
-	if signature == "" {
-		signature = header.Get(legacyWebhookSignatureHeader)
-	}
 	timestamp := header.Get(WebhookTimestampHeader)
-	if timestamp == "" {
-		timestamp = header.Get(legacyWebhookTimestampHeader)
-	}
 	if signature == "" {
 		return &WebhookVerificationError{WebhookMissingSignature, "Missing " + WebhookSignatureHeader + " header"}
 	}

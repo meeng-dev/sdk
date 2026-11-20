@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -41,6 +42,9 @@ type Client struct {
 	apiKey  string
 	baseURL string
 	http    *http.Client
+	// maxRetries and retryDelay are how a call that may be repeated is repeated.
+	maxRetries int
+	retryDelay time.Duration
 	// setupErr is why the client cannot call, answered by every call.
 	setupErr error
 {{- range .Services}}
@@ -66,6 +70,36 @@ func WithHTTPClient(httpClient *http.Client) Option {
 	return func(c *Client) { c.http = httpClient }
 }
 
+// DefaultMaxRetries is how many times a call that may be repeated is repeated
+// after the first attempt.
+const DefaultMaxRetries = 2
+
+// DefaultRetryDelay is the wait before the first repetition; each one waits
+// twice as long as the one before, up to MaxRetryDelay.
+const DefaultRetryDelay = 500 * time.Millisecond
+
+// MaxRetryDelay is the longest a call waits before a repetition, whether the
+// wait comes from the backoff or from the Retry-After the API answered.
+const MaxRetryDelay = 30 * time.Second
+
+// WithMaxRetries sets how many times a call that may be repeated is repeated
+// after the first attempt (2 by default); 0 sends every call once. A call is
+// repeated when the API answers 429 (the call was not processed, so any call
+// may be repeated), and when it answers 500, 502, 503 or 504, or the
+// connection fails, only if repeating it cannot do the work twice: a read, a
+// PUT, a DELETE, or any call that carries an Idempotency-Key. Nothing else is
+// ever repeated, and a 409 never is.
+func WithMaxRetries(n int) Option {
+	return func(c *Client) { c.maxRetries = n }
+}
+
+// WithRetryDelay sets the wait before the first repetition (500 ms by
+// default); each repetition waits twice as long as the one before, and a
+// Retry-After the API answers replaces the wait.
+func WithRetryDelay(d time.Duration) Option {
+	return func(c *Client) { c.retryDelay = d }
+}
+
 // New is a client for the team apiKey belongs to. An empty apiKey is read from
 // MEENG_API_KEY, and the base URL, unless WithBaseURL gives one, from
 // MEENG_BASE_URL.
@@ -77,7 +111,7 @@ func New(apiKey string, opts ...Option) *Client {
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
-	c := &Client{apiKey: apiKey, baseURL: strings.TrimRight(baseURL, "/"), http: &http.Client{
+	c := &Client{apiKey: apiKey, baseURL: strings.TrimRight(baseURL, "/"), maxRetries: DefaultMaxRetries, retryDelay: DefaultRetryDelay, http: &http.Client{
 		Timeout: 30 * time.Second,
 		// The API never redirects, and a redirect would carry the key along:
 		// the 3xx is the answer, and an Error.
@@ -147,43 +181,135 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	if len(query) > 0 {
 		target += "?" + query.Encode()
 	}
-	var reader io.Reader
+	var encoded []byte
 	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
+		var err error
+		if encoded, err = json.Marshal(body); err != nil {
 			return err
 		}
+	}
+	retryable := repeatable(method, config.idempotencyKey)
+	for attempt := 0; ; attempt++ {
+		wait, err := c.attempt(ctx, method, target, encoded, config.idempotencyKey, out)
+		if err == nil {
+			return nil
+		}
+		var refusal *Error
+		isRefusal := errors.As(err, &refusal)
+		again := false
+		switch {
+		case isRefusal && refusal.StatusCode == http.StatusTooManyRequests:
+			again = true
+		case isRefusal:
+			again = retryable && transient(refusal.StatusCode)
+		default:
+			// The connection failed: the call may or may not have arrived.
+			again = retryable && ctx.Err() == nil && !isDecodeError(err)
+		}
+		if !again || attempt >= c.maxRetries {
+			return err
+		}
+		if wait <= 0 {
+			wait = c.backoff(attempt)
+		}
+		if wait > MaxRetryDelay {
+			wait = MaxRetryDelay
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return err
+		case <-timer.C:
+		}
+	}
+}
+
+// attempt sends one request. The wait it returns is the Retry-After of a
+// refusal, or zero.
+func (c *Client) attempt(ctx context.Context, method, target string, encoded []byte, idempotencyKey string, out any) (time.Duration, error) {
+	var reader io.Reader
+	if encoded != nil {
 		reader = bytes.NewReader(encoded)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, target, reader)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "meeng-go/"+Version)
-	if body != nil {
+	if encoded != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if config.idempotencyKey != "" {
-		req.Header.Set("Idempotency-Key", config.idempotencyKey)
+	if idempotencyKey != "" {
+		req.Header.Set("Idempotency-Key", idempotencyKey)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if resp.StatusCode >= 300 {
-		return errorOf(resp, raw)
+		refusal := errorOf(resp, raw)
+		return refusal.RetryAfter, refusal
 	}
 	if out == nil {
-		return nil
+		return 0, nil
 	}
-	return json.Unmarshal(raw, out)
+	if err := json.Unmarshal(raw, out); err != nil {
+		return 0, &decodeError{err}
+	}
+	return 0, nil
+}
+
+// decodeError is an answer that arrived and could not be read: repeating the
+// call would not change it.
+type decodeError struct{ err error }
+
+func (e *decodeError) Error() string { return e.err.Error() }
+func (e *decodeError) Unwrap() error { return e.err }
+
+func isDecodeError(err error) bool {
+	var d *decodeError
+	return errors.As(err, &d)
+}
+
+// repeatable says a call cannot do its work twice: a read, a PUT, a DELETE, or
+// a call with an Idempotency-Key.
+func repeatable(method, idempotencyKey string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete:
+		return true
+	}
+	return idempotencyKey != ""
+}
+
+// transient says the status is a failure that passes.
+func transient(status int) bool {
+	switch status {
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	}
+	return false
+}
+
+// backoff is the wait before repetition number attempt+1: the base delay
+// doubled each time, spread over its upper half so that clients that failed
+// together do not come back together.
+func (c *Client) backoff(attempt int) time.Duration {
+	delay := c.retryDelay << min(attempt, 10)
+	if delay <= 0 {
+		return 0
+	}
+	if delay > MaxRetryDelay {
+		delay = MaxRetryDelay
+	}
+	return delay/2 + time.Duration(rand.Int64N(int64(delay/2)+1))
 }
 
 // errorOf reads a refused answer: {"error":{"code","message"}}, {"error":"text"}
