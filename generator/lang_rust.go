@@ -116,13 +116,12 @@ func enumName(models []*Model, model *Model, field *Field) string {
 	return name
 }
 
-// upperWords writes one_time, BRL or past-due as OneTime, Brl and PastDue:
-// every word capitalized, the rest of it in lower case, as Rust and Swift
-// name types and cases.
+// upperWords writes one_time, BRL, past-due or latestStatus as OneTime, Brl,
+// PastDue and LatestStatus: every word capitalized, the rest of it in lower
+// case, as Rust and Swift name types and cases.
 func upperWords(name string) string {
-	words := strings.FieldsFunc(name, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
 	var b strings.Builder
-	for _, word := range words {
+	for _, word := range words(name) {
 		word = strings.ToLower(word)
 		b.WriteString(strings.ToUpper(word[:1]) + word[1:])
 	}

@@ -25,7 +25,7 @@ module Meeng
 {{- end}}
 {{- end}}
 {{- range .Query}}
-    # @param {{rbName (snake .Name)}} [{{if .List}}String, Array<String>{{else if .Number}}Integer{{else}}String{{end}}, nil] {{.Description}}
+    # @param {{rbName (snake .Name)}} [{{if .List}}String, Array<String>{{else if .Number}}Integer{{else}}String{{end}}, nil] {{lines "    #   " .Description}}
 {{- end}}
 {{- if .Idempotent}}
     # @param idempotency_key [String, nil] makes the send safe to retry: the same key with the same body answers the first result again

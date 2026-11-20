@@ -454,7 +454,7 @@ pub struct EmailBouncedBounce {
     #[serde(rename = "type")]
     pub type_: EmailBouncedBounceType,
     #[serde(rename = "subType")]
-    pub sub_type: EmailBouncedBounceSubtype,
+    pub sub_type: EmailBouncedBounceSubType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
@@ -687,7 +687,7 @@ pub struct EmailsListItem {
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
     #[serde(rename = "latestStatus")]
-    pub latest_status: Option<EmailsListItemLateststatus>,
+    pub latest_status: Option<EmailsListItemLatestStatus>,
     #[serde(rename = "scheduledAt")]
     pub scheduled_at: Option<String>,
     #[serde(rename = "domainId")]
@@ -2010,82 +2010,82 @@ impl<'de> Deserialize<'de> for EmailBouncedBounceType {
 /// The values of `EmailBouncedBounce.subType`.
 ///
 /// A value this SDK does not know yet is kept, as it came, in
-/// [`EmailBouncedBounceSubtype::Unrecognized`].
+/// [`EmailBouncedBounceSubType::Unrecognized`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum EmailBouncedBounceSubtype {
+pub enum EmailBouncedBounceSubType {
     /// `General`
     General,
     /// `NoEmail`
-    Noemail,
+    NoEmail,
     /// `Suppressed`
     Suppressed,
     /// `OnAccountSuppressionList`
-    Onaccountsuppressionlist,
+    OnAccountSuppressionList,
     /// `MailboxFull`
-    Mailboxfull,
+    MailboxFull,
     /// `MessageTooLarge`
-    Messagetoolarge,
+    MessageTooLarge,
     /// `ContentRejected`
-    Contentrejected,
+    ContentRejected,
     /// `AttachmentRejected`
-    Attachmentrejected,
+    AttachmentRejected,
     /// A value this SDK does not know yet.
     Unrecognized(String),
 }
 
-impl EmailBouncedBounceSubtype {
+impl EmailBouncedBounceSubType {
     /// The value as the API writes it.
     pub fn as_str(&self) -> &str {
         match self {
-            EmailBouncedBounceSubtype::General => "General",
-            EmailBouncedBounceSubtype::Noemail => "NoEmail",
-            EmailBouncedBounceSubtype::Suppressed => "Suppressed",
-            EmailBouncedBounceSubtype::Onaccountsuppressionlist => "OnAccountSuppressionList",
-            EmailBouncedBounceSubtype::Mailboxfull => "MailboxFull",
-            EmailBouncedBounceSubtype::Messagetoolarge => "MessageTooLarge",
-            EmailBouncedBounceSubtype::Contentrejected => "ContentRejected",
-            EmailBouncedBounceSubtype::Attachmentrejected => "AttachmentRejected",
-            EmailBouncedBounceSubtype::Unrecognized(value) => value,
+            EmailBouncedBounceSubType::General => "General",
+            EmailBouncedBounceSubType::NoEmail => "NoEmail",
+            EmailBouncedBounceSubType::Suppressed => "Suppressed",
+            EmailBouncedBounceSubType::OnAccountSuppressionList => "OnAccountSuppressionList",
+            EmailBouncedBounceSubType::MailboxFull => "MailboxFull",
+            EmailBouncedBounceSubType::MessageTooLarge => "MessageTooLarge",
+            EmailBouncedBounceSubType::ContentRejected => "ContentRejected",
+            EmailBouncedBounceSubType::AttachmentRejected => "AttachmentRejected",
+            EmailBouncedBounceSubType::Unrecognized(value) => value,
         }
     }
 }
 
-impl From<&str> for EmailBouncedBounceSubtype {
+impl From<&str> for EmailBouncedBounceSubType {
     fn from(value: &str) -> Self {
         match value {
-            "General" => EmailBouncedBounceSubtype::General,
-            "NoEmail" => EmailBouncedBounceSubtype::Noemail,
-            "Suppressed" => EmailBouncedBounceSubtype::Suppressed,
-            "OnAccountSuppressionList" => EmailBouncedBounceSubtype::Onaccountsuppressionlist,
-            "MailboxFull" => EmailBouncedBounceSubtype::Mailboxfull,
-            "MessageTooLarge" => EmailBouncedBounceSubtype::Messagetoolarge,
-            "ContentRejected" => EmailBouncedBounceSubtype::Contentrejected,
-            "AttachmentRejected" => EmailBouncedBounceSubtype::Attachmentrejected,
-            other => EmailBouncedBounceSubtype::Unrecognized(other.to_owned()),
+            "General" => EmailBouncedBounceSubType::General,
+            "NoEmail" => EmailBouncedBounceSubType::NoEmail,
+            "Suppressed" => EmailBouncedBounceSubType::Suppressed,
+            "OnAccountSuppressionList" => EmailBouncedBounceSubType::OnAccountSuppressionList,
+            "MailboxFull" => EmailBouncedBounceSubType::MailboxFull,
+            "MessageTooLarge" => EmailBouncedBounceSubType::MessageTooLarge,
+            "ContentRejected" => EmailBouncedBounceSubType::ContentRejected,
+            "AttachmentRejected" => EmailBouncedBounceSubType::AttachmentRejected,
+            other => EmailBouncedBounceSubType::Unrecognized(other.to_owned()),
         }
     }
 }
 
-impl From<String> for EmailBouncedBounceSubtype {
+impl From<String> for EmailBouncedBounceSubType {
     fn from(value: String) -> Self {
         Self::from(value.as_str())
     }
 }
 
-impl fmt::Display for EmailBouncedBounceSubtype {
+impl fmt::Display for EmailBouncedBounceSubType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl Serialize for EmailBouncedBounceSubtype {
+impl Serialize for EmailBouncedBounceSubType {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-impl<'de> Deserialize<'de> for EmailBouncedBounceSubtype {
+impl<'de> Deserialize<'de> for EmailBouncedBounceSubType {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         String::deserialize(deserializer).map(Self::from)
     }
@@ -2806,10 +2806,10 @@ impl<'de> Deserialize<'de> for EmailSuppressedSuppressionType {
 /// The values of `EmailsListItem.latestStatus`.
 ///
 /// A value this SDK does not know yet is kept, as it came, in
-/// [`EmailsListItemLateststatus::Unrecognized`].
+/// [`EmailsListItemLatestStatus::Unrecognized`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum EmailsListItemLateststatus {
+pub enum EmailsListItemLatestStatus {
     /// `SCHEDULED`
     Scheduled,
     /// `QUEUED`
@@ -2842,70 +2842,70 @@ pub enum EmailsListItemLateststatus {
     Unrecognized(String),
 }
 
-impl EmailsListItemLateststatus {
+impl EmailsListItemLatestStatus {
     /// The value as the API writes it.
     pub fn as_str(&self) -> &str {
         match self {
-            EmailsListItemLateststatus::Scheduled => "SCHEDULED",
-            EmailsListItemLateststatus::Queued => "QUEUED",
-            EmailsListItemLateststatus::Sent => "SENT",
-            EmailsListItemLateststatus::DeliveryDelayed => "DELIVERY_DELAYED",
-            EmailsListItemLateststatus::Bounced => "BOUNCED",
-            EmailsListItemLateststatus::Rejected => "REJECTED",
-            EmailsListItemLateststatus::RenderingFailure => "RENDERING_FAILURE",
-            EmailsListItemLateststatus::Delivered => "DELIVERED",
-            EmailsListItemLateststatus::Opened => "OPENED",
-            EmailsListItemLateststatus::Clicked => "CLICKED",
-            EmailsListItemLateststatus::Complained => "COMPLAINED",
-            EmailsListItemLateststatus::Failed => "FAILED",
-            EmailsListItemLateststatus::Cancelled => "CANCELLED",
-            EmailsListItemLateststatus::Suppressed => "SUPPRESSED",
-            EmailsListItemLateststatus::Unrecognized(value) => value,
+            EmailsListItemLatestStatus::Scheduled => "SCHEDULED",
+            EmailsListItemLatestStatus::Queued => "QUEUED",
+            EmailsListItemLatestStatus::Sent => "SENT",
+            EmailsListItemLatestStatus::DeliveryDelayed => "DELIVERY_DELAYED",
+            EmailsListItemLatestStatus::Bounced => "BOUNCED",
+            EmailsListItemLatestStatus::Rejected => "REJECTED",
+            EmailsListItemLatestStatus::RenderingFailure => "RENDERING_FAILURE",
+            EmailsListItemLatestStatus::Delivered => "DELIVERED",
+            EmailsListItemLatestStatus::Opened => "OPENED",
+            EmailsListItemLatestStatus::Clicked => "CLICKED",
+            EmailsListItemLatestStatus::Complained => "COMPLAINED",
+            EmailsListItemLatestStatus::Failed => "FAILED",
+            EmailsListItemLatestStatus::Cancelled => "CANCELLED",
+            EmailsListItemLatestStatus::Suppressed => "SUPPRESSED",
+            EmailsListItemLatestStatus::Unrecognized(value) => value,
         }
     }
 }
 
-impl From<&str> for EmailsListItemLateststatus {
+impl From<&str> for EmailsListItemLatestStatus {
     fn from(value: &str) -> Self {
         match value {
-            "SCHEDULED" => EmailsListItemLateststatus::Scheduled,
-            "QUEUED" => EmailsListItemLateststatus::Queued,
-            "SENT" => EmailsListItemLateststatus::Sent,
-            "DELIVERY_DELAYED" => EmailsListItemLateststatus::DeliveryDelayed,
-            "BOUNCED" => EmailsListItemLateststatus::Bounced,
-            "REJECTED" => EmailsListItemLateststatus::Rejected,
-            "RENDERING_FAILURE" => EmailsListItemLateststatus::RenderingFailure,
-            "DELIVERED" => EmailsListItemLateststatus::Delivered,
-            "OPENED" => EmailsListItemLateststatus::Opened,
-            "CLICKED" => EmailsListItemLateststatus::Clicked,
-            "COMPLAINED" => EmailsListItemLateststatus::Complained,
-            "FAILED" => EmailsListItemLateststatus::Failed,
-            "CANCELLED" => EmailsListItemLateststatus::Cancelled,
-            "SUPPRESSED" => EmailsListItemLateststatus::Suppressed,
-            other => EmailsListItemLateststatus::Unrecognized(other.to_owned()),
+            "SCHEDULED" => EmailsListItemLatestStatus::Scheduled,
+            "QUEUED" => EmailsListItemLatestStatus::Queued,
+            "SENT" => EmailsListItemLatestStatus::Sent,
+            "DELIVERY_DELAYED" => EmailsListItemLatestStatus::DeliveryDelayed,
+            "BOUNCED" => EmailsListItemLatestStatus::Bounced,
+            "REJECTED" => EmailsListItemLatestStatus::Rejected,
+            "RENDERING_FAILURE" => EmailsListItemLatestStatus::RenderingFailure,
+            "DELIVERED" => EmailsListItemLatestStatus::Delivered,
+            "OPENED" => EmailsListItemLatestStatus::Opened,
+            "CLICKED" => EmailsListItemLatestStatus::Clicked,
+            "COMPLAINED" => EmailsListItemLatestStatus::Complained,
+            "FAILED" => EmailsListItemLatestStatus::Failed,
+            "CANCELLED" => EmailsListItemLatestStatus::Cancelled,
+            "SUPPRESSED" => EmailsListItemLatestStatus::Suppressed,
+            other => EmailsListItemLatestStatus::Unrecognized(other.to_owned()),
         }
     }
 }
 
-impl From<String> for EmailsListItemLateststatus {
+impl From<String> for EmailsListItemLatestStatus {
     fn from(value: String) -> Self {
         Self::from(value.as_str())
     }
 }
 
-impl fmt::Display for EmailsListItemLateststatus {
+impl fmt::Display for EmailsListItemLatestStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl Serialize for EmailsListItemLateststatus {
+impl Serialize for EmailsListItemLatestStatus {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
-impl<'de> Deserialize<'de> for EmailsListItemLateststatus {
+impl<'de> Deserialize<'de> for EmailsListItemLatestStatus {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         String::deserialize(deserializer).map(Self::from)
     }

@@ -6,64 +6,35 @@ import Foundation
     import CryptoKit
 #endif
 
-/// How far from now, in seconds, a webhook's timestamp may be.
-public let webhookTolerance: TimeInterval = 300
-
-/// What every webhook carries: the message's id, the same as the webhook-id
-/// header; the event's type; when it happened, in RFC 3339; the environment it
-/// happened in, `test` or `live`; the showcase of the sale; and its data.
+/// What every webhook carries: the event's id, its type, when it was created
+/// and its data.
 public struct WebhookMessage<Payload: Codable & Sendable & Hashable>: Codable, Sendable, Hashable {
-    /// The message's id, the same on every delivery of it.
+    /// The event's id.
     public let id: String
-    /// What happened: order.paid…
+    /// What happened: `email.delivered`…
     public let type: String
-    /// When it happened.
-    public let timestamp: String
-    /// The environment it happened in, `test` or `live`; empty when an older
-    /// server did not send it.
-    public let environment: String
-    /// The showcase of the sale, the same `showcase_id` the API's objects
-    /// carry; empty when an older server did not send it.
-    public let showcaseId: String
+    /// When the event was created, in RFC 3339.
+    public let createdAt: String
     /// What the event carries.
     public let data: Payload
 
-    public init(id: String, type: String, timestamp: String, environment: String = "", showcaseId: String = "", data: Payload) {
+    public init(id: String, type: String, createdAt: String, data: Payload) {
         self.id = id
         self.type = type
-        self.timestamp = timestamp
-        self.environment = environment
-        self.showcaseId = showcaseId
+        self.createdAt = createdAt
         self.data = data
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, type, timestamp, environment, data
-        case showcaseId = "showcase_id"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        type = try container.decode(String.self, forKey: .type)
-        timestamp = try container.decode(String.self, forKey: .timestamp)
-        environment = try container.decodeIfPresent(String.self, forKey: .environment) ?? ""
-        showcaseId = try container.decodeIfPresent(String.self, forKey: .showcaseId) ?? ""
-        data = try container.decode(Payload.self, forKey: .data)
     }
 }
 {{range .Webhooks}}
 /// The events that carry {{if eq .Data.Kind "model"}}{{article .Data.Model}}{{else}}the event's identifiers{{end}}: {{range $i, $t := .Types}}{{if $i}}, {{end}}`{{$t}}`{{end}}.
 public typealias {{.Name}}WebhookEvent = WebhookMessage<{{swData .Data}}>
 {{end}}
-/// An event of a type this SDK does not know yet: its id, type, timestamp and
-/// environment, showcase, and the body as it was sent.
+/// An event of a type this SDK does not know yet: its id, type and creation
+/// time, and the body as it was sent.
 public struct UnknownWebhookEvent: Sendable, Hashable {
     public let id: String
     public let type: String
-    public let timestamp: String
-    public let environment: String
-    public let showcaseId: String
+    public let createdAt: String
     /// The whole body, as JSON.
     public let body: Data
 }
@@ -79,7 +50,7 @@ public enum WebhookEvent: Sendable, Hashable {
     /// A type this SDK does not know yet.
     case unknown(UnknownWebhookEvent)
 
-    /// The message's id, the same as the webhook-id header.
+    /// The event's id.
     public var id: String {
         switch self {
 {{- range .Webhooks}}
@@ -89,7 +60,7 @@ public enum WebhookEvent: Sendable, Hashable {
         }
     }
 
-    /// What happened: order.paid…
+    /// What happened: `email.delivered`…
     public var type: String {
         switch self {
 {{- range .Webhooks}}
@@ -99,116 +70,142 @@ public enum WebhookEvent: Sendable, Hashable {
         }
     }
 
-    /// When it happened.
-    public var timestamp: String {
+    /// When the event was created.
+    public var createdAt: String {
         switch self {
 {{- range .Webhooks}}
-        case let .{{swLower .Name}}(event): event.timestamp
+        case let .{{swLower .Name}}(event): event.createdAt
 {{- end}}
-        case let .unknown(event): event.timestamp
-        }
-    }
-
-    /// The environment it happened in, `test` or `live`; empty when an older
-    /// server did not send it.
-    public var environment: String {
-        switch self {
-{{- range .Webhooks}}
-        case let .{{swLower .Name}}(event): event.environment
-{{- end}}
-        case let .unknown(event): event.environment
-        }
-    }
-
-    /// The showcase of the sale, the same `showcase_id` the API's objects
-    /// carry; empty when an older server did not send it.
-    public var showcaseId: String {
-        switch self {
-{{- range .Webhooks}}
-        case let .{{swLower .Name}}(event): event.showcaseId
-{{- end}}
-        case let .unknown(event): event.showcaseId
+        case let .unknown(event): event.createdAt
         }
     }
 
     private struct Header: Decodable {
         let id: String
         let type: String
-        let timestamp: String
-        let environment: String?
-        let showcase_id: String?
+        let createdAt: String
     }
 
     /// Reads a verified body into the event its type names.
     static func parse(_ body: Data) throws -> WebhookEvent {
-        let decoder = JSONDecoder()
-        let header = try decoder.decode(Header.self, from: body)
+        let header = try JSONDecoder().decode(Header.self, from: body)
         switch header.type {
 {{- range .Webhooks}}
         case {{range $i, $t := .Types}}{{if $i}}, {{end}}{{swLiteral $t}}{{end}}:
-            return try .{{swLower .Name}}(decoder.decode({{.Name}}WebhookEvent.self, from: body))
+            return .{{swLower .Name}}(try JSONDecoder().decode({{.Name}}WebhookEvent.self, from: body))
 {{- end}}
         default:
-            return .unknown(UnknownWebhookEvent(id: header.id, type: header.type, timestamp: header.timestamp, environment: header.environment ?? "", showcaseId: header.showcase_id ?? "", body: body))
+            return .unknown(UnknownWebhookEvent(id: header.id, type: header.type, createdAt: header.createdAt, body: body))
         }
     }
 }
 
-/// Why a webhook was not accepted.
-public enum WebhookVerificationError: Error, Sendable, Equatable {
-    /// The secret is not `whsec_` and a base64 key.
-    case invalidSecret
-    /// meeng did not sign the request, or signed it too long ago.
-    case invalidSignature
+/// A request meeng did not sign, signed too long ago, or that is not an event.
+/// `code` is `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `INVALID_SIGNATURE_FORMAT`,
+/// `INVALID_TIMESTAMP`, `TIMESTAMP_OUT_OF_RANGE`, `SIGNATURE_MISMATCH` or `INVALID_JSON`.
+public struct WebhookVerificationError: Error, Sendable, Hashable, CustomStringConvertible {
+    /// Why the webhook was refused.
+    public let code: String
+    /// What is wrong.
+    public let message: String
+
+    public var description: String { "\(code): \(message)" }
 }
 
-#if canImport(CryptoKit)
-    /// Checks a webhook meeng sent, as Standard Webhooks signs it — an
-    /// HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}` under the key
-    /// the endpoint's `whsec_` secret encodes, one of the signatures in the
-    /// webhook-signature header, which carries more than one while a secret is
-    /// rotated — and answers its event. Pass the body exactly as it arrived,
-    /// before parsing it.
+/// Checks and reads the webhooks a team's endpoint receives. Make one with
+/// `meeng.webhooks(secret:)`.
+///
+/// The signature header, `X-Meeng-Signature`, is `v1=` and the HMAC-SHA256 of
+/// `{timestamp}.{body}`, in hex; `X-Meeng-Timestamp` is the time the webhook was
+/// sent, in milliseconds since the epoch; `X-Meeng-Event` carries the event's type
+/// and `X-Meeng-Call` the id of the delivery attempt. The app also sends the
+/// `X-UseSend-*` ones, which are read when the meeng ones are missing.
+public struct Webhooks: Sendable {
+    /// The header that carries the signature.
+    public static let signatureHeader = "X-Meeng-Signature"
+    /// The header that carries the time the webhook was sent, in milliseconds.
+    public static let timestampHeader = "X-Meeng-Timestamp"
+    /// The header that carries the event's type.
+    public static let eventHeader = "X-Meeng-Event"
+    /// The header that carries the id of the delivery attempt.
+    public static let callHeader = "X-Meeng-Call"
+    /// How far from now, in seconds, a webhook's timestamp may be by default.
+    public static let defaultTolerance: TimeInterval = 300
+
+    private static let prefix = "v1="
+    let secret: String
+
+    public init(secret: String) {
+        self.secret = secret
+    }
+
+    /// Checks the signature without reading the event; true when it is valid.
+    /// Pass the body exactly as it arrived, before parsing it.
     ///
     /// - Parameters:
     ///   - headers: the request's headers, their names in any case.
-    ///   - now: the moment to check the timestamp against.
-    public func verifyWebhook(secret: String, headers: [String: String], body: Data, now: Date = Date()) throws -> WebhookEvent {
-        try verifyWebhookSignature(secret: secret, headers: headers, body: body, now: now)
-        return try WebhookEvent.parse(body)
+    ///   - secret: another secret than the handler's.
+    ///   - tolerance: how far from now, in seconds, the timestamp may be; a negative number turns the check off.
+    ///   - now: the current time, for tests.
+    public func verify(
+        _ body: Data, headers: [String: String], secret: String? = nil, tolerance: TimeInterval? = nil, now: Date? = nil
+    ) -> Bool {
+        (try? check(body, headers, secret, tolerance, now)) != nil
     }
 
-    /// Checks a webhook's signature as `verifyWebhook` does, without reading
-    /// its body.
-    public func verifyWebhookSignature(secret: String, headers: [String: String], body: Data, now: Date = Date()) throws {
-        let encoded = secret.hasPrefix("whsec_") ? String(secret.dropFirst("whsec_".count)) : secret
-        guard let key = Data(base64Encoded: encoded), !key.isEmpty else {
-            throw WebhookVerificationError.invalidSecret
+    /// Checks the signature and reads the event; throws `WebhookVerificationError`
+    /// when the request is not one meeng signed.
+    public func constructEvent(
+        _ body: Data, headers: [String: String], secret: String? = nil, tolerance: TimeInterval? = nil, now: Date? = nil
+    ) throws -> WebhookEvent {
+        try check(body, headers, secret, tolerance, now)
+        do {
+            return try WebhookEvent.parse(body)
+        } catch {
+            throw WebhookVerificationError(code: "INVALID_JSON", message: "Webhook payload is not valid JSON: \(error)")
         }
-        func header(_ name: String) -> String {
-            headers.first { $0.key.lowercased() == name }?.value ?? ""
-        }
-        let id = header("webhook-id")
-        let stamp = header("webhook-timestamp")
-        // Only ASCII digits: Int64(_:) also takes a sign, which the signer never sends.
-        guard !id.isEmpty, !stamp.isEmpty, stamp.utf8.allSatisfy({ $0 >= 0x30 && $0 <= 0x39 }), let seconds = Int64(stamp) else {
-            throw WebhookVerificationError.invalidSignature
-        }
-        guard abs(now.timeIntervalSince1970 - TimeInterval(seconds)) <= webhookTolerance else {
-            throw WebhookVerificationError.invalidSignature
-        }
-        let signed = Data("\(id).\(stamp).".utf8) + body
-        let symmetric = SymmetricKey(data: key)
-        for signature in header("webhook-signature").split(whereSeparator: \.isWhitespace) {
-            let parts = signature.split(separator: ",", maxSplits: 1)
-            guard parts.count == 2, parts[0] == "v1", let decoded = Data(base64Encoded: String(parts[1])) else {
-                continue
-            }
-            // isValidAuthenticationCode compares in constant time.
-            if HMAC<SHA256>.isValidAuthenticationCode(decoded, authenticating: signed, using: symmetric) {
-                return
-            }
-        }
-        throw WebhookVerificationError.invalidSignature
     }
-#endif
+
+    private func check(
+        _ body: Data, _ headers: [String: String], _ secret: String?, _ tolerance: TimeInterval?, _ now: Date?
+    ) throws {
+        func header(_ name: String) -> String? {
+            headers.first { $0.key.lowercased() == name.lowercased() }.map(\.value).flatMap { $0.isEmpty ? nil : $0 }
+        }
+        guard let signature = header(Webhooks.signatureHeader) ?? header("X-UseSend-Signature") else {
+            throw WebhookVerificationError(code: "MISSING_SIGNATURE", message: "Missing \(Webhooks.signatureHeader) header")
+        }
+        guard let timestamp = header(Webhooks.timestampHeader) ?? header("X-UseSend-Timestamp") else {
+            throw WebhookVerificationError(code: "MISSING_TIMESTAMP", message: "Missing \(Webhooks.timestampHeader) header")
+        }
+        guard signature.hasPrefix(Webhooks.prefix) else {
+            throw WebhookVerificationError(code: "INVALID_SIGNATURE_FORMAT", message: "Signature header must start with v1=")
+        }
+        guard let sent = Double(timestamp.trimmingCharacters(in: .whitespaces)), sent.isFinite else {
+            throw WebhookVerificationError(code: "INVALID_TIMESTAMP", message: "Timestamp header must be a number (milliseconds since epoch)")
+        }
+        let toleranceMs = (tolerance ?? Webhooks.defaultTolerance) * 1000
+        let nowMs = (now ?? Date()).timeIntervalSince1970 * 1000
+        if toleranceMs >= 0 && abs(nowMs - sent) > toleranceMs {
+            throw WebhookVerificationError(code: "TIMESTAMP_OUT_OF_RANGE", message: "Webhook timestamp is outside the allowed tolerance")
+        }
+        #if canImport(CryptoKit)
+            var signed = Data("\(timestamp).".utf8)
+            signed.append(body)
+            let mac = HMAC<SHA256>.authenticationCode(for: signed, using: SymmetricKey(data: Data((secret ?? self.secret).utf8)))
+            let expected = Webhooks.prefix + mac.map { String(format: "%02x", $0) }.joined()
+            // Compared in time that depends only on the length.
+            let left = Array(expected.utf8)
+            let right = Array(signature.utf8)
+            var difference = left.count ^ right.count
+            for index in 0..<min(left.count, right.count) {
+                difference |= Int(left[index] ^ right[index])
+            }
+            if difference != 0 {
+                throw WebhookVerificationError(code: "SIGNATURE_MISMATCH", message: "Webhook signature does not match")
+            }
+        #else
+            throw WebhookVerificationError(code: "SIGNATURE_MISMATCH", message: "this platform has no CryptoKit to check the signature with")
+        #endif
+    }
+}

@@ -9,7 +9,11 @@ extension MeengClient {
     /// The contract this SDK was generated from.
     public static let apiVersion = {{quote .APIVersion}}
 
-    /// meeng's API. The environment, test or live, is the API key's:
-    /// `prk_test_…` or `prk_live_…`.
+    /// Where meeng's API lives. The client appends `{{.APIPrefix}}/v1` to it, so
+    /// `MEENG_BASE_URL`, like the `baseURL` argument, is the address of the app
+    /// and nothing more.
     public static let defaultBaseURL = URL(string: {{quote .BaseURL}})!
+
+    /// What every path starts with, after the base URL.
+    static let apiPrefix = {{quote .APIPrefix}}
 }

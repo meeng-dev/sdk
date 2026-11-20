@@ -21,15 +21,25 @@ var swiftKeywords = map[string]bool{
 func init() {
 	register(Language{Name: "swift", Funcs: template.FuncMap{
 		// quote writes a string literal, escaped the way swift reads it.
-		"quote":     swiftQuote,
-		"swName":    swName,
-		"swType":    swType,
-		"swDoc":     swDoc,
-		"swPath":    swPath,
-		"swEnums":   enumTypes,
-		"swCase":    swCase,
-		"swKey":     swKey,
-		"swParams":  swParams,
+		"quote":    swiftQuote,
+		"swName":   swName,
+		"swType":   swType,
+		"swDoc":    swDoc,
+		"swPath":   swPath,
+		"swEnums":  enumTypes,
+		"swCase":   swCase,
+		"swKey":    swKey,
+		"swParams": swParams,
+		// swQuery is the Swift type of a query filter.
+		"swQuery": func(p *Param) string {
+			switch p.Kind {
+			case "integer":
+				return "Int?"
+			case "stringlist":
+				return "[String]?"
+			}
+			return "String?"
+		},
 		"required":  requiredFields,
 		"optional":  optionalFields,
 		"swLiteral": swLiteral,
@@ -93,6 +103,9 @@ func swBase(models []*Model, model *Model, field *Field, t *TypeRef) string {
 	case "model":
 		return t.Model
 	case "array":
+		if t.OrScalar {
+			return "StringList"
+		}
 		return "[" + swBase(models, model, field, t.Items) + "]"
 	case "map":
 		return "[String: " + swBase(models, model, field, t.Items) + "]"

@@ -45,24 +45,37 @@ func dig(doc map[string]any, keys ...string) map[string]any {
 	return node
 }
 
-// A description or a summary cannot leave its comment, in any language: what
-// ends a comment is broken, a new line stays a comment line, and what a
-// language reads inside a string is escaped.
+// A description cannot leave its comment, in any language: what ends a comment
+// is broken, a new line stays a comment line, and what a language reads inside
+// a string is escaped.
 func TestHostileTextStaysInsideItsComment(t *testing.T) {
 	ir, err := load(t, func(doc map[string]any) {
-		product := dig(doc, "components", "schemas", "Product")
-		product["description"] = hostile
-		dig(product, "properties", "name")["description"] = hostile
-		dig(doc, "paths", "/api/v1/products", "get")["summary"] = hostile
+		body := dig(doc, "paths", "/v1/emails", "post", "requestBody", "content", "application/json", "schema")
+		body["description"] = hostile
+		dig(body, "properties", "subject")["description"] = hostile
+		domain := dig(doc, "paths", "/v1/domains", "get", "responses", "200", "content", "application/json", "schema", "items")
+		domain["description"] = hostile
+		dig(domain, "properties", "name")["description"] = hostile
+		query := dig(doc, "paths", "/v1/emails", "get")["parameters"].([]any)[0].(map[string]any)
+		query["description"] = hostile
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.ContainsAny(ir.Services[0].Methods[0].Summary, "\r\n") {
-		t.Errorf("a summary spans lines: %q", ir.Services[0].Methods[0].Summary)
+	var params *Param
+	for _, service := range ir.Services {
+		for _, method := range service.Methods {
+			if method.OperationID == "emails.list" {
+				params = method.Query[0]
+			}
+		}
+	}
+	if params == nil || strings.ContainsAny(params.Description, "\r") {
+		t.Fatalf("a query description spans lines: %+v", params)
 	}
 	lineComments := map[string][]string{
 		"go": {"//"}, "rust": {"///"}, "swift": {"///"}, "dart": {"///"}, "ruby": {"#"}, "csharp": {"///"},
+		"python": {"#"},
 	}
 	for language := range Languages {
 		out := t.TempDir()
@@ -81,10 +94,8 @@ func TestHostileTextStaysInsideItsComment(t *testing.T) {
 					t.Errorf("%s: %s keeps %q", language, path, broken)
 				}
 			}
-			if language == "elixir" || language == "ruby" {
-				if strings.Contains(strings.ReplaceAll(source, `\#{BREAKOUT_D`, ""), "#{BREAKOUT_D") && language == "elixir" {
-					t.Errorf("%s: %s interpolates the description", language, path)
-				}
+			if language == "elixir" && strings.Contains(strings.ReplaceAll(source, `\#{BREAKOUT_D`, ""), "#{BREAKOUT_D") {
+				t.Errorf("%s: %s interpolates the description", language, path)
 			}
 			for _, line := range strings.Split(source, "\n") {
 				if !strings.Contains(line, "BREAKOUT_C") {
@@ -106,7 +117,8 @@ func TestHostileTextStaysInsideItsComment(t *testing.T) {
 			}
 			return nil
 		})
-		if seen == 0 && language != "elixir" {
+		// PHP writes arrays, and describes only what the surface says.
+		if seen == 0 && language != "elixir" && language != "php" {
 			t.Errorf("%s: the test description reached no file, so the test checks nothing", language)
 		}
 	}
@@ -117,28 +129,28 @@ func TestHostileTextStaysInsideItsComment(t *testing.T) {
 func TestHostileIdentifiersAndValuesStopGeneration(t *testing.T) {
 	cases := map[string]func(doc map[string]any){
 		"an enum value with a quote": func(doc map[string]any) {
-			status := dig(doc, "components", "schemas", "Product", "properties", "status")
-			status["enum"] = []any{"active", `archived"; evil(); "`}
+			status := dig(doc, "paths", "/v1/domains/{id}", "get", "responses", "200", "content", "application/json", "schema", "properties", "status")
+			status["enum"] = []any{"PENDING", `SUCCESS"; evil(); "`}
 		},
 		"an enum value with a new line": func(doc map[string]any) {
-			status := dig(doc, "components", "schemas", "Product", "properties", "status")
-			status["enum"] = []any{"active\nevil"}
+			status := dig(doc, "paths", "/v1/domains/{id}", "get", "responses", "200", "content", "application/json", "schema", "properties", "status")
+			status["enum"] = []any{"PENDING\nevil"}
 		},
 		"a field that is not an identifier": func(doc map[string]any) {
-			properties := dig(doc, "components", "schemas", "Product", "properties")
-			properties[`x"]; evil(); ["`] = map[string]any{"type": "string"}
-		},
-		"a model that is not an identifier": func(doc map[string]any) {
-			schemas := dig(doc, "components", "schemas")
-			schemas["Evil; drop"] = map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}}
+			body := dig(doc, "paths", "/v1/emails", "post", "requestBody", "content", "application/json", "schema", "properties")
+			body[`x"]; evil(); ["`] = map[string]any{"type": "string"}
 		},
 		"a path with a quote": func(doc map[string]any) {
 			paths := dig(doc, "paths")
-			paths[`/api/v1/pr"oducts`] = paths["/api/v1/products"]
+			paths[`/v1/em"ails`] = paths["/v1/emails"]
 		},
 		"a path parameter that is not an identifier": func(doc map[string]any) {
 			paths := dig(doc, "paths")
-			paths["/api/v1/products/{product}/{a b}"] = paths["/api/v1/products/{product}"]
+			paths["/v1/emails/{a b}"] = paths["/v1/emails/{emailId}"]
+		},
+		"a route the surface does not name": func(doc map[string]any) {
+			paths := dig(doc, "paths")
+			paths["/v1/secrets"] = paths["/v1/domains"]
 		},
 		"a server address with a quote": func(doc map[string]any) {
 			doc["servers"] = []any{map[string]any{"url": `https://meeng.dev"; evil(); "`}}
@@ -146,9 +158,12 @@ func TestHostileIdentifiersAndValuesStopGeneration(t *testing.T) {
 		"a contract version with a new line": func(doc map[string]any) {
 			dig(doc, "info")["version"] = "1.0\nevil"
 		},
-		"a webhook type with a quote": func(doc map[string]any) {
-			webhooks := dig(doc, "webhooks")
-			webhooks[`order."created`] = webhooks["order.created"]
+		"a named schema, which the generator does not read": func(doc map[string]any) {
+			dig(doc, "components", "schemas")["Evil"] = map[string]any{"type": "object"}
+		},
+		"a header the SDKs do not send": func(doc map[string]any) {
+			params := dig(doc, "paths", "/v1/emails", "post")["parameters"].([]any)
+			params[0].(map[string]any)["name"] = "X-Evil"
 		},
 	}
 	for name, mutate := range cases {
@@ -157,6 +172,17 @@ func TestHostileIdentifiersAndValuesStopGeneration(t *testing.T) {
 				t.Fatal("generation went ahead")
 			}
 		})
+	}
+}
+
+// A route the contract lost is as loud as one it gained: the surface names
+// every route the SDKs promise.
+func TestARouteTheContractLostStopsGeneration(t *testing.T) {
+	_, err := load(t, func(doc map[string]any) {
+		delete(dig(doc, "paths"), "/v1/analytics/reputation-metrics")
+	})
+	if err == nil || !strings.Contains(err.Error(), "reputation-metrics") {
+		t.Fatalf("generation went ahead or named the wrong route: %v", err)
 	}
 }
 

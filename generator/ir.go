@@ -319,7 +319,14 @@ func build(doc *spec, version string) (*IR, error) {
 		if err := checkPath(path); err != nil {
 			return nil, err
 		}
-		for httpMethod, op := range doc.Paths[path] {
+		verbs := make([]string, 0, len(doc.Paths[path]))
+		for verb := range doc.Paths[path] {
+			verbs = append(verbs, verb)
+		}
+		// Sorted, so that what two routes share is described the same way every run.
+		sort.Strings(verbs)
+		for _, httpMethod := range verbs {
+			op := doc.Paths[path][httpMethod]
 			if !httpMethods[httpMethod] {
 				return nil, fmt.Errorf("generator: %s is not an HTTP method the SDKs send (%s)", httpMethod, path)
 			}

@@ -15,33 +15,19 @@ struct Requester: Sendable {
     let baseURL: String
     let timeout: TimeInterval
     let transport: MeengTransport
-    /// Why the base URL is refused; every call throws it before sending anything.
-    var baseURLError: MeengError?
+    /// Why the client cannot call (no key, an insecure address); every call throws it before sending anything.
+    var setupError: MeengError?
 
-    /// Calls the API and answers what it wrapped in `data`; a refusal throws
-    /// `MeengError`.
+    /// Calls the API and reads its answer; a refusal throws `MeengError`.
     func request<T: Decodable>(
         _ method: String,
         _ path: String,
         query: [(String, String?)] = [],
         body: (any Encodable & Sendable)? = nil,
-        idempotencyKey: String? = nil,
-        apiKey: String? = nil
+        idempotencyKey: String? = nil
     ) async throws -> T {
-        let data = try await send(method, path, query: query, body: body, idempotencyKey: idempotencyKey, apiKey: apiKey)
-        return try JSONDecoder().decode(Envelope<T>.self, from: data).data
-    }
-
-    /// Calls the API for an answer that is a 204 with no body; a refusal
-    /// throws `MeengError`.
-    func requestNoContent(
-        _ method: String,
-        _ path: String,
-        body: (any Encodable & Sendable)? = nil,
-        idempotencyKey: String? = nil,
-        apiKey: String? = nil
-    ) async throws {
-        _ = try await send(method, path, query: [], body: body, idempotencyKey: idempotencyKey, apiKey: apiKey)
+        let data = try await send(method, path, query: query, body: body, idempotencyKey: idempotencyKey)
+        return try JSONDecoder().decode(T.self, from: data)
     }
 
     private func send(
@@ -49,13 +35,12 @@ struct Requester: Sendable {
         _ path: String,
         query: [(String, String?)],
         body: (any Encodable & Sendable)?,
-        idempotencyKey: String?,
-        apiKey: String?
+        idempotencyKey: String?
     ) async throws -> Data {
-        if let baseURLError {
-            throw baseURLError
+        if let setupError {
+            throw setupError
         }
-        var address = baseURL + path
+        var address = baseURL + MeengClient.apiPrefix + path
         let pairs = query.compactMap { name, value -> String? in
             guard let value, !value.isEmpty else { return nil }
             return "\(escape(name))=\(escape(value))"
@@ -68,8 +53,7 @@ struct Requester: Sendable {
         }
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = method
-        let key = apiKey.flatMap { $0.isEmpty ? nil : $0 } ?? self.apiKey
-        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("meeng-swift/\(MeengClient.version)", forHTTPHeaderField: "User-Agent")
         if let body {
@@ -78,11 +62,8 @@ struct Requester: Sendable {
             request.httpBody = try encoder.encode(body)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-        // A POST is sent with a key of its own, one a call, unless the caller gave one.
         if let idempotencyKey, !idempotencyKey.isEmpty {
             request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
-        } else if method == "POST" {
-            request.setValue(UUID().uuidString.lowercased(), forHTTPHeaderField: "Idempotency-Key")
         }
         let (data, response) = try await transport(request)
         if response.statusCode >= 300 {
@@ -122,14 +103,9 @@ extension MeengError {
     }
 }
 
-/// A map filter is one pair a key: `metadata[pedido]=123`, the keys sorted.
-func deepObject(_ name: String, _ map: [String: String]?) -> [(String, String?)] {
-    (map ?? [:]).sorted { $0.key < $1.key }.map { ("\(name)[\($0.key)]", $0.value) }
-}
-
-private struct Envelope<T: Decodable>: Decodable {
-    let data: T
-}
+/// A body with nothing in it, which a POST or PUT with no body of its own sends
+/// as `{}`, as useSend's SDKs do.
+struct EmptyBody: Encodable, Sendable {}
 
 private let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 

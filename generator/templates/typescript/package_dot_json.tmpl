@@ -29,6 +29,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --lib es2022,dom --types node --strict --noUncheckedIndexedAccess --allowImportingTsExtensions --skipLibCheck test/meeng.test.ts",
     "test": "node --test test/*.test.ts"
   },
   "devDependencies": {

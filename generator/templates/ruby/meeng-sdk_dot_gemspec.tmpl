@@ -13,6 +13,8 @@ Gem::Specification.new do |spec|
   spec.files = Dir["lib/**/*.rb"] + ["README.md"]
   spec.require_paths = ["lib"]
   spec.metadata = {
+    # Not published until the names are confirmed: gem push refuses this host.
+    "allowed_push_host" => "https://rubygems.invalid",
     "homepage_uri" => "https://meeng.dev",
     "source_code_uri" => "https://github.com/meeng-dev/sdk",
     "rubygems_mfa_required" => "true"

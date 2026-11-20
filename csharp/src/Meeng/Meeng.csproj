@@ -11,6 +11,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsAotCompatible>true</IsAotCompatible>
 
+    <!-- Not packable until the names are confirmed. -->
+    <IsPackable>false</IsPackable>
     <PackageId>MeengDev.Sdk</PackageId>
     <Version>0.1.0</Version>
     <Authors>meeng</Authors>

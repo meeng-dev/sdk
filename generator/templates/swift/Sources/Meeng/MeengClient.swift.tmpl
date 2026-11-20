@@ -6,41 +6,62 @@ import Foundation
     import FoundationNetworking
 #endif
 
-/// meeng's API with one organization's API key. The key says the
-/// organization and the environment: `prk_test_…` is the test environment,
-/// `prk_live_…` the live one.
+/// meeng's API with one team's API key. Without a key it is read from
+/// `MEENG_API_KEY`, and the address of the app from `MEENG_BASE_URL`.
 ///
-///     let meeng = MeengClient(apiKey: ProcessInfo.processInfo.environment["MEENG_API_KEY"]!)
-///     let product = try await meeng.products.create(ProductsCreateParams(name: "Curso"))
-///     for try await product in meeng.products.listIter() { … }
+///     let meeng = MeengClient(apiKey: "mg_123")
+///     let sent = try await meeng.emails.send(
+///         EmailsSendParams(to: ["customer@example.com"], from: "hello@acme.com", subject: "Hello"))
 public final class MeengClient: Sendable {
 {{- range .Services}}
     /// The API's {{.Name}}.
     public let {{swName .Name}}: {{pascal .Name}}Service
 {{- end}}
 
-    /// A client for the organization `apiKey` belongs to.
+    /// The address every call goes to, with the API prefix.
+    public let url: String
+
+    /// A client for the team `apiKey` belongs to.
     ///
     /// - Parameters:
-    ///   - baseURL: another address, such as a local server. It must be https;
-    ///     http is accepted only for localhost, 127.0.0.0/8 and ::1, and any
-    ///     other makes every call throw a `MeengError` before sending anything.
+    ///   - apiKey: the team's API key; `MEENG_API_KEY` when nil. Without one, every
+    ///     call throws a `MeengError` before sending anything.
+    ///   - baseURL: another app, such as a self-hosted one: its address, without
+    ///     `/api/v1`; `MEENG_BASE_URL` when nil. It must be https; http is accepted
+    ///     only for localhost, 127.0.0.0/8 and ::1, and any other makes every call
+    ///     throw a `MeengError` before sending anything.
     ///   - timeout: how long a call may take, 30 seconds by default.
     ///   - transport: what sends the requests; a `URLSession` that refuses redirects by default.
     public init(
-        apiKey: String,
-        baseURL: URL = MeengClient.defaultBaseURL,
+        apiKey: String? = nil,
+        baseURL: URL? = nil,
         timeout: TimeInterval = 30,
         transport: MeengTransport? = nil
     ) {
-        var base = baseURL.absoluteString
+        let environment = ProcessInfo.processInfo.environment
+        let key = apiKey.flatMap { $0.isEmpty ? nil : $0 } ?? environment["MEENG_API_KEY"] ?? ""
+        let address =
+            baseURL
+            ?? environment["MEENG_BASE_URL"].flatMap { $0.isEmpty ? nil : URL(string: $0) }
+            ?? MeengClient.defaultBaseURL
+        var base = address.absoluteString
         while base.hasSuffix("/") {
             base.removeLast()
         }
-        var requester = Requester(apiKey: apiKey, baseURL: base, timeout: timeout, transport: transport ?? Requester.urlSession)
-        requester.baseURLError = MeengError.insecureBaseURL(baseURL)
+        var requester = Requester(apiKey: key, baseURL: base, timeout: timeout, transport: transport ?? Requester.urlSession)
+        if key.isEmpty {
+            requester.setupError = MeengError(status: 0, code: "missing_api_key", message: "meeng: missing API key: pass it to MeengClient(apiKey:) or set MEENG_API_KEY")
+        } else {
+            requester.setupError = MeengError.insecureBaseURL(address)
+        }
+        url = base + MeengClient.apiPrefix
 {{- range .Services}}
         {{swName .Name}} = {{pascal .Name}}Service(requester: requester)
 {{- end}}
+    }
+
+    /// Checks and reads the webhooks a team's endpoint receives.
+    public func webhooks(secret: String) -> Webhooks {
+        Webhooks(secret: secret)
     }
 }
