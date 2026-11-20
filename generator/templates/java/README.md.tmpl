@@ -32,7 +32,7 @@ Uma recusa da API lança `MeengException` (`getStatus()`, `getCode()`, como `NOT
 
 {{range .Services}}### `meeng.{{javaName .Name}}()`
 
-{{range .Methods}}- `{{camel .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{camel .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}Os parâmetros de caminho são `String`; os filtros de listagem são o `ListParams` do serviço (uma lista em `domainId` vira um `domainId` por valor). `emails().send` e `emails().batch` aceitam `RequestOptions.builder().idempotencyKey("pedido-1").build()`: a mesma chave com o mesmo corpo devolve o primeiro resultado. Os destinatários são `List<String>`; a API aceita uma string solta, e o SDK a lê como lista de um item.
 

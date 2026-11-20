@@ -32,7 +32,7 @@ Os campos obrigatórios de um corpo vêm primeiro no inicializador; os opcionais
 
 {{range .Services}}### `meeng.{{swName .Name}}`
 
-{{range .Methods}}- `{{swName .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{swName .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}Os parâmetros de caminho são `String`; os filtros de listagem são argumentos nomeados (`startDate:`, `domainId:`; um array em `domainId` vira um `domainId` por valor). `emails.send` e `emails.batch` aceitam `idempotencyKey: "pedido-1"`: a mesma chave com o mesmo corpo devolve o primeiro resultado.
 

@@ -46,54 +46,54 @@ Campos opcionais do corpo são ponteiros; campos que a API pode devolver como `n
 
 ### `client.Emails`
 
-- `Send`: Sends an email, now or at scheduledAt.
-- `Batch`: Sends up to 100 emails in one request.
-- `Get`: Reads one email with its events.
-- `List`: Lists emails, newest first, with an optional date range and domain filter.
-- `Update`: Reschedules an email that has not been sent.
-- `Cancel`: Cancels a scheduled email.
+- `Send`: envia um e-mail, agora ou em `scheduledAt`.
+- `Batch`: envia até 100 e-mails numa requisição.
+- `Get`: lê um e-mail com os seus eventos.
+- `List`: lista e-mails, do mais novo ao mais velho, com período e domínio opcionais.
+- `Update`: reagenda um e-mail que ainda não saiu.
+- `Cancel`: cancela um e-mail agendado.
 
 ### `client.Domains`
 
-- `List`: Lists the sending domains of the team.
-- `Create`: Adds a sending domain and returns the DNS records to publish.
-- `Verify`: Asks for the domain's DNS records to be checked again.
-- `Get`: Reads one domain with its DNS records.
-- `Delete`: Removes a domain.
+- `List`: lista os domínios de envio do time.
+- `Create`: adiciona um domínio de envio e devolve os registros DNS a publicar.
+- `Verify`: pede para conferir de novo os registros DNS do domínio.
+- `Get`: lê um domínio com os seus registros DNS.
+- `Delete`: remove um domínio.
 
 ### `client.Contacts`
 
-- `Create`: Adds a contact to a contact book.
-- `List`: Lists the contacts of a contact book, optionally by email or id.
-- `Get`: Reads one contact.
-- `Update`: Changes the fields of a contact that are sent.
-- `Upsert`: Creates the contact, or replaces it when it exists.
-- `Delete`: Removes a contact.
-- `BulkCreate`: Adds many contacts to a contact book in one request.
-- `BulkDelete`: Removes many contacts from a contact book in one request.
+- `Create`: adiciona um contato a uma lista de contatos.
+- `List`: lista os contatos de uma lista, com filtro opcional por e-mail ou id.
+- `Get`: lê um contato.
+- `Update`: muda só os campos enviados de um contato.
+- `Upsert`: cria o contato, ou o substitui quando ele já existe.
+- `Delete`: remove um contato.
+- `BulkCreate`: adiciona vários contatos a uma lista numa requisição.
+- `BulkDelete`: remove vários contatos de uma lista numa requisição.
 
 ### `client.ContactBooks`
 
-- `List`: Lists the contact books of the team.
-- `Create`: Creates a contact book.
-- `Get`: Reads one contact book.
-- `Update`: Changes the fields of a contact book that are sent.
-- `Delete`: Removes a contact book and its contacts.
+- `List`: lista as listas de contatos do time.
+- `Create`: cria uma lista de contatos.
+- `Get`: lê uma lista de contatos.
+- `Update`: muda só os campos enviados de uma lista de contatos.
+- `Delete`: remove uma lista de contatos e os seus contatos.
 
 ### `client.Campaigns`
 
-- `Create`: Creates a campaign, and sends it now when sendNow is true.
-- `List`: Lists campaigns, optionally by status or a search text.
-- `Get`: Reads one campaign with its counters.
-- `Delete`: Removes a campaign.
-- `Schedule`: Schedules a campaign, or sends it now when no time is given.
-- `Pause`: Pauses a running or scheduled campaign.
-- `Resume`: Resumes a paused campaign.
+- `Create`: cria uma campanha, e a envia agora quando `sendNow` é verdadeiro.
+- `List`: lista campanhas, com filtro opcional por status ou texto.
+- `Get`: lê uma campanha com os seus contadores.
+- `Delete`: remove uma campanha.
+- `Schedule`: agenda uma campanha, ou a envia agora quando não há horário.
+- `Pause`: pausa uma campanha em andamento ou agendada.
+- `Resume`: retoma uma campanha pausada.
 
 ### `client.Analytics`
 
-- `EmailTimeSeries`: Counts emails by day over the last 7 or 30 days.
-- `ReputationMetrics`: Reads the bounce and complaint rates of the sending reputation.
+- `EmailTimeSeries`: conta e-mails por dia nos últimos 7 ou 30 dias.
+- `ReputationMetrics`: lê as taxas de rejeição e de reclamação da reputação de envio.
 
 Os parâmetros de caminho são strings; os filtros de listagem são a struct `<Recurso><Método>Query` (campo zero é omitido, e `DomainID` é uma lista que vira um `domainId` por valor).
 

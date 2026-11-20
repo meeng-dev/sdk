@@ -1,100 +1,87 @@
-# Working in this repository
+# meeng/sdk — repository rules
 
-meeng's SDKs, one package per language, generated from the public API's
-contract the way Polar generates its own. Read this before changing anything.
+## Scope and authority
+
+Os SDKs do meeng, um pacote por linguagem, gerados do contrato da API pelo gerador em Go deste repositório. O meeng é um espelho funcional do useSend ([[ADR-0001-usesend-is-a-functional-mirror]]): a API pública é a do useSend v1, então estes SDKs têm o mesmo formato dos SDKs do useSend. Troca-se o nome do cliente, a chave e a URL, e o código do cliente continua igual.
+
+Este repositório é filho do vault `meeng-dev/` (a raiz não é Git; este diretório é um repositório próprio). As notas do vault ficam nas pastas numeradas da raiz do vault (`10-adr/`, `60-contracts/`, `70-gaps/`, `90-reference/`); a frente deste trabalho é [[F5-sdk]], o contrato da API é [[CT-public-api]] e a regra de Go é [[ADR-0003-go-only]]. Instruções para agentes ficam só neste `AGENTS.md`; nunca `CLAUDE.md`. Quem edita o vault edita no vault, não aqui.
+
+Antes de mexer, leia: este arquivo, `generator/surface.go`, `generator/webhooks.go` e o `AGENTS.md` do vault (`../AGENTS.md`).
 
 ## What is generated and what is written
 
-- `go/`, `typescript/`, `python/`, `php/`, `ruby/`, `java/`, `csharp/`,
-  `elixir/`, `dart/`, `rust/` and `swift/` are **output**. The generator
-  empties each one and writes it again, so an edit there is lost on the next
-  run. Change the template instead.
-- `js/` and `react/` are **written by hand**, not generated: the browser
-  packages (`@meeng-dev/js`, the loader and types of meeng.js; and
-  `@meeng-dev/react`, its React bindings). They are not server SDKs, so the
-  "every language" rule does not apply to them. Their names are proposals until
-  Paulo confirms them, and both are `"private": true` until then. They follow the
-  contract of `https://meeng.dev/v1/meeng.js` (meeng.dev's `public/`); change
-  that script and these types together.
-- `generator/templates/<language>/` is where every SDK's hand-written part
-  lives: client, errors, pagination, webhooks, tests, README. A `.tmpl` file is
-  rendered with the IR; any other file is copied. `_dot_` in a name becomes `.`;
-  `__model__` and `__service__` write the file once per model or per service.
-- `generator/` (Go) reads `openapi.json` into a language-neutral IR
-  (`ir.go`) and renders it (`emit.go`, `lang_<language>.go`).
-- `openapi.json` is copied from meeng.dev (`docs/contracts/api.openapi.json`,
-  which meeng.dev's CI keeps equal to the routes). Never edit it here: change
-  the API in meeng.dev, export it, then run `./regen.sh` (it copies the contract
-  committed at the HEAD of meeng.dev's develop, or another ref, or with
-  `--worktree` the checkout's file, and writes the eleven SDKs).
+- `go/`, `typescript/`, `python/`, `php/`, `ruby/`, `java/`, `csharp/`, `elixir/`, `dart/`, `rust/` e `swift/` são **saída**. O gerador esvazia cada pasta e escreve de novo; uma edição ali se perde na próxima rodada. Mude o template.
+- `generator/templates/<linguagem>/` é a parte escrita à mão de cada SDK: cliente, erros, webhooks, testes, README. Um arquivo `.tmpl` é renderizado com o IR; qualquer outro é copiado. `_dot_` num nome vira `.`; `__model__`, `__service__` e `__webhook__` escrevem o arquivo uma vez por modelo, por serviço ou por grupo de webhook.
+- `generator/` (Go) lê o `openapi.json` num IR neutro (`ir.go`) e o renderiza (`emit.go`, `lang_<linguagem>.go`).
+- `generator/surface.go` e `generator/webhooks.go` existem porque o contrato do useSend **não traz** `operationId`, tags, schemas nomeados nem webhooks. O primeiro dá o nome de cada método (`emails.send`, `contacts.bulkCreate`…), os apelidos (`emails.create`, `campaigns.getAll`) e o nome dos modelos de resposta que se repetem (`Domain`, `Contact`, `ContactBook`, `Campaign`, `Email`); o segundo descreve os 21 eventos de webhook e seus dados. Uma rota do contrato que o `surface.go` não nomeia, ou uma do `surface.go` que o contrato não tem, **para a geração**: nenhum SDK perde ou renomeia uma rota em silêncio.
+- `Package.swift` e `composer.json` na raiz são escritos à mão (SwiftPM e Packagist leem a raiz do repositório); mantenha-os iguais a `swift/Package.swift` e `php/composer.json`.
+
+## The contract
+
+`openapi.json` é o contrato do useSend v1 (`reference_usesend/apps/docs/api-reference/openapi.json`, commit `7a378ca`) **com troca só de marca**: `info.title` vira `meeng API` e `servers[0].url` vira `https://app.meeng.dev/api`. Caminhos, schemas e nomes são idênticos; `./regen.sh --reference` refaz o arquivo a partir do clone e o resultado é byte a byte o commitado. **Nunca edite o `openapi.json` à mão.**
+
+O `regen.sh` vai passar a copiar o **contrato commitado do app meeng.dev**: `docs/contracts/api.openapi.json`, que o `aru openapi:check` do app mantém igual às rotas reais (a rota é a fonte; [[GAP-openapi-source]]). Enquanto o app não exporta esse arquivo só o `--reference` funciona. Quando exportar: `./regen.sh` (HEAD do `develop` do app), `./regen.sh <ref>` ou `./regen.sh --worktree`, depois `./check.sh`. Se o contrato do app trouxer rota, campo ou tipo novo, o gerador para até alguém nomeá-lo em `surface.go`; se o app divergir do useSend, a diferença é decisão de ADR, não do gerador.
+
+Diferenças deliberadas entre os SDKs e o contrato escrito, todas vindas do código do useSend:
+- o erro é `{error: {code, message}}`; também se lê `{error: "texto"}` (o `openapi.json` declara assim os 403 e 404, e o `PUT /domains/{id}/verify` responde assim) e o erro de validação do zod, `{success: false, error: {issues, name}}`, que vira o código `ZodError` e a primeira falha como mensagem (`from: Required`);
+- `to`, `cc`, `bcc` e `replyTo` aceitam texto ou lista de textos na API: os SDKs enviam a lista e leem um texto solto como lista de um;
+- as rotas `POST`/`PUT` sem corpo mandam `{}`, como os SDKs do useSend;
+- o `Idempotency-Key` só vale em `emails.send` e `emails.batch`, só é enviado quando o chamador o dá (nenhum SDK inventa uma chave) e a API o guarda por 24 horas;
+- `page` e `limit` são inteiros nos SDKs mesmo onde o contrato os escreve como texto; `domainId` de `emails.list` é uma lista, enviada como um `domainId` por valor.
+
+## Names the SDKs share
+
+- **Cliente:** `Meeng` (Go `meeng.New`, Java `new Meeng`, C# `MeengClient`, Ruby `Meeng::Client`, Rust `meeng::Client`, Swift `MeengClient`, Elixir `Meeng.new`); TypeScript `new Meeng(apiKey?, baseUrl?)`.
+- **Recursos:** `emails` (`send`, `batch`, `get`, `list`, `update`, `cancel`), `domains`, `contacts`, `contactBooks`, `campaigns`, `analytics` e `webhooks`. O TypeScript devolve `{data, error}` como o useSend; o Python devolve `(data, error)` e levanta `MeengHTTPError` por padrão (`raise_on_error`); as demais linguagens usam o jeito delas (exceção, `Result`, erro de retorno).
+- **Ambiente:** `MEENG_API_KEY` e `MEENG_BASE_URL`. A URL base é a do **app** (`https://app.meeng.dev`), sem `/api/v1`: o cliente acrescenta o prefixo `/api` do contrato e os caminhos `/v1/...`. Só `https` é aceito; `http` vale para `localhost`, `127.0.0.0/8` e `::1`, para a chave nunca viajar em texto puro. Nenhum cliente segue redirecionamento.
+- **Webhooks:** `meeng.webhooks(secret)` com `verify` e `constructEvent` (a grafia de cada linguagem). O esquema é **exatamente o do useSend**: `v1=` mais o HMAC-SHA256 em hexadecimal de `"{timestamp}.{corpo}"` com o segredo `whsec_…` como chave literal; o timestamp em milissegundos; tolerância de 5 minutos (negativa desliga); códigos de erro `MISSING_SIGNATURE`, `MISSING_TIMESTAMP`, `INVALID_SIGNATURE_FORMAT`, `INVALID_TIMESTAMP`, `TIMESTAMP_OUT_OF_RANGE`, `SIGNATURE_MISMATCH`, `INVALID_BODY` e `INVALID_JSON`. Os cabeçalhos são `X-Meeng-Signature`, `X-Meeng-Timestamp`, `X-Meeng-Event` e `X-Meeng-Call`; os `X-UseSend-*` são aceitos como alternativa (o app envia os dois conjuntos com os mesmos valores). O envelope é `{id, type, version, createdAt, teamId, data, attempt}`; o `id` é o da chamada e vale para deduplicar. Mude o verificador e o app ([[GAP-webhook-usesend-dialect]]) juntos, ou nenhum.
 
 ## The gates
 
-`./check.sh` runs all of them; nothing is finished until it exits zero.
-- generator: gofmt, vet, test, regenerate;
-- go: vet and test;
-- typescript: `tsc --noEmit` and `node --test`;
-- js and react: `tsc --noEmit`, the ESM and CommonJS build, and `node --test`
-  (react runs on jsdom, a development dependency; `react/` links `../js`, so
-  `js/` is built first);
-- python: unittest and `mypy --strict` on 3.11;
-- php: `tests/run.php` and PHPStan level 8;
-- ruby: minitest under `ruby -w`;
-- java: `mvn verify` (`-Xlint:all -Werror`);
-- csharp: `dotnet test`, warnings as errors;
-- elixir: compile and test with `--warnings-as-errors`;
-- dart: `dart format`, `dart analyze --fatal-infos`, `dart test`;
-- rust: `cargo fmt --check`, clippy `-D warnings`, `cargo test`;
-- swift: `swift test` in `swift/` and `swift build` at the root (macOS only:
-  CryptoKit and Network; CI runs it in its own macOS job).
+`./check.sh` roda todos; nada está pronto até ele sair com zero. Cada passo imprime `== <linguagem>`.
+- gerador: `gofmt`, `go vet`, `go test -race` (o contrato lido, a superfície, o texto hostil, o determinismo) e `go run ./cmd/sdkgen`;
+- go: `go vet` e `go test -race`;
+- typescript: `tsc --noEmit` do código e dos testes, e `node --test`;
+- python: `unittest` com `-W error` e `mypy --strict` em 3.11;
+- php: `tests/run.php` e PHPStan nível 8;
+- ruby: minitest sob `ruby -w`;
+- java: `mvn verify`;
+- csharp: `dotnet test` (net8.0 e net10.0 compilam, com aviso como erro);
+- elixir: `mix compile` e `mix test`, com `--warnings-as-errors`;
+- dart: `dart format --language-version=3.8 --set-exit-if-changed`, `dart analyze --fatal-infos` e `dart test`;
+- rust: `cargo fmt --check`, `cargo clippy -D warnings` e `cargo test`;
+- swift: `swift test` em `swift/` e `swift build` na raiz (só macOS: CryptoKit e Network).
 
-`Package.swift` at the root is hand-written, because SwiftPM resolves a
-package from the repository root; keep it in step with `swift/Package.swift`.
+Uma ferramenta que falta **para o gate** (sai com erro), a não ser que se passe `SKIP_MISSING=1`, e então ela é nomeada e pulada: uma linguagem que ninguém verificou não está verificada. `MYPY` e `PHPSTAN` apontam essas ferramentas quando não estão no `PATH` (o `PHPSTAN` pode ser um `.phar`). `CHECK_DRIFT=1` (na CI) também falha quando um SDK commitado difere do que o gerador escreve. Use `GOWORK=off`: o `go.work` do vault não vale aqui. Use `$(go env GOROOT)/bin/gofmt`.
 
-CI also fails when the committed SDKs differ from what the generator writes.
-
-Use `$(go env GOROOT)/bin/gofmt`: a Homebrew gofmt on the PATH may be a newer
-release that formats differently from CI.
+O `cmd/sdkgen` roda `dart format` sobre o Dart gerado, com versão de linguagem fixa; sem o Dart no `PATH` ele avisa e deixa o Dart como está.
 
 ## Rules
 
-- Every SDK does the same thing, under the same version (`VERSION`). A feature
-  goes into every language, with the same test in each, or into none.
-- No third-party runtime dependency where the language's standard library can
-  do HTTP, JSON and HMAC. The two exceptions are deliberate: Dart uses `http`
-  and `crypto` from dart.dev, and Rust uses serde, serde_json, ureq, hmac,
-  sha2 and base64. Do not add others.
-- Each SDK keeps its language's idiom for walking every page: Go `ListIter`,
-  TypeScript async iterators, Python and Ruby `list_iter`, PHP generators,
-  Java `Iterable`, C# `IAsyncEnumerable`, Elixir `list_stream`, Dart and Swift
-  streams, Rust `Iterator`.
-- Webhook verification is Standard Webhooks, exactly what meeng.dev signs
-  (`app/Services/Webhooks.go`). Change both together or neither.
-- Code, comments and commits are in English; the READMEs are in Brazilian
-  Portuguese. Commits are authored by `Paulo R. Lima <paulorlima@hyz.is>` (meeng is a product), set with `git config` in the checkout, without AI
-  attribution.
+- Todo SDK faz a mesma coisa, sob a mesma versão (`VERSION`). Um recurso entra em todas as linguagens, com o mesmo teste em cada uma, ou em nenhuma. Os testes de cada linguagem cobrem os mesmos casos (envio com chave de idempotência, corpo `{}`, lote, filtros com lista, escape de caminho, lista sem objeto em volta, `DELETE` com corpo, `PUT` com id, os formatos de erro, destinatário texto ou lista, ambiente, `https`, redirecionamento e as seis situações do webhook).
+- Nenhuma dependência de tempo de execução onde a biblioteca padrão faz HTTP, JSON e HMAC. As exceções deliberadas são as do Peráta: Dart usa `http` e `crypto` do dart.dev, Rust usa `serde`, `serde_json`, `ureq`, `hmac` e `sha2`. Não acrescente outras.
+- Código, comentários, erros e commits em inglês; os README em português do Brasil. Um commit diz o que mudou e por quê.
+- Identidade: `Paulo R. Lima <paulorlima@hyz.is>` (o meeng é produto), no `git config` local, nunca em `--author`; `core.hooksPath` aponta para `/Users/paulorlima9/Developer/arandu-io/.githooks`. Nunca atribuição a IA: sem `Co-Authored-By`, sem rodapé "Generated with", sem emoji de robô.
+- `declared` não é `implemented`, e `implemented` não é `tested`: diga o que rodou e o que foi pulado.
+- Push, criação de repositório ou organização no GitHub, publicação em registro de pacotes, cadastro em serviço de terceiros e deploy exigem autorização do Paulo. Fluxo develop → main, sem force-push.
 
 ## Names
 
-The package is the GitHub repository: organization `meeng-dev`, package
-`sdk`. npm `@meeng-dev/sdk`, Packagist `meeng-dev/sdk`, Maven `dev.meeng:sdk`,
-Go and Swift `github.com/meeng-dev/sdk`; where a registry has no namespace,
-`meeng-sdk` (PyPI, RubyGems, crates.io), `meeng_sdk` (Hex, pub.dev)
-and `MeengDev.Sdk` (NuGet). In every registry the package belongs to the
-`meeng-dev` organization. Never rename or add a package without Paulo's
-confirmation.
+Os nomes públicos são **propostas** até o Paulo confirmar ([[GAP-public-names]]; regra global `public-names-ask-first`). O padrão é o do GitHub, `<organização>/<repositório>`: organização `meeng-dev`, pacote `sdk`.
+
+| Registro | Nome proposto |
+|---|---|
+| Go | `github.com/meeng-dev/sdk/go` |
+| npm | `@meeng-dev/sdk` |
+| PyPI, RubyGems, crates.io | `meeng-sdk` |
+| Packagist | `meeng-dev/sdk` |
+| Maven | `dev.meeng:sdk` |
+| NuGet | `MeengDev.Sdk` |
+| Hex, pub.dev | `meeng_sdk` |
+| Swift (SwiftPM) | `https://github.com/meeng-dev/sdk`, produto `Meeng` |
+
+Nenhum pacote foi publicado, e cada um está marcado para não sair por engano: `"private": true` no npm, o classificador `Private :: Do Not Upload` no PyPI, `publish = false` no Cargo, `publish_to: none` no pub.dev, `allowed_push_host` inválido no RubyGems e `IsPackable` falso no NuGet. Quem publicar tira a marca junto com a confirmação do nome. Nunca renomeie nem acrescente um pacote sem a confirmação do Paulo.
 
 ## Release
 
-One version for every language.
-1. Bump `VERSION`, run `./regen.sh` and `./check.sh`, and commit on
-   develop; after CI, fast-forward main.
-2. Tag `vX.Y.Z` and `go/vX.Y.Z` on that commit and push both. The `v` tag runs
-   `.github/workflows/release.yml`, which publishes npm, PyPI, RubyGems,
-   crates.io, Hex, pub.dev, NuGet and Maven Central (trusted publishing where
-   the registry has it, secrets otherwise; each job skips a version the
-   registry already has); the `go/` tag is the Go module's version, and Swift
-   and Packagist read the `v` tag from this repository through the root
-   `Package.swift` and `composer.json`, which are hand-written and must stay in
-   step with `swift/Package.swift` and `php/composer.json`. The one-time
-   account-side setup per registry is in `RELEASING.md`.
+Uma versão para todas as linguagens. Ainda não há release: a `VERSION` é `0.1.0`, o primeiro conjunto. Quando houver autorização: suba o `VERSION`, rode `./regen.sh` e `./check.sh`, faça o commit no `develop` e avance o `main` depois da CI; tag `vX.Y.Z` e `go/vX.Y.Z` no mesmo commit. O fluxo de publicação por registro (confiança por OIDC onde houver) será escrito quando os nomes forem confirmados.

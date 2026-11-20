@@ -39,7 +39,7 @@ Uma recusa da API lança `MeengException` (`status`, `code`, como `NOT_UNIQUE` o
 
 {{range .Services}}### `meeng.{{dartName .Name}}`
 
-{{range .Methods}}- `{{dartName .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{dartName .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}Os parâmetros de caminho são `String`; os filtros de listagem são argumentos nomeados (`startDate:`, `domainId:`; uma lista em `domainId` vira um `domainId` por valor). `emails.send` e `emails.batch` aceitam `idempotencyKey: 'pedido-1'`: a mesma chave com o mesmo corpo devolve o primeiro resultado. Os destinatários são `List<String>`; a API aceita uma string solta, e o SDK a lê como lista de um item.
 

@@ -109,9 +109,11 @@ type Method struct {
 	// OperationID is service.name: emails.send.
 	OperationID string
 	Summary     string
-	HTTPMethod  string
-	Path        string
-	PathParams  []string
+	// SummaryPT is the summary as the READMEs say it, in Brazilian Portuguese.
+	SummaryPT  string
+	HTTPMethod string
+	Path       string
+	PathParams []string
 	// Query are the optional filters.
 	Query []*Param
 	// Body is the request model, or nil. When BodyList is true the request
@@ -439,7 +441,7 @@ func typeSignature(t *TypeRef) string {
 
 func (l *loader) methodOf(op *operation, httpMethod, path string, def operationDef) (*Method, error) {
 	id := def.Service + "." + def.Name
-	method := &Method{Service: def.Service, Name: def.Name, OperationID: id, Summary: def.Summary, Aliases: def.Aliases, HTTPMethod: httpMethod, Path: path, Write: httpMethod != "GET"}
+	method := &Method{Service: def.Service, Name: def.Name, OperationID: id, Summary: def.Summary, SummaryPT: def.Readme, Aliases: def.Aliases, HTTPMethod: httpMethod, Path: path, Write: httpMethod != "GET"}
 	// The path names its parameters; a contract that forgets to declare one
 	// (the upsert of a contact does) still has it.
 	for _, part := range pathParts(path) {

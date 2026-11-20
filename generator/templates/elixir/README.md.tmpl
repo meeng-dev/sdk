@@ -30,7 +30,7 @@ Toda chamada devolve `{:ok, dados}` ou `{:error, %Meeng.Error{}}` (com `status`,
 
 {{range .Services}}### `Meeng.{{pascal .Name}}`
 
-{{range .Methods}}- `{{snake .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{snake .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}`Meeng.Emails.create/3` é outro nome de `send/3`, e `Meeng.Campaigns.get_all/2` de `list/2`.
 

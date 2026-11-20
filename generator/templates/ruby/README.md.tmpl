@@ -30,7 +30,7 @@ Sem argumentos, `Meeng::Client.new` lê a chave de `MEENG_API_KEY` e o endereço
 
 {{range .Services}}### `meeng.{{snake .Name}}`
 
-{{range .Methods}}- `{{snake .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{snake .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}`emails.create` é outro nome de `emails.send`, e `campaigns.get_all` de `campaigns.list`.
 

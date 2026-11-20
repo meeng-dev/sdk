@@ -32,54 +32,54 @@ Sem argumentos, `Meeng()` lê a chave de `MEENG_API_KEY` e o endereço do app de
 
 ### `meeng.emails`
 
-- `send`: Sends an email, now or at scheduledAt.
-- `batch`: Sends up to 100 emails in one request.
-- `get`: Reads one email with its events.
-- `list`: Lists emails, newest first, with an optional date range and domain filter.
-- `update`: Reschedules an email that has not been sent.
-- `cancel`: Cancels a scheduled email.
+- `send`: envia um e-mail, agora ou em `scheduledAt`.
+- `batch`: envia até 100 e-mails numa requisição.
+- `get`: lê um e-mail com os seus eventos.
+- `list`: lista e-mails, do mais novo ao mais velho, com período e domínio opcionais.
+- `update`: reagenda um e-mail que ainda não saiu.
+- `cancel`: cancela um e-mail agendado.
 
 ### `meeng.domains`
 
-- `list`: Lists the sending domains of the team.
-- `create`: Adds a sending domain and returns the DNS records to publish.
-- `verify`: Asks for the domain's DNS records to be checked again.
-- `get`: Reads one domain with its DNS records.
-- `delete`: Removes a domain.
+- `list`: lista os domínios de envio do time.
+- `create`: adiciona um domínio de envio e devolve os registros DNS a publicar.
+- `verify`: pede para conferir de novo os registros DNS do domínio.
+- `get`: lê um domínio com os seus registros DNS.
+- `delete`: remove um domínio.
 
 ### `meeng.contacts`
 
-- `create`: Adds a contact to a contact book.
-- `list`: Lists the contacts of a contact book, optionally by email or id.
-- `get`: Reads one contact.
-- `update`: Changes the fields of a contact that are sent.
-- `upsert`: Creates the contact, or replaces it when it exists.
-- `delete`: Removes a contact.
-- `bulk_create`: Adds many contacts to a contact book in one request.
-- `bulk_delete`: Removes many contacts from a contact book in one request.
+- `create`: adiciona um contato a uma lista de contatos.
+- `list`: lista os contatos de uma lista, com filtro opcional por e-mail ou id.
+- `get`: lê um contato.
+- `update`: muda só os campos enviados de um contato.
+- `upsert`: cria o contato, ou o substitui quando ele já existe.
+- `delete`: remove um contato.
+- `bulk_create`: adiciona vários contatos a uma lista numa requisição.
+- `bulk_delete`: remove vários contatos de uma lista numa requisição.
 
 ### `meeng.contact_books`
 
-- `list`: Lists the contact books of the team.
-- `create`: Creates a contact book.
-- `get`: Reads one contact book.
-- `update`: Changes the fields of a contact book that are sent.
-- `delete`: Removes a contact book and its contacts.
+- `list`: lista as listas de contatos do time.
+- `create`: cria uma lista de contatos.
+- `get`: lê uma lista de contatos.
+- `update`: muda só os campos enviados de uma lista de contatos.
+- `delete`: remove uma lista de contatos e os seus contatos.
 
 ### `meeng.campaigns`
 
-- `create`: Creates a campaign, and sends it now when sendNow is true.
-- `list`: Lists campaigns, optionally by status or a search text.
-- `get`: Reads one campaign with its counters.
-- `delete`: Removes a campaign.
-- `schedule`: Schedules a campaign, or sends it now when no time is given.
-- `pause`: Pauses a running or scheduled campaign.
-- `resume`: Resumes a paused campaign.
+- `create`: cria uma campanha, e a envia agora quando `sendNow` é verdadeiro.
+- `list`: lista campanhas, com filtro opcional por status ou texto.
+- `get`: lê uma campanha com os seus contadores.
+- `delete`: remove uma campanha.
+- `schedule`: agenda uma campanha, ou a envia agora quando não há horário.
+- `pause`: pausa uma campanha em andamento ou agendada.
+- `resume`: retoma uma campanha pausada.
 
 ### `meeng.analytics`
 
-- `email_time_series`: Counts emails by day over the last 7 or 30 days.
-- `reputation_metrics`: Reads the bounce and complaint rates of the sending reputation.
+- `email_time_series`: conta e-mails por dia nos últimos 7 ou 30 dias.
+- `reputation_metrics`: lê as taxas de rejeição e de reclamação da reputação de envio.
 
 `emails.create` é outro nome de `emails.send`, `campaigns.get_all` de `campaigns.list`, e `meeng.contactBooks` de `meeng.contact_books`.
 

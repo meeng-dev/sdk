@@ -31,7 +31,7 @@ Uma recusa da API lança `MeengException` (`Status`, `Code`, como `NOT_UNIQUE` o
 
 {{range .Services}}### `meeng.{{pascal .Name}}`
 
-{{range .Methods}}- `{{pascal .Name}}Async`: {{.Summary}}.
+{{range .Methods}}- `{{pascal .Name}}Async`: {{.SummaryPT}}.
 {{end}}
 {{end}}Os parâmetros de caminho são `string`; os filtros de listagem são o `<Recurso><Método>Query` (uma lista em `DomainId` vira um `domainId` por valor). `Emails.SendAsync` e `Emails.BatchAsync` aceitam `new RequestOptions { IdempotencyKey = "pedido-1" }`: a mesma chave com o mesmo corpo devolve o primeiro resultado. Os destinatários são `IReadOnlyList<string>`; a API aceita uma string solta, e o SDK a lê como lista de um item.
 

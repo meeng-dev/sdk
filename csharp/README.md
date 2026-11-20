@@ -31,54 +31,54 @@ Uma recusa da API lança `MeengException` (`Status`, `Code`, como `NOT_UNIQUE` o
 
 ### `meeng.Emails`
 
-- `SendAsync`: Sends an email, now or at scheduledAt.
-- `BatchAsync`: Sends up to 100 emails in one request.
-- `GetAsync`: Reads one email with its events.
-- `ListAsync`: Lists emails, newest first, with an optional date range and domain filter.
-- `UpdateAsync`: Reschedules an email that has not been sent.
-- `CancelAsync`: Cancels a scheduled email.
+- `SendAsync`: envia um e-mail, agora ou em `scheduledAt`.
+- `BatchAsync`: envia até 100 e-mails numa requisição.
+- `GetAsync`: lê um e-mail com os seus eventos.
+- `ListAsync`: lista e-mails, do mais novo ao mais velho, com período e domínio opcionais.
+- `UpdateAsync`: reagenda um e-mail que ainda não saiu.
+- `CancelAsync`: cancela um e-mail agendado.
 
 ### `meeng.Domains`
 
-- `ListAsync`: Lists the sending domains of the team.
-- `CreateAsync`: Adds a sending domain and returns the DNS records to publish.
-- `VerifyAsync`: Asks for the domain's DNS records to be checked again.
-- `GetAsync`: Reads one domain with its DNS records.
-- `DeleteAsync`: Removes a domain.
+- `ListAsync`: lista os domínios de envio do time.
+- `CreateAsync`: adiciona um domínio de envio e devolve os registros DNS a publicar.
+- `VerifyAsync`: pede para conferir de novo os registros DNS do domínio.
+- `GetAsync`: lê um domínio com os seus registros DNS.
+- `DeleteAsync`: remove um domínio.
 
 ### `meeng.Contacts`
 
-- `CreateAsync`: Adds a contact to a contact book.
-- `ListAsync`: Lists the contacts of a contact book, optionally by email or id.
-- `GetAsync`: Reads one contact.
-- `UpdateAsync`: Changes the fields of a contact that are sent.
-- `UpsertAsync`: Creates the contact, or replaces it when it exists.
-- `DeleteAsync`: Removes a contact.
-- `BulkCreateAsync`: Adds many contacts to a contact book in one request.
-- `BulkDeleteAsync`: Removes many contacts from a contact book in one request.
+- `CreateAsync`: adiciona um contato a uma lista de contatos.
+- `ListAsync`: lista os contatos de uma lista, com filtro opcional por e-mail ou id.
+- `GetAsync`: lê um contato.
+- `UpdateAsync`: muda só os campos enviados de um contato.
+- `UpsertAsync`: cria o contato, ou o substitui quando ele já existe.
+- `DeleteAsync`: remove um contato.
+- `BulkCreateAsync`: adiciona vários contatos a uma lista numa requisição.
+- `BulkDeleteAsync`: remove vários contatos de uma lista numa requisição.
 
 ### `meeng.ContactBooks`
 
-- `ListAsync`: Lists the contact books of the team.
-- `CreateAsync`: Creates a contact book.
-- `GetAsync`: Reads one contact book.
-- `UpdateAsync`: Changes the fields of a contact book that are sent.
-- `DeleteAsync`: Removes a contact book and its contacts.
+- `ListAsync`: lista as listas de contatos do time.
+- `CreateAsync`: cria uma lista de contatos.
+- `GetAsync`: lê uma lista de contatos.
+- `UpdateAsync`: muda só os campos enviados de uma lista de contatos.
+- `DeleteAsync`: remove uma lista de contatos e os seus contatos.
 
 ### `meeng.Campaigns`
 
-- `CreateAsync`: Creates a campaign, and sends it now when sendNow is true.
-- `ListAsync`: Lists campaigns, optionally by status or a search text.
-- `GetAsync`: Reads one campaign with its counters.
-- `DeleteAsync`: Removes a campaign.
-- `ScheduleAsync`: Schedules a campaign, or sends it now when no time is given.
-- `PauseAsync`: Pauses a running or scheduled campaign.
-- `ResumeAsync`: Resumes a paused campaign.
+- `CreateAsync`: cria uma campanha, e a envia agora quando `sendNow` é verdadeiro.
+- `ListAsync`: lista campanhas, com filtro opcional por status ou texto.
+- `GetAsync`: lê uma campanha com os seus contadores.
+- `DeleteAsync`: remove uma campanha.
+- `ScheduleAsync`: agenda uma campanha, ou a envia agora quando não há horário.
+- `PauseAsync`: pausa uma campanha em andamento ou agendada.
+- `ResumeAsync`: retoma uma campanha pausada.
 
 ### `meeng.Analytics`
 
-- `EmailTimeSeriesAsync`: Counts emails by day over the last 7 or 30 days.
-- `ReputationMetricsAsync`: Reads the bounce and complaint rates of the sending reputation.
+- `EmailTimeSeriesAsync`: conta e-mails por dia nos últimos 7 ou 30 dias.
+- `ReputationMetricsAsync`: lê as taxas de rejeição e de reclamação da reputação de envio.
 
 Os parâmetros de caminho são `string`; os filtros de listagem são o `<Recurso><Método>Query` (uma lista em `DomainId` vira um `domainId` por valor). `Emails.SendAsync` e `Emails.BatchAsync` aceitam `new RequestOptions { IdempotencyKey = "pedido-1" }`: a mesma chave com o mesmo corpo devolve o primeiro resultado. Os destinatários são `IReadOnlyList<string>`; a API aceita uma string solta, e o SDK a lê como lista de um item.
 

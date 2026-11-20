@@ -1,55 +1,57 @@
-# SDKs da meeng
+# SDKs do meeng
 
-Os SDKs oficiais da API da meeng, num monorepo no padrão do Polar: um contrato, um gerador e um pacote por linguagem.
+Os SDKs da API do meeng, num monorepo: um contrato, um gerador em Go e um pacote por linguagem. A API do meeng é a do useSend v1, então cada SDK tem o mesmo formato do SDK do useSend: troque o nome do cliente, a chave e a URL, e o resto do código continua igual.
 
-| Linguagem | Pasta | Pacote |
+> Nenhum pacote foi publicado. Os nomes abaixo são propostas, aguardando a confirmação do Paulo, e cada pacote está marcado para não sair por engano.
+
+| Linguagem | Pasta | Pacote proposto |
 |---|---|---|
 | Go | [`go/`](go) | `github.com/meeng-dev/sdk/go` |
 | TypeScript / JavaScript | [`typescript/`](typescript) | `@meeng-dev/sdk` (npm) |
 | Python | [`python/`](python) | `meeng-sdk` (PyPI) |
 | PHP | [`php/`](php) | `meeng-dev/sdk` (Packagist) |
 | Ruby | [`ruby/`](ruby) | `meeng-sdk` (RubyGems) |
-| Java (e Kotlin) | [`java/`](java) | `dev.meeng:sdk` (Maven Central) |
+| Java | [`java/`](java) | `dev.meeng:sdk` (Maven) |
 | C# / .NET | [`csharp/`](csharp) | `MeengDev.Sdk` (NuGet) |
 | Elixir | [`elixir/`](elixir) | `meeng_sdk` (Hex) |
 | Dart / Flutter | [`dart/`](dart) | `meeng_sdk` (pub.dev) |
 | Rust | [`rust/`](rust) | `meeng-sdk` (crates.io) |
-| Swift (iOS, macOS) | [`swift/`](swift) | Swift Package Manager: `https://github.com/meeng-dev/sdk` |
+| Swift | [`swift/`](swift) | `https://github.com/meeng-dev/sdk` (SwiftPM) |
 
-Para o navegador há dois pacotes escritos à mão, que não são SDKs de servidor (nomes propostos, ainda não publicados): [`js/`](js) (`@meeng-dev/js`, o carregador e os tipos do meeng.js) e [`react/`](react) (`@meeng-dev/react`, provedor, formulário pronto, campo de cartão e botão de checkout). Cobrem os quatro modos de checkout: redirecionamento, modal, componentes prontos e cartão transparente.
+Todos fazem o mesmo, sob a mesma versão (`VERSION`), com o mesmo teste em cada linguagem:
 
-Os nomes seguem o GitHub: organização `meeng-dev`, pacote `sdk`; onde o registro não aceita barra, `meeng-sdk` (ou `meeng_sdk`). Em cada registro o pacote pertence à organização `meeng-dev`.
+- a chave de API e a URL do app lidas de `MEENG_API_KEY` e `MEENG_BASE_URL`, ou passadas ao cliente;
+- os recursos `emails` (`send`, `batch`, `get`, `list`, `update`, `cancel`), `domains`, `contacts`, `contactBooks`, `campaigns` e `analytics`;
+- `Idempotency-Key` nos envios, só quando o chamador o dá;
+- erros com `code` e `message`, nos formatos que a API escreve;
+- `webhooks(secret)` com `verify` e `constructEvent`, no esquema do useSend, com os cabeçalhos `X-Meeng-*` e também os `X-UseSend-*`, e o evento tipado pelo `type`.
 
-Todos fazem o mesmo, com a mesma versão (`VERSION`):
-- a chave da organização (`prk_test_…` ou `prk_live_…`), que define organização e ambiente;
-- os recursos da API (produtos, preços, clientes, sessões do portal do cliente, checkouts, pedidos, pagamentos com parcelamento, cartões salvos, assinaturas, reembolsos);
-- listas paginadas com iterador que percorre todas as páginas;
-- `Idempotency-Key` nas escritas;
-- erros tipados, com o problema de cada campo e o `Retry-After`;
-- verificação dos webhooks (Standard Webhooks, com mais de uma assinatura durante a rotação do segredo) e o evento tipado pelo `type`: um tipo para cada dado que ele carrega (pedido, assinatura, checkout, disputa, benefício concedido, cliente, reembolso, identificadores) e um tipo desconhecido para o que a versão ainda não conhece.
+```ts
+import { Meeng } from "@meeng-dev/sdk";
 
-A ingestão de uso (`usage.ingest`, `POST /api/v1/usage/token-events`) também está nos SDKs: ela usa a credencial de uma fonte de ingestão (`pus_test_…` ou `pus_live_…`) no lugar da chave da organização, então o cliente é montado com ela. Não tem `Idempotency-Key`: o evento se identifica pelo `external_event_id`, e o erro vem em `data` com o evento recusado em `record`.
-
-Só usam a biblioteca padrão da linguagem, com duas exceções onde ela não tem HTTP, JSON ou HMAC: Dart (`http` e `crypto`, do próprio time do Dart) e Rust (`serde`, `ureq`, `hmac`, `sha2`, `base64`).
-
-## Como é feito
-
+const meeng = new Meeng("mg_123");
+const { data, error } = await meeng.emails.send({
+  from: "hello@acme.com",
+  to: "cliente@example.com",
+  subject: "Olá",
+  html: "<p>Olá!</p>",
+});
 ```
-openapi.json      o contrato da API pública, exportado pelo meeng.dev
-generator/        OpenAPI → IR neutra → um emissor por linguagem (templates)
-cmd/sdkgen        o comando que gera
-regen.sh          sincroniza o contrato do meeng.dev e gera os 11 SDKs
-<linguagem>/      saída do gerador, uma pasta por linguagem: nunca editada à mão
-js/, react/       pacotes do navegador, escritos à mão (não gerados)
-Package.swift     o manifesto do Swift na raiz, que o SwiftPM exige
-composer.json     o manifesto do PHP na raiz, que o Packagist exige
-```
+
+O README de cada pasta mostra o equivalente na linguagem.
+
+## Como funciona
+
+`openapi.json` é o contrato do useSend v1 com a marca trocada (título e servidor; o resto é idêntico). O gerador (`generator/`, em Go) lê o contrato num modelo neutro e escreve cada SDK a partir de `generator/templates/<linguagem>/`. Os nomes dos métodos e os eventos de webhook, que o contrato não traz, estão em `generator/surface.go` e `generator/webhooks.go`.
 
 ```sh
-./regen.sh                  # contrato novo (o commitado no develop do meeng.dev) e os 11 SDKs de novo
-./regen.sh --worktree       # o mesmo, com o arquivo da árvore de trabalho do meeng.dev, commitado ou não
-go run ./cmd/sdkgen         # regenerar do openapi.json que já está aqui
-./check.sh                  # todos os gates
+./regen.sh --reference   # refaz o openapi.json do clone do useSend e escreve os 11 SDKs
+go run ./cmd/sdkgen      # escreve os SDKs a partir do openapi.json que está aqui
+./check.sh               # os gates de todas as linguagens
 ```
 
-Licença MIT.
+Quando o app meeng.dev exportar o contrato (`docs/contracts/api.openapi.json`), `./regen.sh` passa a copiá-lo de lá. As regras do repositório, as ferramentas de cada linguagem e as diferenças deliberadas entre o SDK e o contrato estão em [`AGENTS.md`](AGENTS.md).
+
+## Licença
+
+MIT. Veja [`LICENSE.md`](LICENSE.md).

@@ -32,7 +32,7 @@ Os campos obrigatórios de um corpo vão em `new`; cada campo opcional tem um m�
 
 {{range .Services}}### `client.{{rsName .Name}}()`
 
-{{range .Methods}}- `{{rsName .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{rsName .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}Os parâmetros de caminho são `&str`; os filtros de listagem são o `<Recurso><Método>Query` (uma lista em `domain_id` vira um `domainId` por valor). `client.emails().idempotency_key("pedido-1").send(...)` torna o envio seguro para repetir (vale em `send` e `batch`): a mesma chave com o mesmo corpo devolve o primeiro resultado.
 

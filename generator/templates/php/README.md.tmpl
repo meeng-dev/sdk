@@ -30,7 +30,7 @@ Sem argumentos, `new Meeng()` lê a chave de `MEENG_API_KEY` e o endereço do ap
 
 {{range .Services}}### `$meeng->{{phpName .Name}}`
 
-{{range .Methods}}- `{{camel .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{camel .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}Os filtros de listagem vão num array (`['page' => 2, 'domainId' => ['1', '2']]`; uma lista vira um `domainId` por valor). `emails->send` e `emails->batch` aceitam a `$idempotencyKey` como último argumento: a mesma chave com o mesmo corpo devolve o primeiro resultado.
 

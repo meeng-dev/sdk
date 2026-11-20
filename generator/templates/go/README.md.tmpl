@@ -46,7 +46,7 @@ Campos opcionais do corpo são ponteiros; campos que a API pode devolver como `n
 
 {{range .Services}}### `client.{{pascal .Name}}`
 
-{{range .Methods}}- `{{pascal .Name}}`: {{.Summary}}.
+{{range .Methods}}- `{{pascal .Name}}`: {{.SummaryPT}}.
 {{end}}
 {{end}}Os parâmetros de caminho são strings; os filtros de listagem são a struct `<Recurso><Método>Query` (campo zero é omitido, e `DomainID` é uma lista que vira um `domainId` por valor).
 
