@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 
 namespace Meeng;
@@ -61,6 +62,19 @@ public sealed class MeengException : Exception
                 {
                     code = Text(found, "code");
                     message = Text(found, "message");
+                    // A refused validation answers {"success": false, "error": {"issues", "name"}}, with no code of its own.
+                    if (code.Length == 0)
+                    {
+                        code = Text(found, "name");
+                    }
+                    if (message.Length == 0 && found.TryGetProperty("issues", out var issues) && issues.ValueKind == JsonValueKind.Array && issues.GetArrayLength() > 0)
+                    {
+                        var first = issues[0];
+                        var where = first.ValueKind == JsonValueKind.Object && first.TryGetProperty("path", out var path) && path.ValueKind == JsonValueKind.Array && path.GetArrayLength() > 0
+                            ? string.Join(".", path.EnumerateArray().Select(part => part.ToString())) + ": "
+                            : "";
+                        message = where + (first.ValueKind == JsonValueKind.Object ? Text(first, "message") : "");
+                    }
                 }
             }
         }

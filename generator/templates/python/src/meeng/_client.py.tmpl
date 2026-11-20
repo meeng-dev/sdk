@@ -40,7 +40,12 @@ def urllib_transport(method: str, url: str, headers: dict[str, str], body: bytes
             return response.status, {key.lower(): value for key, value in response.headers.items()}, response.read()
     except urllib.error.HTTPError as error:
         try:
-            return error.code, {key.lower(): value for key, value in error.headers.items()}, error.read()
+            try:
+                raw = error.read()
+            except OSError:
+                # A refusal whose body never arrived is still a refusal.
+                raw = b""
+            return error.code, {key.lower(): value for key, value in error.headers.items()}, raw
         finally:
             error.close()
 

@@ -28,6 +28,25 @@ class MeengException implements Exception {
           message = found['message'] is String
               ? found['message'] as String
               : null;
+          // A refused validation answers
+          // {"success": false, "error": {"issues", "name"}}, with no code of
+          // its own.
+          if (code == null || code.isEmpty) {
+            code = found['name'] is String ? found['name'] as String : null;
+          }
+          if (message == null || message.isEmpty) {
+            final issues = found['issues'];
+            if (issues is List<Object?> && issues.isNotEmpty) {
+              final first = issues.first;
+              if (first is Map<String, Object?> && first['message'] is String) {
+                final path = first['path'];
+                final where = path is List<Object?> && path.isNotEmpty
+                    ? '${path.join('.')}: '
+                    : '';
+                message = '$where${first['message']}';
+              }
+            }
+          }
         }
       }
     } on FormatException {

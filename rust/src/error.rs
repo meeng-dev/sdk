@@ -44,7 +44,52 @@ pub struct ApiError {
 #[derive(Deserialize, Default)]
 struct Problem {
     code: Option<String>,
+    name: Option<String>,
     message: Option<String>,
+    #[serde(default)]
+    issues: Vec<Issue>,
+}
+
+/// One problem a refused validation found: `{"path": ["from"], "message": "Required"}`.
+#[derive(Deserialize, Default)]
+struct Issue {
+    #[serde(default)]
+    path: Vec<serde_json::Value>,
+    message: Option<String>,
+}
+
+impl Problem {
+    /// A refused validation answers `{"success": false, "error": {"issues",
+    /// "name"}}`, with no code of its own.
+    fn code(&self) -> Option<String> {
+        self.code
+            .clone()
+            .filter(|code| !code.is_empty())
+            .or_else(|| self.name.clone())
+    }
+
+    fn message(&self) -> Option<String> {
+        self.message
+            .clone()
+            .filter(|message| !message.is_empty())
+            .or_else(|| {
+                let issue = self.issues.first()?;
+                let text = issue.message.clone()?;
+                let path: Vec<String> = issue
+                    .path
+                    .iter()
+                    .map(|part| {
+                        part.as_str()
+                            .map_or_else(|| part.to_string(), str::to_owned)
+                    })
+                    .collect();
+                Some(if path.is_empty() {
+                    text
+                } else {
+                    format!("{}: {}", path.join("."), text)
+                })
+            })
+    }
 }
 
 /// `{"error": {"code", "message"}}`, `{"error": "text"}` or the error itself.
@@ -62,24 +107,23 @@ impl ApiError {
         let body: ErrorBody = serde_json::from_slice(&response.body).unwrap_or_default();
         let problem = match body.error {
             Some(serde_json::Value::String(text)) => Problem {
-                code: None,
                 message: Some(text),
+                ..Problem::default()
             },
             Some(other) => serde_json::from_value(other).unwrap_or_default(),
             None => Problem {
                 code: body.code,
                 message: body.message,
+                ..Problem::default()
             },
         };
         Self {
             status: response.status,
             code: problem
-                .code
-                .filter(|code| !code.is_empty())
+                .code()
                 .unwrap_or_else(|| "INTERNAL_SERVER_ERROR".to_owned()),
             message: problem
-                .message
-                .filter(|message| !message.is_empty())
+                .message()
                 .unwrap_or_else(|| reason(response.status).to_owned()),
             retry_after: response
                 .header("retry-after")

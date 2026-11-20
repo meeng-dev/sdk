@@ -150,10 +150,14 @@ async function errorOf(response: Response): Promise<ErrorResponse> {
     }
     const wrapped = (body as { error?: unknown }).error;
     const found = typeof wrapped === "object" && wrapped !== null ? wrapped : wrapped === undefined ? body : { message: String(wrapped) };
-    const { code, message } = found as { code?: unknown; message?: unknown };
+    const { code, name, message, issues } = found as { code?: unknown; name?: unknown; message?: unknown; issues?: unknown };
+    // A refused validation answers {"success": false, "error": {"issues", "name"}}, with no code of its own.
+    const first = Array.isArray(issues) ? (issues[0] as { path?: unknown; message?: unknown } | undefined) : undefined;
+    const issue =
+      first && typeof first.message === "string" ? `${Array.isArray(first.path) && first.path.length > 0 ? `${first.path.join(".")}: ` : ""}${first.message}` : "";
     return {
-      code: typeof code === "string" && code !== "" ? code : fallback.code,
-      message: typeof message === "string" ? message : fallback.message,
+      code: typeof code === "string" && code !== "" ? code : typeof name === "string" && name !== "" ? name : fallback.code,
+      message: typeof message === "string" && message !== "" ? message : issue !== "" ? issue : fallback.message,
       status: response.status,
     };
   } catch {

@@ -116,6 +116,7 @@ class MeengTest(unittest.TestCase):
             (409, {"error": {"code": "NOT_UNIQUE", "message": "Idempotency-Key already used"}}, "NOT_UNIQUE", "Idempotency-Key already used"),
             (403, {"error": "Forbidden"}, "INTERNAL_SERVER_ERROR", "Forbidden"),
             (400, {"code": "BAD_REQUEST", "message": "bad"}, "BAD_REQUEST", "bad"),
+            (400, {"success": False, "error": {"issues": [{"code": "invalid_type", "path": ["from"], "message": "Required"}], "name": "ZodError"}}, "ZodError", "from: Required"),
             (502, b"<html>", "INTERNAL_SERVER_ERROR", "Bad Gateway"),
         ]
         for status, body, code, message in cases:
@@ -150,6 +151,7 @@ class MeengTest(unittest.TestCase):
             def do_POST(self):
                 self.send_response(302)
                 self.send_header("Location", "https://elsewhere.test/")
+                self.send_header("Content-Length", "0")
                 self.end_headers()
 
             def log_message(self, *args):

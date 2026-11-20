@@ -44,7 +44,15 @@ module Meeng
         found = { "message" => found } if found.is_a?(String)
         if found.is_a?(Hash)
           code = found["code"] if found["code"].is_a?(String) && !found["code"].empty?
-          message = found["message"] if found["message"].is_a?(String)
+          # A refused validation answers {"success": false, "error": {"issues", "name"}}, with no code of its own.
+          code = found["name"] if !found["code"].is_a?(String) && found["name"].is_a?(String) && !found["name"].empty?
+          if found["message"].is_a?(String) && !found["message"].empty?
+            message = found["message"]
+          elsif found["issues"].is_a?(Array) && found["issues"].first.is_a?(Hash) && found["issues"].first["message"].is_a?(String)
+            first = found["issues"].first
+            where = first["path"].is_a?(Array) && !first["path"].empty? ? "#{first["path"].join(".")}: " : ""
+            message = where + first["message"]
+          end
         end
       end
       retry_after = headers["retry-after"].to_s

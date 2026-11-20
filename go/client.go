@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -200,13 +201,32 @@ func errorOf(resp *http.Response, raw []byte) *Error {
 	if json.Unmarshal(raw, &body) == nil {
 		code, message := body.Code, body.Message
 		if len(body.Error) > 0 {
+			// A refused validation answers {"success": false, "error": {"issues", "name"}}, with no code of its own.
 			var nested struct {
 				Code    string `json:"code"`
+				Name    string `json:"name"`
 				Message string `json:"message"`
+				Issues  []struct {
+					Path    []any  `json:"path"`
+					Message string `json:"message"`
+				} `json:"issues"`
 			}
 			var text string
 			if json.Unmarshal(body.Error, &nested) == nil {
 				code, message = nested.Code, nested.Message
+				if code == "" {
+					code = nested.Name
+				}
+				if message == "" && len(nested.Issues) > 0 {
+					parts := make([]string, len(nested.Issues[0].Path))
+					for i, part := range nested.Issues[0].Path {
+						parts[i] = fmt.Sprint(part)
+					}
+					message = nested.Issues[0].Message
+					if len(parts) > 0 {
+						message = strings.Join(parts, ".") + ": " + message
+					}
+				}
 			} else if json.Unmarshal(body.Error, &text) == nil {
 				code, message = "", text
 			}

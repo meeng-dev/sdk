@@ -39,6 +39,17 @@ public struct MeengError: Error, Sendable, Hashable, CustomStringConvertible, Lo
             } else if let object = found as? [String: Any] {
                 code = object["code"] as? String
                 message = object["message"] as? String
+                // A refused validation answers {"success": false, "error": {"issues", "name"}},
+                // with no code of its own.
+                if code?.isEmpty ?? true {
+                    code = object["name"] as? String
+                }
+                if message?.isEmpty ?? true, let first = (object["issues"] as? [[String: Any]])?.first,
+                    let text = first["message"] as? String
+                {
+                    let path = (first["path"] as? [Any])?.map { "\($0)" }.joined(separator: ".") ?? ""
+                    message = path.isEmpty ? text : "\(path): \(text)"
+                }
             }
         }
         let retryAfter = response.value(forHTTPHeaderField: "Retry-After")

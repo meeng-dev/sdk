@@ -239,6 +239,24 @@ void main() {
       ),
       (403, {'error': 'Forbidden'}, 'INTERNAL_SERVER_ERROR', 'Forbidden'),
       (400, {'code': 'BAD_REQUEST', 'message': 'bad'}, 'BAD_REQUEST', 'bad'),
+      (
+        400,
+        {
+          'success': false,
+          'error': {
+            'issues': [
+              {
+                'code': 'invalid_type',
+                'path': ['from'],
+                'message': 'Required',
+              },
+            ],
+            'name': 'ZodError',
+          },
+        },
+        'ZodError',
+        'from: Required',
+      ),
       (502, '<html>', 'INTERNAL_SERVER_ERROR', 'Bad Gateway'),
     ];
     for (final (status, body, code, message) in cases) {

@@ -40,9 +40,16 @@ final class MeengException extends \RuntimeException
             if (is_array($found)) {
                 if (is_string($found['code'] ?? null) && $found['code'] !== '') {
                     $code = $found['code'];
+                } elseif (is_string($found['name'] ?? null) && $found['name'] !== '') {
+                    // A refused validation answers {"success": false, "error": {"issues", "name"}}.
+                    $code = $found['name'];
                 }
-                if (is_string($found['message'] ?? null)) {
+                $first = is_array($found['issues'] ?? null) ? ($found['issues'][0] ?? null) : null;
+                if (is_string($found['message'] ?? null) && $found['message'] !== '') {
                     $message = $found['message'];
+                } elseif (is_array($first) && is_string($first['message'] ?? null)) {
+                    $path = is_array($first['path'] ?? null) ? implode('.', $first['path']) : '';
+                    $message = ($path !== '' ? $path . ': ' : '') . $first['message'];
                 }
             }
         }

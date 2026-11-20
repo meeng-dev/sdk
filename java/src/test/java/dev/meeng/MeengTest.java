@@ -164,6 +164,7 @@ class MeengTest {
             {409, map("error", map("code", "NOT_UNIQUE", "message", "Idempotency-Key already used")), "NOT_UNIQUE", "Idempotency-Key already used"},
             {403, map("error", "Forbidden"), "INTERNAL_SERVER_ERROR", "Forbidden"},
             {400, map("code", "BAD_REQUEST", "message", "bad"), "BAD_REQUEST", "bad"},
+            {400, map("success", false, "error", map("issues", List.of(map("code", "invalid_type", "path", List.of("from"), "message", "Required")), "name", "ZodError")), "ZodError", "from: Required"},
             {502, "<html>", "INTERNAL_SERVER_ERROR", "Bad Gateway"},
         };
         for (Object[] each : cases) {

@@ -54,14 +54,35 @@ defmodule Meeng.Error do
     %__MODULE__{
       status: status,
       code: if(is_binary(code) and code != "", do: code, else: "INTERNAL_SERVER_ERROR"),
-      message: if(is_binary(message), do: message, else: Map.get(@reasons, status, "Error")),
+      message:
+        if(is_binary(message) and message != "",
+          do: message,
+          else: Map.get(@reasons, status, "Error")
+        ),
       retry_after: retry_after(headers)
     }
   end
 
   defp found(text) when is_binary(text), do: {nil, text}
-  defp found(%{} = data), do: {data["code"], data["message"]}
+  # A refused validation answers {"success": false, "error": {"issues", "name"}},
+  # with no code of its own.
+  defp found(%{} = data) do
+    code = if is_binary(data["code"]) and data["code"] != "", do: data["code"], else: data["name"]
+
+    message =
+      case {data["message"], data["issues"]} do
+        {message, _} when is_binary(message) and message != "" -> message
+        {_, [%{"message" => text} = first | _]} when is_binary(text) -> where(first) <> text
+        _ -> nil
+      end
+
+    {code, message}
+  end
+
   defp found(_other), do: {nil, nil}
+
+  defp where(%{"path" => [_ | _] = path}), do: Enum.map_join(path, ".", &to_string/1) <> ": "
+  defp where(_issue), do: ""
 
   defp retry_after(headers) do
     with {_name, value} <- List.keyfind(headers, "retry-after", 0),

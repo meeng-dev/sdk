@@ -163,6 +163,7 @@ public class MeengTests
     [InlineData(409, """{"error":{"code":"NOT_UNIQUE","message":"Idempotency-Key already used"}}""", "NOT_UNIQUE", "Idempotency-Key already used")]
     [InlineData(403, """{"error":"Forbidden"}""", "INTERNAL_SERVER_ERROR", "Forbidden")]
     [InlineData(400, """{"code":"BAD_REQUEST","message":"bad"}""", "BAD_REQUEST", "bad")]
+    [InlineData(400, """{"success":false,"error":{"issues":[{"code":"invalid_type","path":["from"],"message":"Required"}],"name":"ZodError"}}""", "ZodError", "from: Required")]
     [InlineData(502, "<html>", "INTERNAL_SERVER_ERROR", "Bad Gateway")]
     public async Task ARefusalThrowsInEveryShapeTheApiWritesIt(int status, string body, string code, string message)
     {

@@ -1,6 +1,7 @@
 package dev.meeng;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -72,6 +73,21 @@ public class MeengException extends RuntimeException {
                     Map<String, Object> error = Json.asObject(found);
                     code = text(error.get("code"));
                     message = text(error.get("message"));
+                    // A refused validation answers {"success": false, "error": {"issues", "name"}}, with no code of its own.
+                    if (code.isEmpty()) {
+                        code = text(error.get("name"));
+                    }
+                    if (message.isEmpty() && error.get("issues") instanceof List && !((List<?>) error.get("issues")).isEmpty()
+                            && ((List<?>) error.get("issues")).get(0) instanceof Map) {
+                        Map<String, Object> first = Json.asObject(((List<?>) error.get("issues")).get(0));
+                        StringBuilder where = new StringBuilder();
+                        if (first.get("path") instanceof List) {
+                            for (Object part : (List<?>) first.get("path")) {
+                                where.append(where.length() == 0 ? "" : ".").append(part);
+                            }
+                        }
+                        message = (where.length() == 0 ? "" : where + ": ") + text(first.get("message"));
+                    }
                 }
             }
         } catch (IllegalStateException e) {

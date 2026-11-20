@@ -217,6 +217,7 @@ fn a_refusal_is_an_error_in_every_shape_the_api_writes_it() {
         (409, serde_json::json!({"error": {"code": "NOT_UNIQUE", "message": "Idempotency-Key already used"}}).to_string(), "NOT_UNIQUE", "Idempotency-Key already used"),
         (403, serde_json::json!({"error": "Forbidden"}).to_string(), "INTERNAL_SERVER_ERROR", "Forbidden"),
         (400, serde_json::json!({"code": "BAD_REQUEST", "message": "bad"}).to_string(), "BAD_REQUEST", "bad"),
+        (400, serde_json::json!({"success": false, "error": {"issues": [{"code": "invalid_type", "path": ["from"], "message": "Required"}], "name": "ZodError"}}).to_string(), "ZodError", "from: Required"),
         (502, "<html>".to_owned(), "INTERNAL_SERVER_ERROR", "Bad Gateway"),
     ];
     for (status, body, code, message) in cases {

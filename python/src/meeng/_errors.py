@@ -37,9 +37,19 @@ def error_of(status: int, reason: str, raw: bytes) -> ErrorResponse:
         found = {"message": found}
     if isinstance(found, dict):
         code, message = found.get("code"), found.get("message")
+        if not (isinstance(code, str) and code):
+            # A refused validation answers {"success": false, "error": {"issues", "name"}}, with no code of its own.
+            code = found.get("name")
         if isinstance(code, str) and code:
             error["code"] = code
-        if isinstance(message, str):
+        if not (isinstance(message, str) and message):
+            issues = found.get("issues")
+            first = issues[0] if isinstance(issues, list) and issues else None
+            if isinstance(first, dict) and isinstance(first.get("message"), str):
+                path = first.get("path")
+                where = ".".join(str(part) for part in path) + ": " if isinstance(path, list) and path else ""
+                message = where + first["message"]
+        if isinstance(message, str) and message:
             error["message"] = message
     return error
 
