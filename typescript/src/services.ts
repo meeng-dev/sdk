@@ -70,7 +70,7 @@ export class EmailsService {
    * Cancels a scheduled email.
    */
   async cancel(emailId: string | number, options?: CallOptions): Promise<Result<models.EmailsCancelResponse>> {
-    return this.#client.request<models.EmailsCancelResponse>("POST", `/v1/emails/${encodeURIComponent(String(emailId))}/cancel`, { options });
+    return this.#client.request<models.EmailsCancelResponse>("POST", `/v1/emails/${encodeURIComponent(String(emailId))}/cancel`, { body: {}, options });
   }
 }
 
@@ -100,7 +100,7 @@ export class DomainsService {
    * Asks for the domain's DNS records to be checked again.
    */
   async verify(id: string | number, options?: CallOptions): Promise<Result<models.DomainsVerifyResponse>> {
-    return this.#client.request<models.DomainsVerifyResponse>("PUT", `/v1/domains/${encodeURIComponent(String(id))}/verify`, { options });
+    return this.#client.request<models.DomainsVerifyResponse>("PUT", `/v1/domains/${encodeURIComponent(String(id))}/verify`, { body: {}, options });
   }
 
   /**
@@ -301,14 +301,14 @@ export class CampaignsService {
    * Pauses a running or scheduled campaign.
    */
   async pause(campaignId: string | number, options?: CallOptions): Promise<Result<models.CampaignActionResponse>> {
-    return this.#client.request<models.CampaignActionResponse>("POST", `/v1/campaigns/${encodeURIComponent(String(campaignId))}/pause`, { options });
+    return this.#client.request<models.CampaignActionResponse>("POST", `/v1/campaigns/${encodeURIComponent(String(campaignId))}/pause`, { body: {}, options });
   }
 
   /**
    * Resumes a paused campaign.
    */
   async resume(campaignId: string | number, options?: CallOptions): Promise<Result<models.CampaignActionResponse>> {
-    return this.#client.request<models.CampaignActionResponse>("POST", `/v1/campaigns/${encodeURIComponent(String(campaignId))}/resume`, { options });
+    return this.#client.request<models.CampaignActionResponse>("POST", `/v1/campaigns/${encodeURIComponent(String(campaignId))}/resume`, { body: {}, options });
   }
 }
 

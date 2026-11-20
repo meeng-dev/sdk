@@ -5,13 +5,13 @@
 require "ipaddr"
 require "json"
 require "net/http"
-require "securerandom"
 require "uri"
 
 module Meeng
   # The standard library's HTTP, so the SDK depends on nothing. A transport is
   # anything that answers +call(method, url, headers, body, timeout)+ with
-  # +[status, headers in lower case, body]+.
+  # +[status, headers in lower case, body]+. It does not follow redirects, so the
+  # key never goes where a redirect points.
   class NetHTTPTransport
     def call(method, url, headers, body, timeout)
       uri = URI(url)
@@ -23,26 +23,32 @@ module Meeng
     end
   end
 
-  # meeng's API with one organization's API key.
+  # meeng's API with one team's API key. Without a key it is read from
+  # MEENG_API_KEY, and the address of the app from MEENG_BASE_URL.
   #
-  # The key says the organization and the environment: +prk_test_…+ is the
-  # test environment, +prk_live_…+ the live one.
+  #   meeng = Meeng::Client.new("mg_123")
+  #   sent = meeng.emails.send(from: "hello@acme.com", to: "customer@example.com", subject: "Hello", html: "<p>Hello</p>")
   #
-  #   meeng = Meeng::Client.new(ENV.fetch("MEENG_API_KEY"))
-  #   product = meeng.products.create({ name: "Curso" })
-  #   meeng.products.list_iter { |product| puts product.name }
+  # Answers are hashes with symbol keys, the API's own names (+:emailId+); a
+  # refusal raises Meeng::Error.
   class Client
 {{- range .Services}}
     # @return [{{pascal .Name}}Service]
     attr_reader :{{snake .Name}}
 {{- end}}
 
-    # The base URL must be https; http is accepted only for localhost,
-    # 127.0.0.0/8 and ::1, and any other raises ArgumentError.
-    def initialize(api_key, base_url: DEFAULT_BASE_URL, timeout: 30, transport: NetHTTPTransport.new)
-      @api_key = api_key
-      @base_url = base_url.chomp("/")
-      check_base_url!(@base_url)
+    # The base URL is the address of the app, without +{{.APIPrefix}}/v1+. It must be
+    # https; http is accepted only for localhost, 127.0.0.0/8 and ::1, and any
+    # other raises ArgumentError.
+    def initialize(api_key = nil, base_url = nil, timeout: 30, transport: NetHTTPTransport.new)
+      key = api_key.nil? || api_key.empty? ? ENV.fetch("MEENG_API_KEY", nil) : api_key
+      raise ArgumentError, "Missing API key. Pass it to Meeng::Client.new(\"mg_123\") or set MEENG_API_KEY" if key.nil? || key.empty?
+
+      @key = key
+      base = base_url.nil? || base_url.empty? ? (ENV.fetch("MEENG_BASE_URL", nil) || DEFAULT_BASE_URL) : base_url
+      base = base.chomp("/")
+      check_base_url!(base)
+      @url = base + API_PREFIX
       @timeout = timeout
       @transport = transport
 {{- range .Services}}
@@ -50,22 +56,28 @@ module Meeng
 {{- end}}
     end
 
-    # Calls the API and answers what it wrapped in +data+; a refusal raises
-    # Meeng::Error.
-    def request(method, path, query: nil, body: nil, idempotency_key: nil, api_key: nil)
-      url = @base_url + path
-      values = (query || {}).flat_map do |name, value|
-        if value.is_a?(Hash)
-          # A map filter is one pair a key: metadata[pedido]=123, the keys sorted.
-          value.sort_by { |key, _| key.to_s }.map { |key, each| ["#{name}[#{key}]", each] }
-        else
-          [[name, value]]
-        end
+    # @return [String] the address every call goes to, with the API prefix
+    attr_reader :url
+
+    # Checks and reads the webhooks a team's endpoint receives.
+    #
+    # @return [Webhooks]
+    def webhooks(secret)
+      Webhooks.new(secret)
+    end
+
+    # Calls the API and answers its JSON, decoded with symbol keys; a refusal
+    # raises Meeng::Error.
+    def request(method, path, query: nil, body: nil, idempotency_key: nil)
+      pairs = []
+      (query || {}).each do |name, value|
+        # A list is sent once for each value: name=a&name=b.
+        Array(value).each { |each| pairs << [name, each] unless each.nil? || each == "" }
       end
-      values = values.reject { |_, value| value.nil? || value == "" }
-      url += "?#{URI.encode_www_form(values)}" unless values.empty?
+      full = @url + path
+      full += "?#{URI.encode_www_form(pairs)}" unless pairs.empty?
       headers = {
-        "Authorization" => "Bearer #{api_key.nil? || api_key.empty? ? @api_key : api_key}",
+        "Authorization" => "Bearer #{@key}",
         "Accept" => "application/json",
         "User-Agent" => "meeng-ruby/#{VERSION}"
       }
@@ -74,15 +86,11 @@ module Meeng
         data = JSON.generate(body)
         headers["Content-Type"] = "application/json"
       end
-      # A POST is sent with a key of its own, one a call, unless the caller gave one.
-      idempotency_key = SecureRandom.uuid if (idempotency_key.nil? || idempotency_key.empty?) && method == "POST"
       headers["Idempotency-Key"] = idempotency_key if idempotency_key && !idempotency_key.empty?
-      status, response_headers, raw = @transport.call(method, url, headers, data, @timeout)
+      status, response_headers, raw = @transport.call(method, full, headers, data, @timeout)
       raise Error.from_response(status, response_headers, raw) if status >= 300
 
-      return nil if status == 204
-
-      JSON.parse(raw).fetch("data")
+      JSON.parse(raw, symbolize_names: true)
     end
 
     private

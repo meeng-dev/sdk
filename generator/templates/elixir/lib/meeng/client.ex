@@ -1,19 +1,16 @@
 defmodule Meeng.Client do
   @moduledoc """
-  meeng's API with one organization's API key.
+  meeng's API with one team's API key.
 
-  The key says the organization and the environment: `prk_test_…` is the test
-  environment, `prk_live_…` the live one.
-
-      client = Meeng.Client.new(System.fetch_env!("MEENG_API_KEY"))
-      {:ok, product} = Meeng.Products.get(client, "prod_1")
+      client = Meeng.Client.new("mg_123")
+      {:ok, email} = Meeng.Emails.get(client, "em_1")
   """
 
   @derive {Inspect, except: [:api_key]}
   @enforce_keys [:api_key]
   defstruct [
     :api_key,
-    base_url: Meeng.default_base_url(),
+    base_url: nil,
     timeout: 30_000,
     transport: &Meeng.Client.httpc/5
   ]
@@ -34,59 +31,64 @@ defmodule Meeng.Client do
         }
 
   @doc """
-  A client for the organization `api_key` belongs to.
+  A client for the team `api_key` belongs to; `MEENG_API_KEY` when it is nil.
 
-  Options: `:base_url` (another address, such as a local server: https, or
-  http only for localhost, 127.0.0.0/8 and ::1, or `ArgumentError`), `:timeout`
-  in milliseconds (30 seconds) and `:transport` (see `t:transport/0`).
+  Options: `:base_url` (the address of the app, without `/api/v1`, such as a
+  self-hosted one; `MEENG_BASE_URL` when left out. It must be https, or http only
+  for localhost, 127.0.0.0/8 and ::1, or `ArgumentError`), `:timeout` in
+  milliseconds (30 seconds) and `:transport` (see `t:transport/0`).
   """
-  @spec new(String.t(), keyword()) :: t()
-  def new(api_key, opts \\ []) when is_binary(api_key) do
+  @spec new(String.t() | nil, keyword()) :: t()
+  def new(api_key \\ nil, opts \\ []) do
+    api_key = api_key || System.get_env("MEENG_API_KEY")
+
+    unless is_binary(api_key) and api_key != "" do
+      raise ArgumentError,
+            "Missing API key. Pass it to Meeng.new(\"mg_123\") or set MEENG_API_KEY"
+    end
+
     base_url =
-      opts |> Keyword.get(:base_url, Meeng.default_base_url()) |> String.trim_trailing("/")
+      (Keyword.get(opts, :base_url) || System.get_env("MEENG_BASE_URL") ||
+         Meeng.default_base_url())
+      |> String.trim_trailing("/")
 
     check_base_url!(base_url)
 
     %__MODULE__{
       api_key: api_key,
-      base_url: base_url,
+      base_url: base_url <> Meeng.api_prefix(),
       timeout: Keyword.get(opts, :timeout, 30_000),
       transport: Keyword.get(opts, :transport, &__MODULE__.httpc/5)
     }
   end
 
   @doc """
-  Calls the API and answers what it wrapped in `data`.
+  Calls the API and answers its JSON, decoded.
 
-  Options: `:query`, `:body`, `:idempotency_key` and `:api_key`, another
-  organization's key for this call. A POST without an `:idempotency_key` is
-  sent with a random one of its own, one a call.
+  Options: `:query`, `:body` and `:idempotency_key`.
   """
   @spec request(t(), String.t(), String.t(), keyword()) ::
           {:ok, term()} | {:error, Meeng.Error.t()}
   def request(%__MODULE__{} = client, method, path, opts \\ []) do
     headers =
       [
-        {"Authorization", "Bearer " <> key(opts[:api_key], client.api_key)},
+        {"Authorization", "Bearer " <> client.api_key},
         {"Accept", "application/json"},
         {"User-Agent", "meeng-elixir/" <> Meeng.version()}
       ]
       |> put_header("Content-Type", opts[:body] && "application/json")
-      |> put_header("Idempotency-Key", idempotency_key(method, opts[:idempotency_key]))
+      |> put_header("Idempotency-Key", opts[:idempotency_key])
 
-    body = if opts[:body], do: JSON.encode!(opts[:body])
+    body = if opts[:body], do: JSON.encode!(body(opts[:body]))
     url = client.base_url <> path <> query(opts[:query])
 
     case client.transport.(method, url, headers, body, client.timeout) do
-      {:ok, {204, _response_headers, _raw}} ->
-        {:ok, nil}
-
       {:ok, {status, response_headers, raw}} when status >= 300 ->
         {:error, Meeng.Error.from_response(status, response_headers, raw)}
 
       {:ok, {_status, _headers, raw}} ->
         case JSON.decode(raw) do
-          {:ok, %{"data" => data}} ->
+          {:ok, data} ->
             {:ok, data}
 
           _ ->
@@ -94,7 +96,7 @@ defmodule Meeng.Client do
              %Meeng.Error{
                status: nil,
                code: "invalid_response",
-               message: "the answer is not wrapped in data"
+               message: "the answer is not JSON"
              }}
         end
 
@@ -104,12 +106,18 @@ defmodule Meeng.Client do
   end
 
   @doc false
-  # A path parameter, escaped.
-  @spec segment(String.t()) :: String.t()
-  def segment(value), do: URI.encode(value, &URI.char_unreserved?/1)
+  # A body as JSON writes it: a keyword list is its map, a list of them walked.
+  @spec body(term()) :: term()
+  def body([_ | _] = list) do
+    if Keyword.keyword?(list), do: Map.new(list), else: Enum.map(list, &body/1)
+  end
 
-  defp key(override, _default) when is_binary(override) and override != "", do: override
-  defp key(_override, default), do: default
+  def body(other), do: other
+
+  @doc false
+  # A path parameter, escaped.
+  @spec segment(String.t() | integer()) :: String.t()
+  def segment(value), do: value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
 
   # The base URL must be https; http is accepted only for localhost,
   # 127.0.0.0/8 and ::1.
@@ -135,20 +143,6 @@ defmodule Meeng.Client do
     end
   end
 
-  # A POST is sent with a key of its own, one a call, unless the caller gave one.
-  defp idempotency_key("POST", given) when given in [nil, ""], do: uuid()
-  defp idempotency_key(_method, given), do: given
-
-  # A random UUID (version 4).
-  defp uuid do
-    <<a::32, b::16, _::4, c::12, _::2, d::14, e::48>> = :crypto.strong_rand_bytes(16)
-
-    [{a, 8}, {b, 4}, {Bitwise.bor(0x4000, c), 4}, {Bitwise.bor(0x8000, d), 4}, {e, 12}]
-    |> Enum.map_join("-", fn {number, width} ->
-      number |> Integer.to_string(16) |> String.downcase() |> String.pad_leading(width, "0")
-    end)
-  end
-
   defp put_header(headers, _name, value) when value in [nil, false, ""], do: headers
   defp put_header(headers, name, value), do: headers ++ [{name, value}]
 
@@ -157,14 +151,9 @@ defmodule Meeng.Client do
   defp query(values) do
     pairs =
       Enum.flat_map(values, fn
-        # A map filter is one pair a key: metadata[pedido]=123, the keys sorted.
-        {name, map} when is_map(map) ->
-          map
-          |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
-          |> Enum.map(fn {key, value} -> {"#{name}[#{key}]", value} end)
-
-        pair ->
-          [pair]
+        # A list is sent once for each value: name=a&name=b.
+        {name, list} when is_list(list) -> Enum.map(list, &{name, &1})
+        pair -> [pair]
       end)
 
     case Enum.reject(pairs, fn {_name, value} -> value in [nil, ""] end) do

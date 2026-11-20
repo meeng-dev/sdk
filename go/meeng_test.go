@@ -46,6 +46,19 @@ func TestSendingAnEmailCarriesTheKeyTheBodyAndTheIdempotencyKey(t *testing.T) {
 	}
 }
 
+func TestAWriteWithNoBodyOfItsOwnSendsAnEmptyObject(t *testing.T) {
+	client := server(t, func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/emails/em_1/cancel" || string(raw) != "{}" {
+			t.Errorf("request %s %s %q", r.Method, r.URL.Path, raw)
+		}
+		fmt.Fprint(w, `{"emailId":"em_1"}`)
+	})
+	if _, err := client.Emails.Cancel(context.Background(), "em_1"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestASendWithoutAnIdempotencyKeySendsNone(t *testing.T) {
 	client := server(t, func(w http.ResponseWriter, r *http.Request) {
 		if _, sent := r.Header["Idempotency-Key"]; sent {

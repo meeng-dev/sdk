@@ -48,6 +48,13 @@ class MeengTest(unittest.TestCase):
         self.assertEqual(request["headers"]["User-Agent"], f"meeng-python/{VERSION}")
         self.assertEqual(json.loads(request["body"]), {"from": "hello@acme.com", "to": ["a@x.com", "b@x.com"], "subject": "Hi", "html": "<p>Hi</p>"})
 
+    def test_a_write_with_no_body_of_its_own_sends_an_empty_object(self):
+        meeng, seen = client(lambda r: (200, {"emailId": "em_1"}))
+        meeng.emails.cancel("em_1")
+        self.assertEqual(seen[0]["method"], "POST")
+        self.assertEqual(seen[0]["url"].path, "/api/v1/emails/em_1/cancel")
+        self.assertEqual(seen[0]["body"], b"{}")
+
     def test_a_send_without_an_idempotency_key_sends_none(self):
         meeng, seen = client(lambda r: (200, {"emailId": "em_1"}))
         meeng.emails.create({"from": "hello@acme.com", "to": "a@x.com", "subject": "Hi", "text": "Hi"})

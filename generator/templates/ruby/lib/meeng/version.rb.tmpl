@@ -9,7 +9,11 @@ module Meeng
   # The contract this SDK was generated from.
   API_VERSION = {{quote .APIVersion}}
 
-  # meeng's API. The environment, test or live, is the API key's: prk_test_…
-  # or prk_live_….
+  # Where meeng's API lives. The client appends +{{.APIPrefix}}/v1+ to it, so
+  # MEENG_BASE_URL, like the +base_url+ argument, is the address of the app and
+  # nothing more.
   DEFAULT_BASE_URL = {{quote .BaseURL}}
+
+  # What every path starts with, after the base URL.
+  API_PREFIX = {{quote .APIPrefix}}
 end

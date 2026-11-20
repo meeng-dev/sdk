@@ -51,7 +51,7 @@ class EmailsService:
 
     def cancel(self, email_id: str | int) -> tuple[models.EmailsCancelResponse | None, ErrorResponse | None]:
         """Cancels a scheduled email."""
-        data, error = self._client.request("POST", f"/v1/emails/{segment(email_id)}/cancel")
+        data, error = self._client.request("POST", f"/v1/emails/{segment(email_id)}/cancel", body={})
         return data, error
 
 
@@ -73,7 +73,7 @@ class DomainsService:
 
     def verify(self, id: str | int) -> tuple[models.DomainsVerifyResponse | None, ErrorResponse | None]:
         """Asks for the domain's DNS records to be checked again."""
-        data, error = self._client.request("PUT", f"/v1/domains/{segment(id)}/verify")
+        data, error = self._client.request("PUT", f"/v1/domains/{segment(id)}/verify", body={})
         return data, error
 
     def get(self, id: str | int) -> tuple[models.Domain | None, ErrorResponse | None]:
@@ -212,12 +212,12 @@ class CampaignsService:
 
     def pause(self, campaign_id: str | int) -> tuple[models.CampaignActionResponse | None, ErrorResponse | None]:
         """Pauses a running or scheduled campaign."""
-        data, error = self._client.request("POST", f"/v1/campaigns/{segment(campaign_id)}/pause")
+        data, error = self._client.request("POST", f"/v1/campaigns/{segment(campaign_id)}/pause", body={})
         return data, error
 
     def resume(self, campaign_id: str | int) -> tuple[models.CampaignActionResponse | None, ErrorResponse | None]:
         """Resumes a paused campaign."""
-        data, error = self._client.request("POST", f"/v1/campaigns/{segment(campaign_id)}/resume")
+        data, error = self._client.request("POST", f"/v1/campaigns/{segment(campaign_id)}/resume", body={})
         return data, error
 
 

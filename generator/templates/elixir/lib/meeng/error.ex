@@ -2,85 +2,66 @@ defmodule Meeng.Error do
   @moduledoc """
   A request the API refused.
 
-  `code` is the API's: `invalid_credential`, `forbidden`, `not_found`,
-  `invalid_request`, `conflict`, `idempotency_conflict`, `unsupported_media_type`, `body_too_large`, `rate_limited` or
-  `unavailable`.
-  `message` is the API's explanation, `fields` says, for `invalid_request`, what
-  is wrong with each field, `record` is, for the usage ingestion, the position
-  (from 1) in the batch of the event the API refused (0 for any other error),
-  and `retry_after` is how many seconds to wait on a 429.
+  `code` is the API's, such as `NOT_UNIQUE`, `FORBIDDEN` or `NOT_FOUND`; it is
+  `INTERNAL_SERVER_ERROR` when the answer carried none. `status` is the HTTP
+  status and `retry_after`, on a 429, how many seconds to wait.
 
   A request that never got an answer has no `status` and the code `transport`.
   """
 
-  defexception [:status, code: "", message: "", fields: %{}, retry_after: nil, record: 0]
+  defexception [:status, code: "", message: "", retry_after: nil]
 
   @type t :: %__MODULE__{
           status: non_neg_integer() | nil,
           code: String.t(),
           message: String.t(),
-          fields: %{optional(String.t()) => [String.t()]},
-          retry_after: non_neg_integer() | nil,
-          record: non_neg_integer()
+          retry_after: non_neg_integer() | nil
         }
 
   @impl true
-  def message(%__MODULE__{status: status, code: code, message: "", fields: fields}) do
-    case fields_summary(fields) do
-      "" -> "meeng: #{status} #{code}"
-      detail -> "meeng: #{status} #{code}: #{detail}"
-    end
-  end
+  def message(%__MODULE__{status: status, code: code, message: ""}),
+    do: "meeng: #{status} #{code}"
 
   def message(%__MODULE__{status: status, code: code, message: message}),
     do: "meeng: #{status} #{code}: #{message}"
 
-  defp fields_summary(fields) when is_map(fields) do
-    fields
-    |> Enum.sort_by(fn {key, _} -> key end)
-    |> Enum.flat_map(fn
-      {key, [first | _]} -> ["#{key}: #{first}"]
-      _ -> []
-    end)
-    |> Enum.join("; ")
-  end
+  @reasons %{
+    400 => "Bad Request",
+    401 => "Unauthorized",
+    403 => "Forbidden",
+    404 => "Not Found",
+    409 => "Conflict",
+    422 => "Unprocessable Entity",
+    429 => "Too Many Requests",
+    500 => "Internal Server Error",
+    502 => "Bad Gateway",
+    503 => "Service Unavailable"
+  }
 
-  defp fields_summary(_), do: ""
-
-  @doc "The error a response with a status of 300 or more is."
+  @doc """
+  The error a response with a status of 300 or more is: the answer's
+  `{"error": {"code", "message"}}`, `{"error": "text"}` or the error itself.
+  """
   @spec from_response(non_neg_integer(), [{String.t(), String.t()}], binary()) :: t()
   def from_response(status, headers, body) do
-    data =
+    {code, message} =
       case JSON.decode(body) do
-        {:ok, %{} = data} -> data
+        {:ok, %{} = data} -> found(Map.get(data, "error", data))
         # A refusal without a JSON body is still a refusal.
-        _ -> %{}
-      end
-
-    # Every error is the problem itself (error, message, fields). Servers from before
-    # that document wrapped the usage ingestion's errors in data: still read.
-    data =
-      case data do
-        %{"error" => _} -> data
-        %{"data" => %{} = wrapped} -> wrapped
-        _ -> data
+        _ -> {nil, nil}
       end
 
     %__MODULE__{
       status: status,
-      code: string(data["error"]),
-      message: string(data["message"]),
-      fields: data["fields"] || %{},
-      retry_after: retry_after(headers),
-      record: record(data["record"])
+      code: if(is_binary(code) and code != "", do: code, else: "INTERNAL_SERVER_ERROR"),
+      message: if(is_binary(message), do: message, else: Map.get(@reasons, status, "Error")),
+      retry_after: retry_after(headers)
     }
   end
 
-  defp record(value) when is_integer(value) and value > 0, do: value
-  defp record(_value), do: 0
-
-  defp string(value) when is_binary(value), do: value
-  defp string(_value), do: ""
+  defp found(text) when is_binary(text), do: {nil, text}
+  defp found(%{} = data), do: {data["code"], data["message"]}
+  defp found(_other), do: {nil, nil}
 
   defp retry_after(headers) do
     with {_name, value} <- List.keyfind(headers, "retry-after", 0),

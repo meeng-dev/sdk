@@ -40,6 +40,14 @@ test("sending an email carries the key, the body and the idempotency key", async
   assert.deepEqual(JSON.parse(seen[0]?.body ?? ""), { from: "hello@acme.com", to: ["a@x.com", "b@x.com"], subject: "Hi", html: "<p>Hi</p>", headers: { "X-Order": "1" } });
 });
 
+test("a write with no body of its own sends an empty object, as useSend does", async () => {
+  const { meeng, seen } = client(() => json(200, { emailId: "em_1" }));
+  await meeng.emails.cancel("em_1");
+  assert.equal(seen[0]?.method, "POST");
+  assert.equal(seen[0]?.url.pathname, "/api/v1/emails/em_1/cancel");
+  assert.equal(seen[0]?.body, "{}");
+});
+
 test("a send without an idempotency key sends none", async () => {
   const { meeng, seen } = client(() => json(200, { emailId: "em_1" }));
   await meeng.emails.create({ from: "hello@acme.com", to: "a@x.com", subject: "Hi", text: "Hi" });

@@ -4,34 +4,18 @@
 
 # meeng's SDK for Ruby, generated from meeng's API contract.
 #
-#   meeng = Meeng::Client.new(ENV.fetch("MEENG_API_KEY"))
-#   product = meeng.products.create({ name: "Curso" }, idempotency_key: "produto-curso")
-#   meeng.products.list_iter.each { |product| puts product.name }
+#   meeng = Meeng::Client.new("mg_123")
+#   sent = meeng.emails.send(from: "hello@acme.com", to: "customer@example.com", subject: "Hello", html: "<p>Hello</p>")
+#   sent[:emailId]
 module Meeng
   # A path parameter, escaped.
   def self.segment(value)
     value.to_s.b.gsub(/[^A-Za-z0-9\-._~]/) { |char| format("%%%02X", char.ord) }
   end
-
-  # A value as JSON writes it: params and models as hashes, lists and maps of
-  # them walked.
-  def self.wire(value)
-    case value
-    when Params then value.to_wire
-    when Model then value.to_h.transform_keys(&:to_s).transform_values { |each| wire(each) }
-    when Array then value.map { |each| wire(each) }
-    when Hash then value.transform_values { |each| wire(each) }
-    else value
-    end
-  end
 end
 
 require_relative "meeng/version"
 require_relative "meeng/error"
-require_relative "meeng/model"
-require_relative "meeng/models"
-require_relative "meeng/params"
-require_relative "meeng/page"
 require_relative "meeng/services"
-require_relative "meeng/client"
 require_relative "meeng/webhooks"
+require_relative "meeng/client"

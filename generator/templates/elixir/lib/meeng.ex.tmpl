@@ -4,16 +4,24 @@ defmodule Meeng do
   @moduledoc """
   meeng's SDK for Elixir, generated from meeng's API contract.
 
-      client = Meeng.new(System.fetch_env!("MEENG_API_KEY"))
-      {:ok, product} = Meeng.Products.create(client, %{name: "Curso"}, idempotency_key: "produto-curso")
+      client = Meeng.new("mg_123")
 
-      client
-      |> Meeng.Products.list_stream()
-      |> Enum.each(&IO.puts(&1.name))
+      {:ok, sent} =
+        Meeng.Emails.send(client, %{
+          from: "hello@acme.com",
+          to: "customer@example.com",
+          subject: "Hello",
+          html: "<p>Hello</p>"
+        })
 
-  Every call answers `{:ok, value}` or `{:error, %Meeng.Error{}}`; the
-  `*_stream` functions walk every page lazily and raise `Meeng.Error` on a
-  refusal.
+      sent["emailId"]
+
+  Every call answers `{:ok, data}` or `{:error, %Meeng.Error{}}`. Bodies are
+  maps (or keyword lists) with the API's own names, such as `contactBookId`, and
+  the data is the answer's JSON, decoded into maps with string keys.
+
+  Without a key, `Meeng.new/2` reads `MEENG_API_KEY`, and the address of the app
+  from `MEENG_BASE_URL`.
   """
 
   @doc "This SDK's version."
@@ -25,25 +33,29 @@ defmodule Meeng do
   def api_version, do: {{quote .APIVersion}}
 
   @doc """
-  meeng's API. The environment, test or live, is the API key's: `prk_test_…`
-  or `prk_live_…`.
+  Where meeng's API lives. The client appends `{{.APIPrefix}}/v1` to it, so
+  `MEENG_BASE_URL`, like the `:base_url` option, is the address of the app and
+  nothing more.
   """
   @spec default_base_url() :: String.t()
   def default_base_url, do: {{quote .BaseURL}}
 
-  @doc "A client for the organization `api_key` belongs to; see `Meeng.Client.new/2`."
-  @spec new(String.t(), keyword()) :: Meeng.Client.t()
-  defdelegate new(api_key, opts \\ []), to: Meeng.Client
+  @doc "What every path starts with, after the base URL."
+  @spec api_prefix() :: String.t()
+  def api_prefix, do: {{quote .APIPrefix}}
 
-  @doc "Checks a webhook meeng sent; see `Meeng.Webhook.verify/4`."
-  @spec verify_webhook(String.t(), Enumerable.t(), binary(), keyword()) ::
-          {:ok, Meeng.WebhookEvent.t()} | {:error, Meeng.WebhookVerificationError.t()}
-  defdelegate verify_webhook(secret, headers, body, opts \\ []), to: Meeng.Webhook, as: :verify
+  @doc "A client for the team `api_key` belongs to; see `Meeng.Client.new/2`."
+  @spec new(String.t() | nil, keyword()) :: Meeng.Client.t()
+  defdelegate new(api_key \\ nil, opts \\ []), to: Meeng.Client
 
-  @doc "Checks a webhook's signature; see `Meeng.Webhook.verify_signature/4`."
-  @spec verify_webhook_signature(String.t(), Enumerable.t(), binary(), keyword()) ::
-          :ok | {:error, Meeng.WebhookVerificationError.t()}
-  defdelegate verify_webhook_signature(secret, headers, body, opts \\ []),
-    to: Meeng.Webhook,
-    as: :verify_signature
+  @doc "Checks a webhook's signature; see `Meeng.Webhooks.verify/4`."
+  @spec verify_webhook(String.t(), Enumerable.t(), binary(), keyword()) :: boolean()
+  defdelegate verify_webhook(secret, headers, body, opts \\ []), to: Meeng.Webhooks, as: :verify
+
+  @doc "Checks and reads a webhook; see `Meeng.Webhooks.construct_event/4`."
+  @spec construct_webhook_event(String.t(), Enumerable.t(), binary(), keyword()) ::
+          {:ok, map()} | {:error, Meeng.WebhookVerificationError.t()}
+  defdelegate construct_webhook_event(secret, headers, body, opts \\ []),
+    to: Meeng.Webhooks,
+    as: :construct_event
 end

@@ -116,7 +116,7 @@ func (s *EmailsService) Update(ctx context.Context, emailId string, params Email
 // Cancel: Cancels a scheduled email.
 func (s *EmailsService) Cancel(ctx context.Context, emailId string, opts ...RequestOption) (*EmailsCancelResponse, error) {
 	var out EmailsCancelResponse
-	err := s.client.do(ctx, http.MethodPost, "/v1/emails/"+url.PathEscape(emailId)+"/cancel", nil, nil, &out, opts)
+	err := s.client.do(ctx, http.MethodPost, "/v1/emails/"+url.PathEscape(emailId)+"/cancel", nil, struct{}{}, &out, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s *DomainsService) Create(ctx context.Context, params DomainsCreateParams,
 // Verify: Asks for the domain's DNS records to be checked again.
 func (s *DomainsService) Verify(ctx context.Context, id string, opts ...RequestOption) (*DomainsVerifyResponse, error) {
 	var out DomainsVerifyResponse
-	err := s.client.do(ctx, http.MethodPut, "/v1/domains/"+url.PathEscape(id)+"/verify", nil, nil, &out, opts)
+	err := s.client.do(ctx, http.MethodPut, "/v1/domains/"+url.PathEscape(id)+"/verify", nil, struct{}{}, &out, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +427,7 @@ func (s *CampaignsService) Schedule(ctx context.Context, campaignId string, para
 // Pause: Pauses a running or scheduled campaign.
 func (s *CampaignsService) Pause(ctx context.Context, campaignId string, opts ...RequestOption) (*CampaignActionResponse, error) {
 	var out CampaignActionResponse
-	err := s.client.do(ctx, http.MethodPost, "/v1/campaigns/"+url.PathEscape(campaignId)+"/pause", nil, nil, &out, opts)
+	err := s.client.do(ctx, http.MethodPost, "/v1/campaigns/"+url.PathEscape(campaignId)+"/pause", nil, struct{}{}, &out, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +437,7 @@ func (s *CampaignsService) Pause(ctx context.Context, campaignId string, opts ..
 // Resume: Resumes a paused campaign.
 func (s *CampaignsService) Resume(ctx context.Context, campaignId string, opts ...RequestOption) (*CampaignActionResponse, error) {
 	var out CampaignActionResponse
-	err := s.client.do(ctx, http.MethodPost, "/v1/campaigns/"+url.PathEscape(campaignId)+"/resume", nil, nil, &out, opts)
+	err := s.client.do(ctx, http.MethodPost, "/v1/campaigns/"+url.PathEscape(campaignId)+"/resume", nil, struct{}{}, &out, opts)
 	if err != nil {
 		return nil, err
 	}
