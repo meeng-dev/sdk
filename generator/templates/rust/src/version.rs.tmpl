@@ -6,6 +6,10 @@ pub const VERSION: &str = {{quote .Version}};
 /// The contract this SDK was generated from.
 pub const API_VERSION: &str = {{quote .APIVersion}};
 
-/// Peráta's API. The environment, test or live, is the API key's:
-/// `prk_test_…` or `prk_live_…`.
+/// Where meeng's API lives. The client appends `{{.APIPrefix}}/v1` to it, so
+/// `MEENG_BASE_URL`, like [`ClientBuilder::base_url`](crate::ClientBuilder::base_url),
+/// is the address of the app and nothing more.
 pub const DEFAULT_BASE_URL: &str = {{quote .BaseURL}};
+
+/// What every path starts with, after the base URL.
+pub const API_PREFIX: &str = {{quote .APIPrefix}};

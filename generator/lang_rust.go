@@ -36,15 +36,24 @@ func init() {
 			sort.Strings(names)
 			return names
 		},
-		"rsPath":      rsPath,
-		"rsPathOwned": rsPathOwned,
-		"rsEnums":     enumTypes,
-		"rsVariant":   func(value string) string { return upperWords(value) },
-		"rsAttrs":     rsAttrs,
-		"rsInto":      rsInto,
-		"rsInit":      rsInit,
-		"required":    requiredFields,
-		"optional":    optionalFields,
+		"rsPath": rsPath,
+		// rsQuery is the Rust type of a query filter, as the query struct holds it.
+		"rsQuery": func(p *Param) string {
+			switch p.Kind {
+			case "integer":
+				return "Option<u32>"
+			case "stringlist":
+				return "Vec<String>"
+			}
+			return "Option<String>"
+		},
+		"rsEnums":   enumTypes,
+		"rsVariant": func(value string) string { return upperWords(value) },
+		"rsAttrs":   rsAttrs,
+		"rsInto":    rsInto,
+		"rsInit":    rsInit,
+		"required":  requiredFields,
+		"optional":  optionalFields,
 		// rsData is the Rust type of a webhook's data.
 		"rsData": func(t *TypeRef) string {
 			if t.Kind == "model" {
@@ -126,6 +135,7 @@ func upperWords(name string) string {
 
 // snakeCase writes customerId, customer-id or customer_id as customer_id.
 func snakeCase(name string) string {
+	name = strings.TrimLeft(name, "_")
 	var b strings.Builder
 	for i, r := range name {
 		switch {
@@ -170,6 +180,9 @@ func rsBase(models []*Model, model *Model, field *Field, t *TypeRef) string {
 	case "model":
 		return t.Model
 	case "array":
+		if t.OrScalar {
+			return "Vec<String>"
+		}
 		return "Vec<" + rsBase(models, model, field, t.Items) + ">"
 	case "map":
 		return "std::collections::HashMap<String, " + rsBase(models, model, field, t.Items) + ">"
@@ -235,6 +248,14 @@ func rsAttrs(field *Field) string {
 	}
 	if !field.Required {
 		parts = append(parts, `default, skip_serializing_if = "Option::is_none"`)
+	}
+	if field.Type.OrScalar {
+		// A lone string is read as a list of one.
+		if field.Nullable || !field.Required {
+			parts = append(parts, `deserialize_with = "crate::json::optional_string_list"`)
+		} else {
+			parts = append(parts, `deserialize_with = "crate::json::string_list"`)
+		}
 	}
 	if len(parts) == 0 {
 		return ""

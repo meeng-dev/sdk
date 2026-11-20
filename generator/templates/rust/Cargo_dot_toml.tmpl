@@ -3,13 +3,15 @@ name = "meeng-sdk"
 version = "{{.Version}}"
 edition = "2021"
 rust-version = "1.88"
-description = "meeng's SDK for Rust: products, customers, checkouts, payments, subscriptions and webhooks."
+description = "meeng's SDK for Rust: emails, domains, contacts, contact books, campaigns, analytics and webhooks, with the same shape as useSend's."
 license = "MIT"
 homepage = "https://meeng.dev"
 repository = "https://github.com/meeng-dev/sdk"
 documentation = "https://docs.rs/meeng-sdk"
 readme = "README.md"
-keywords = ["meeng", "payments", "pix", "api", "webhooks"]
+# Not published until the names are confirmed.
+publish = false
+keywords = ["meeng", "email", "smtp", "api", "webhooks"]
 categories = ["api-bindings", "web-programming::http-client"]
 
 [lib]
@@ -17,7 +19,6 @@ categories = ["api-bindings", "web-programming::http-client"]
 name = "meeng"
 
 [dependencies]
-base64 = "0.23"
 hmac = "0.13"
 serde = { version = "1.0.200", features = ["derive"] }
 serde_json = "1.0.100"

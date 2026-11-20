@@ -68,7 +68,7 @@ public struct UnknownWebhookEvent: Sendable, Hashable {
     public let body: Data
 }
 
-/// A webhook Peráta sent, verified: one case a kind of data, the event's type
+/// A webhook meeng sent, verified: one case a kind of data, the event's type
 /// telling apart what happened, or `.unknown` for a type this SDK does not
 /// know yet.
 public enum WebhookEvent: Sendable, Hashable {
@@ -158,12 +158,12 @@ public enum WebhookEvent: Sendable, Hashable {
 public enum WebhookVerificationError: Error, Sendable, Equatable {
     /// The secret is not `whsec_` and a base64 key.
     case invalidSecret
-    /// Peráta did not sign the request, or signed it too long ago.
+    /// meeng did not sign the request, or signed it too long ago.
     case invalidSignature
 }
 
 #if canImport(CryptoKit)
-    /// Checks a webhook Peráta sent, as Standard Webhooks signs it — an
+    /// Checks a webhook meeng sent, as Standard Webhooks signs it — an
     /// HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}` under the key
     /// the endpoint's `whsec_` secret encodes, one of the signatures in the
     /// webhook-signature header, which carries more than one while a secret is

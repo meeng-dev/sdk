@@ -1,0 +1,26 @@
+[package]
+name = "meeng-sdk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "meeng's SDK for Rust: emails, domains, contacts, contact books, campaigns, analytics and webhooks, with the same shape as useSend's."
+license = "MIT"
+homepage = "https://meeng.dev"
+repository = "https://github.com/meeng-dev/sdk"
+documentation = "https://docs.rs/meeng-sdk"
+readme = "README.md"
+# Not published until the names are confirmed.
+publish = false
+keywords = ["meeng", "email", "smtp", "api", "webhooks"]
+categories = ["api-bindings", "web-programming::http-client"]
+
+[lib]
+# The crate is meeng-sdk; the code says `use meeng::…`.
+name = "meeng"
+
+[dependencies]
+hmac = "0.13"
+serde = { version = "1.0.200", features = ["derive"] }
+serde_json = "1.0.100"
+sha2 = "0.11"
+ureq = { version = "3", default-features = false, features = ["rustls"] }

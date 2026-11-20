@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
 
@@ -20,17 +19,15 @@ pub enum Error {
     /// The client's base URL is not https and not a loopback address, so no
     /// request was sent: the API key would cross the network in clear text.
     InsecureBaseUrl,
+    /// No API key was given and `MEENG_API_KEY` is not set.
+    MissingApiKey,
 }
 
 /// A request the API refused.
 ///
-/// `code` is the API's: invalid_credential, forbidden, not_found,
-/// invalid_request, conflict, idempotency_conflict, unsupported_media_type, body_too_large, rate_limited or
-/// unavailable.
-/// `fields` says, for invalid_request, what is wrong with each field. `record`
-/// is, for the usage ingestion, the position (from 1) in the batch of the event
-/// the API refused, and 0 for any other error. `retry_after` is how long to
-/// wait on a 429.
+/// `code` is the API's, such as `NOT_UNIQUE`, `FORBIDDEN` or `NOT_FOUND`; it is
+/// `INTERNAL_SERVER_ERROR` when the answer carried none. `retry_after` is how
+/// long to wait on a 429.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ApiError {
@@ -40,29 +37,22 @@ pub struct ApiError {
     pub code: String,
     /// What went wrong, for a person to read.
     pub message: String,
-    /// The problems of each field of the request.
-    pub fields: HashMap<String, Vec<String>>,
-    /// The event of a batch the API refused, from 1, or 0.
-    pub record: u32,
     /// How long to wait before trying again.
     pub retry_after: Option<Duration>,
 }
 
 #[derive(Deserialize, Default)]
 struct Problem {
-    error: Option<String>,
+    code: Option<String>,
     message: Option<String>,
-    fields: Option<HashMap<String, Vec<String>>>,
-    record: Option<u32>,
 }
 
-/// Every error is the problem itself (error, message, fields). Servers from before
-/// that document wrapped the usage ingestion's errors in data: still read.
+/// `{"error": {"code", "message"}}`, `{"error": "text"}` or the error itself.
 #[derive(Deserialize, Default)]
 struct ErrorBody {
-    #[serde(flatten)]
-    problem: Problem,
-    data: Option<Problem>,
+    error: Option<serde_json::Value>,
+    code: Option<String>,
+    message: Option<String>,
 }
 
 impl ApiError {
@@ -70,16 +60,27 @@ impl ApiError {
     /// still a refusal.
     pub(crate) fn from_response(response: &HttpResponse) -> Self {
         let body: ErrorBody = serde_json::from_slice(&response.body).unwrap_or_default();
-        let problem = match (body.problem.error.is_some(), body.data) {
-            (false, Some(wrapped)) => wrapped,
-            _ => body.problem,
+        let problem = match body.error {
+            Some(serde_json::Value::String(text)) => Problem {
+                code: None,
+                message: Some(text),
+            },
+            Some(other) => serde_json::from_value(other).unwrap_or_default(),
+            None => Problem {
+                code: body.code,
+                message: body.message,
+            },
         };
         Self {
             status: response.status,
-            code: problem.error.unwrap_or_default(),
-            message: problem.message.unwrap_or_default(),
-            fields: problem.fields.unwrap_or_default(),
-            record: problem.record.unwrap_or_default(),
+            code: problem
+                .code
+                .filter(|code| !code.is_empty())
+                .unwrap_or_else(|| "INTERNAL_SERVER_ERROR".to_owned()),
+            message: problem
+                .message
+                .filter(|message| !message.is_empty())
+                .unwrap_or_else(|| reason(response.status).to_owned()),
             retry_after: response
                 .header("retry-after")
                 .and_then(|value| value.trim().parse::<u64>().ok())
@@ -88,28 +89,25 @@ impl ApiError {
     }
 }
 
+fn reason(status: u16) -> &'static str {
+    match status {
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        403 => "Forbidden",
+        404 => "Not Found",
+        409 => "Conflict",
+        422 => "Unprocessable Entity",
+        429 => "Too Many Requests",
+        500 => "Internal Server Error",
+        502 => "Bad Gateway",
+        503 => "Service Unavailable",
+        _ => "Error",
+    }
+}
+
 impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let detail = if self.message.is_empty() {
-            let mut keys: Vec<&String> = self
-                .fields
-                .iter()
-                .filter(|(_, v)| !v.is_empty())
-                .map(|(k, _)| k)
-                .collect();
-            keys.sort();
-            keys.iter()
-                .map(|k| format!("{}: {}", k, self.fields[*k][0]))
-                .collect::<Vec<_>>()
-                .join("; ")
-        } else {
-            self.message.clone()
-        };
-        if detail.is_empty() {
-            write!(f, "meeng: {} {}", self.status, self.code)
-        } else {
-            write!(f, "meeng: {} {}: {}", self.status, self.code, detail)
-        }
+        write!(f, "meeng: {} {}: {}", self.status, self.code, self.message)
     }
 }
 
@@ -122,6 +120,7 @@ impl fmt::Display for Error {
             Error::Transport(error) => write!(f, "meeng: {error}"),
             Error::Json(error) => write!(f, "meeng: json: {error}"),
             Error::InsecureBaseUrl => f.write_str("meeng: the base URL must be https (http is accepted only for localhost, 127.0.0.0/8 and ::1), so the API key is never sent in clear text"),
+            Error::MissingApiKey => f.write_str("meeng: missing API key: pass it to Client::new or set MEENG_API_KEY"),
         }
     }
 }
@@ -132,7 +131,7 @@ impl std::error::Error for Error {
             Error::Api(error) => Some(error),
             Error::Transport(error) => Some(error.as_ref()),
             Error::Json(error) => Some(error),
-            Error::InsecureBaseUrl => None,
+            Error::InsecureBaseUrl | Error::MissingApiKey => None,
         }
     }
 }

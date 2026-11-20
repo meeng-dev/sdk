@@ -1,15 +1,13 @@
 use std::fmt;
-use std::hash::{BuildHasher, Hasher, RandomState};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use ureq::RequestExt;
 
 use crate::error::{ApiError, Error};
-use crate::version::{DEFAULT_BASE_URL, VERSION};
+use crate::version::{API_PREFIX, DEFAULT_BASE_URL, VERSION};
 
 /// Any error a [`Transport`] answers.
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -162,28 +160,23 @@ impl Transport for UreqTransport {
     }
 }
 
-/// Options of one call: the key it is made with and, for a write, the key
-/// that makes it safe to repeat.
+/// Options of one call: the key that makes a send safe to retry.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RequestOptions {
-    /// Makes a write safe to repeat: the same key with the same body answers
-    /// the first response again; with another body, a 409. A 2xx answer stays
-    /// under the key; a 4xx or 5xx frees it, so the same key can be sent
-    /// again. A POST without one is sent with a random key of its own, one a
-    /// call.
+    /// Makes a send safe to retry: the same key with the same body answers the
+    /// first result again; with another body, a 409 `NOT_UNIQUE`. The key is up
+    /// to 256 characters and expires after 24 hours. The API reads it on
+    /// `emails().send` and `emails().batch`.
     pub idempotency_key: Option<String>,
-    /// Sends the call with another organization's key.
-    pub api_key: Option<String>,
 }
 
-/// meeng's API with one organization's API key. The key says the
-/// organization and the environment: `prk_test_…` is the test environment,
-/// `prk_live_…` the live one.
+/// meeng's API with one team's API key. [`Client::from_env`] reads the key from
+/// `MEENG_API_KEY`, and the address of the app from `MEENG_BASE_URL`.
 ///
 /// A client is cheap to clone, and its clones share one connection pool.
 #[derive(Clone)]
 pub struct Client {
-    api_key: String,
+    api_key: Option<String>,
     base_url: String,
     timeout: Duration,
     transport: Arc<dyn Transport>,
@@ -200,7 +193,7 @@ impl fmt::Debug for Client {
 
 /// Configures a [`Client`].
 pub struct ClientBuilder {
-    api_key: String,
+    api_key: Option<String>,
     base_url: String,
     timeout: Duration,
     transport: Option<Arc<dyn Transport>>,
@@ -216,10 +209,10 @@ impl fmt::Debug for ClientBuilder {
 }
 
 impl ClientBuilder {
-    /// Points the client at another address, such as a local server. It must
-    /// be https; http is accepted only for localhost, 127.0.0.0/8 and ::1,
-    /// and any other makes every call answer [`Error::InsecureBaseUrl`]
-    /// before anything is sent.
+    /// Points the client at another app, such as a self-hosted one: the address
+    /// of the app, without `/api/v1`. It must be https; http is accepted only
+    /// for localhost, 127.0.0.0/8 and ::1, and any other makes every call
+    /// answer [`Error::InsecureBaseUrl`] before anything is sent.
     pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = base_url.into().trim_end_matches('/').to_owned();
         self
@@ -250,29 +243,42 @@ impl ClientBuilder {
     }
 }
 
-#[derive(Deserialize)]
-struct Envelope<T> {
-    data: T,
-}
-
 impl Client {
-    /// A client for the organization `api_key` belongs to.
+    /// A client for the team `api_key` belongs to. The address of the app is
+    /// `MEENG_BASE_URL` when that is set.
     pub fn new(api_key: impl Into<String>) -> Self {
         Self::builder(api_key).build()
     }
 
-    /// Configures a client for the organization `api_key` belongs to.
+    /// A client for the key in `MEENG_API_KEY`; [`Error::MissingApiKey`] when
+    /// it is not set.
+    pub fn from_env() -> Result<Self, Error> {
+        match std::env::var("MEENG_API_KEY") {
+            Ok(key) if !key.is_empty() => Ok(Self::new(key)),
+            _ => Err(Error::MissingApiKey),
+        }
+    }
+
+    /// Configures a client for the team `api_key` belongs to.
     pub fn builder(api_key: impl Into<String>) -> ClientBuilder {
+        let base_url = std::env::var("MEENG_BASE_URL")
+            .ok()
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| DEFAULT_BASE_URL.to_owned());
         ClientBuilder {
-            api_key: api_key.into(),
-            base_url: DEFAULT_BASE_URL.to_owned(),
+            api_key: Some(api_key.into()).filter(|key| !key.is_empty()),
+            base_url: base_url.trim_end_matches('/').to_owned(),
             timeout: Duration::from_secs(30),
             transport: None,
         }
     }
 
-    /// Calls the API and answers what it wrapped in `data`; a refusal is
-    /// [`Error::Api`].
+    /// The address every call goes to, with the API prefix.
+    pub fn url(&self) -> String {
+        format!("{}{}", self.base_url, API_PREFIX)
+    }
+
+    /// Calls the API and reads its answer; a refusal is [`Error::Api`].
     pub(crate) fn request<T, B>(
         &self,
         method: &str,
@@ -285,10 +291,13 @@ impl Client {
         T: DeserializeOwned,
         B: Serialize + ?Sized,
     {
+        let Some(api_key) = &self.api_key else {
+            return Err(Error::MissingApiKey);
+        };
         if !secure_base_url(&self.base_url) {
             return Err(Error::InsecureBaseUrl);
         }
-        let mut url = format!("{}{}", self.base_url, path);
+        let mut url = format!("{}{}{}", self.base_url, API_PREFIX, path);
         let pairs: Vec<String> = query
             .iter()
             .filter(|(_, value)| !value.is_empty())
@@ -298,7 +307,6 @@ impl Client {
             url.push('?');
             url.push_str(&pairs.join("&"));
         }
-        let api_key = options.api_key.as_deref().unwrap_or(&self.api_key);
         let mut headers = vec![
             ("Authorization".to_owned(), format!("Bearer {api_key}")),
             ("Accept".to_owned(), "application/json".to_owned()),
@@ -315,8 +323,7 @@ impl Client {
             .idempotency_key
             .as_deref()
             .filter(|key| !key.is_empty())
-            .map(str::to_owned)
-            .or_else(|| (method == "POST").then(new_idempotency_key));
+            .map(str::to_owned);
         if let Some(key) = key {
             headers.push(("Idempotency-Key".to_owned(), key));
         }
@@ -331,12 +338,7 @@ impl Client {
         if response.status >= 300 {
             return Err(Error::Api(ApiError::from_response(&response)));
         }
-        if response.status == 204 {
-            // No body: only a request for `()` can read it.
-            return serde_json::from_slice(b"null").map_err(Error::Json);
-        }
-        let envelope: Envelope<T> = serde_json::from_slice(&response.body).map_err(Error::Json)?;
-        Ok(envelope.data)
+        serde_json::from_slice(&response.body).map_err(Error::Json)
     }
 }
 
@@ -359,35 +361,6 @@ fn secure_base_url(base_url: &str) -> bool {
         Some("http") => loopback,
         _ => false,
     }
-}
-
-/// A random UUID (version 4). The standard library has no CSPRNG and the SDK
-/// takes no dependency for one, so the bytes are SipHash outputs under keys the
-/// operating system seeds for each [`RandomState`], mixed with a counter and
-/// the clock: a key has to be unique, not secret.
-fn new_idempotency_key() -> String {
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |since| since.as_nanos());
-    let mut bytes = [0u8; 16];
-    for half in bytes.chunks_mut(8) {
-        let mut hasher = RandomState::new().build_hasher();
-        hasher.write_u64(COUNTER.fetch_add(1, Ordering::Relaxed));
-        hasher.write_u128(nanos);
-        half.copy_from_slice(&hasher.finish().to_be_bytes());
-    }
-    bytes[6] = bytes[6] & 0x0f | 0x40;
-    bytes[8] = bytes[8] & 0x3f | 0x80;
-    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
-    format!(
-        "{}-{}-{}-{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..32]
-    )
 }
 
 /// A path parameter or a query value, escaped: everything but letters,

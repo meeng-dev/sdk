@@ -2,18 +2,13 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, UNIX_EPOCH};
 
+use hmac::{Hmac, KeyInit, Mac};
 use meeng::{
-    verify_webhook_at, verify_webhook_signature_at, BoxError, CheckoutClientPayment,
-    CheckoutsCreateParams, CheckoutsListParams, Client, CustomersCreateParams, CustomersListParams,
-    DiscountsCreateParams, DiscountsCreateParamsDuration, DiscountsCreateParamsType,
-    DiscountsListParams, Error, HttpRequest, HttpResponse, OrdersListParams, PricePricingModel,
-    PricesCreateParams, PricesCreateParamsInterval, PricesCreateParamsPricingModel,
-    PricesCreateParamsType, PricesCreateTier, ProductStatus, ProductsCreateParams,
-    ProductsListParams, UsageIngestEvent, UsageIngestEventCost, UsageIngestEventCostCurrency,
-    UsageIngestParams, WebhookError, WebhookEvent,
+    BoxError, Client, EmailsBatchParams, EmailsListQuery, EmailsSendParams, Error, HttpRequest,
+    HttpResponse, WebhookEvent, WebhookOptions, Webhooks,
 };
+use sha2::Sha256;
 
 type Seen = Arc<Mutex<Vec<HttpRequest>>>;
 
@@ -25,893 +20,489 @@ fn client(answer: impl Fn(&HttpRequest) -> HttpResponse + Send + Sync + 'static)
         record.lock().unwrap().push(request);
         Ok(response)
     };
-    let client = Client::builder("prk_test_key")
+    let client = Client::builder("mg_test_key")
         .base_url("https://meeng.test/")
         .transport(transport)
         .build();
     (client, seen)
 }
 
-fn product(id: &str) -> serde_json::Value {
-    serde_json::json!({"id": id, "name": "Curso", "description": "", "status": "active", "showcase_id": "shw_1", "created_at": "2026-10-17T00:00:00Z"})
-}
-
 fn json(status: u16, body: serde_json::Value) -> HttpResponse {
-    HttpResponse::new(status, body.to_string()).with_header("Content-Type", "application/json")
+    HttpResponse::new(status, body.to_string())
+        .with_header("Content-Type", "application/json")
+        .with_header("Retry-After", "7")
 }
 
-fn query(url: &str, name: &str) -> Option<String> {
-    let (_, query) = url.split_once('?')?;
-    query.split('&').find_map(|pair| {
-        let (key, value) = pair.split_once('=')?;
-        (key == name).then(|| value.to_owned())
-    })
+fn body_of(request: &HttpRequest) -> serde_json::Value {
+    serde_json::from_slice(request.body.as_deref().unwrap()).unwrap()
 }
 
 #[test]
-fn a_call_carries_the_key_and_unwraps_the_data() {
-    let (client, seen) = client(|_| json(200, serde_json::json!({"data": product("prod_1")})));
-    let got = client.products().get("prod_1").unwrap();
-    assert_eq!(got.id, "prod_1");
-    assert_eq!(got.status, ProductStatus::Active);
+fn sending_an_email_carries_the_key_the_body_and_the_idempotency_key() {
+    let (client, seen) = client(|_| json(200, serde_json::json!({"emailId": "em_1"})));
+    let params = EmailsSendParams::new(
+        vec!["a@x.com".to_owned(), "b@x.com".to_owned()],
+        "hello@acme.com",
+    )
+    .subject("Hi")
+    .html("<p>Hi</p>");
+    let sent = client
+        .emails()
+        .idempotency_key("order-1")
+        .send(&params)
+        .unwrap();
+    assert_eq!(sent.email_id.as_deref(), Some("em_1"));
     let seen = seen.lock().unwrap();
-    assert_eq!(seen[0].method, "GET");
-    assert_eq!(seen[0].url, "https://meeng.test/api/v1/products/prod_1");
-    assert_eq!(seen[0].header("authorization"), Some("Bearer prk_test_key"));
+    assert_eq!(seen[0].method, "POST");
+    assert_eq!(seen[0].url, "https://meeng.test/api/v1/emails");
+    assert_eq!(seen[0].header("authorization"), Some("Bearer mg_test_key"));
+    assert_eq!(seen[0].header("idempotency-key"), Some("order-1"));
+    assert_eq!(seen[0].header("content-type"), Some("application/json"));
     assert_eq!(
         seen[0].header("user-agent"),
         Some(format!("meeng-rust/{}", meeng::VERSION).as_str())
     );
+    assert_eq!(
+        body_of(&seen[0]),
+        serde_json::json!({"from": "hello@acme.com", "to": ["a@x.com", "b@x.com"], "subject": "Hi", "html": "<p>Hi</p>"})
+    );
 }
 
 #[test]
-fn a_write_sends_its_body_and_idempotency_key() {
-    let (client, seen) = client(|_| json(201, serde_json::json!({"data": product("prod_1")})));
-    let created = client
-        .products()
-        .idempotency_key("create-1")
-        .create(&ProductsCreateParams::new("Curso"))
-        .unwrap();
-    assert_eq!(created.name, "Curso");
+fn a_write_with_no_body_of_its_own_sends_an_empty_object() {
+    let (client, seen) = client(|_| json(200, serde_json::json!({"emailId": "em_1"})));
+    client.emails().cancel("em_1").unwrap();
     let seen = seen.lock().unwrap();
     assert_eq!(seen[0].method, "POST");
-    assert_eq!(seen[0].header("idempotency-key"), Some("create-1"));
-    assert_eq!(seen[0].header("content-type"), Some("application/json"));
-    let body: serde_json::Value = serde_json::from_slice(seen[0].body.as_deref().unwrap()).unwrap();
-    // The optional description, left unset, is not sent.
-    assert_eq!(body, serde_json::json!({"name": "Curso"}));
+    assert_eq!(seen[0].url, "https://meeng.test/api/v1/emails/em_1/cancel");
+    assert_eq!(seen[0].body.as_deref(), Some(b"{}".as_slice()));
 }
 
 #[test]
-fn a_checkout_session_hands_back_the_client_secret_for_the_browser() {
-    let session = |secret: &str| {
-        serde_json::json!({"data": {
-            "id": "pcl_1", "url": "https://meeng.dev/pagamento/pcl_1", "product_id": "prod_1", "price_id": "price_1",
-            "status": "active", "label": "", "quantity": 1, "success_url": "https://loja.example/obrigado", "cancel_url": "",
-            "expires_at": null, "created_at": "2026-11-16T12:00:00Z", "session_id": "cs_1", "client_secret": secret,
-            "client_secret_expires_at": "2026-11-16T12:30:00Z", "status_key": "sk_1",
-            "amount_cents": null, "items": [], "metadata": {}, "client_reference_id": "",
-            "discount_id": "", "showcase_id": "shw_1", "subscription_start_at": null
-        }})
-    };
-    let calls = std::sync::atomic::AtomicUsize::new(0);
-    let (client, seen) = client(move |_| {
-        if calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
-            json(201, session("cs_secret_1"))
-        } else {
-            json(201, session("")).with_header("Idempotent-Replayed", "true")
-        }
-    });
-    let params = CheckoutsCreateParams::new("price_1", "prod_1")
-        .success_url("https://loja.example/obrigado");
-    let checkout = client
-        .checkouts()
-        .idempotency_key("pedido-1")
-        .create(&params)
+fn a_send_without_an_idempotency_key_sends_none() {
+    let (client, seen) = client(|_| json(200, serde_json::json!({"emailId": "em_1"})));
+    client
+        .emails()
+        .send(&EmailsSendParams::new(vec!["a@x.com".to_owned()], "hello@acme.com").text("Hi"))
         .unwrap();
-    assert_eq!(checkout.client_secret, "cs_secret_1");
-    assert_eq!(checkout.session_id, "cs_1");
-    assert_eq!(checkout.status_key, "sk_1");
-    assert_eq!(checkout.client_secret_expires_at, "2026-11-16T12:30:00Z");
-    assert_eq!(checkout.url, "https://meeng.dev/pagamento/pcl_1");
-    assert_eq!(checkout.expires_at, None);
-    {
-        let seen = seen.lock().unwrap();
-        assert_eq!(seen[0].method, "POST");
-        assert_eq!(seen[0].url, "https://meeng.test/api/v1/checkouts");
-        assert_eq!(seen[0].header("idempotency-key"), Some("pedido-1"));
-        let body: serde_json::Value =
-            serde_json::from_slice(seen[0].body.as_deref().unwrap()).unwrap();
+    assert_eq!(seen.lock().unwrap()[0].header("idempotency-key"), None);
+}
+
+#[test]
+fn a_batch_answers_the_list_of_ids() {
+    let (client, seen) = client(|_| {
+        json(
+            200,
+            serde_json::json!({"data": [{"emailId": "em_1"}, {"emailId": "em_2"}]}),
+        )
+    });
+    let got = client
+        .emails()
+        .batch(&[
+            EmailsBatchParams::new(vec!["a@x.com".to_owned()], "hello@acme.com")
+                .subject("One")
+                .text("1"),
+            EmailsBatchParams::new(vec!["b@x.com".to_owned()], "hello@acme.com")
+                .subject("Two")
+                .text("2"),
+        ])
+        .unwrap();
+    assert_eq!(got.data[1].email_id, "em_2");
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen[0].url, "https://meeng.test/api/v1/emails/batch");
+    assert_eq!(body_of(&seen[0]).as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn listing_emails_sends_the_filters_a_list_once_for_each_value() {
+    let (client, seen) = client(|_| {
+        json(
+            200,
+            serde_json::json!({"data": [{"id": "em_1", "to": "a@x.com", "from": "h@acme.com", "subject": "Hi", "html": null, "text": "Hi", "createdAt": "x", "updatedAt": "x", "latestStatus": "DELIVERED", "scheduledAt": null, "domainId": 3}], "count": 1}),
+        )
+    });
+    let query = EmailsListQuery::new()
+        .page(2)
+        .limit(10)
+        .start_date("2026-11-01T00:00:00Z")
+        .domain_id(["1", "2"]);
+    let got = client.emails().list(&query).unwrap();
+    assert_eq!(got.count, 1);
+    assert_eq!(got.data[0].to, vec!["a@x.com".to_owned()]);
+    assert_eq!(
+        got.data[0].latest_status.as_ref().map(|s| s.as_str()),
+        Some("DELIVERED")
+    );
+    assert_eq!(
+        seen.lock().unwrap()[0].url,
+        "https://meeng.test/api/v1/emails?page=2&limit=10&startDate=2026-11-01T00%3A00%3A00Z&domainId=1&domainId=2"
+    );
+}
+
+#[test]
+fn a_path_parameter_is_escaped() {
+    let (client, seen) = client(|_| {
+        json(
+            200,
+            serde_json::json!({"id": "a/b c", "teamId": 1, "to": ["a@x.com"], "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "createdAt": "x", "updatedAt": "x", "emailEvents": [{"emailId": "a/b c", "status": "SENT", "createdAt": "x", "data": {"ip": "1.2.3.4"}}]}),
+        )
+    });
+    let email = client.emails().get("a/b c").unwrap();
+    assert_eq!(
+        seen.lock().unwrap()[0].url,
+        "https://meeng.test/api/v1/emails/a%2Fb%20c"
+    );
+    assert_eq!(email.email_events[0].status.as_str(), "SENT");
+}
+
+#[test]
+fn a_list_the_api_answers_without_an_object_around_it_is_a_list() {
+    let (client, _) = client(|_| {
+        json(
+            200,
+            serde_json::json!([{"id": "cb_1", "name": "News", "teamId": 1, "properties": {"plan": "string"}, "variables": ["plan"], "emoji": "x", "createdAt": "x", "updatedAt": "x", "_count": {"contacts": 4}}]),
+        )
+    });
+    let books = client.contact_books().list().unwrap();
+    assert_eq!(books[0].name, "News");
+    assert_eq!(books[0].count.as_ref().unwrap().contacts, 4);
+}
+
+#[test]
+fn a_delete_can_carry_a_body() {
+    let (client, seen) = client(|_| json(200, serde_json::json!({"success": true, "count": 2})));
+    let got = client
+        .contacts()
+        .bulk_delete(
+            "cb_1",
+            &meeng::ContactsBulkDeleteParams::new(vec!["c1".to_owned(), "c2".to_owned()]),
+        )
+        .unwrap();
+    assert_eq!(got.count, 2);
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen[0].method, "DELETE");
+    assert_eq!(
+        seen[0].url,
+        "https://meeng.test/api/v1/contactBooks/cb_1/contacts/bulk"
+    );
+    assert_eq!(
+        body_of(&seen[0]),
+        serde_json::json!({"contactIds": ["c1", "c2"]})
+    );
+}
+
+#[test]
+fn upsert_takes_the_contacts_id_in_the_path() {
+    let (client, seen) = client(|_| json(200, serde_json::json!({"contactId": "c_1"})));
+    let got = client
+        .contacts()
+        .upsert(
+            "cb_1",
+            "c_1",
+            &meeng::ContactsUpsertParams::new("a@x.com").first_name("Ana"),
+        )
+        .unwrap();
+    assert_eq!(got.contact_id, "c_1");
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen[0].method, "PUT");
+    assert_eq!(
+        seen[0].url,
+        "https://meeng.test/api/v1/contactBooks/cb_1/contacts/c_1"
+    );
+}
+
+#[test]
+fn a_refusal_is_an_error_in_every_shape_the_api_writes_it() {
+    let cases = [
+        (409, serde_json::json!({"error": {"code": "NOT_UNIQUE", "message": "Idempotency-Key already used"}}).to_string(), "NOT_UNIQUE", "Idempotency-Key already used"),
+        (403, serde_json::json!({"error": "Forbidden"}).to_string(), "INTERNAL_SERVER_ERROR", "Forbidden"),
+        (400, serde_json::json!({"code": "BAD_REQUEST", "message": "bad"}).to_string(), "BAD_REQUEST", "bad"),
+        (502, "<html>".to_owned(), "INTERNAL_SERVER_ERROR", "Bad Gateway"),
+    ];
+    for (status, body, code, message) in cases {
+        let (client, _) = client(move |_| {
+            HttpResponse::new(status, body.clone()).with_header("Retry-After", "7")
+        });
+        let error = client.emails().cancel("em_1").unwrap_err();
+        let refusal = error.api().expect("an API error");
+        assert_eq!(refusal.status, status);
+        assert_eq!(refusal.code, code);
+        assert_eq!(refusal.retry_after, Some(std::time::Duration::from_secs(7)));
         assert_eq!(
-            body,
-            serde_json::json!({"product_id": "prod_1", "price_id": "price_1", "success_url": "https://loja.example/obrigado"})
+            error.to_string(),
+            format!("meeng: {status} {code}: {message}")
         );
     }
-    let again = client
-        .checkouts()
-        .idempotency_key("pedido-1")
-        .create(&params)
-        .unwrap();
-    assert_eq!(again.client_secret, "");
-    assert_eq!(again.session_id, "cs_1");
 }
 
 #[test]
-fn a_model_that_may_be_null_decodes_both_ways() {
-    let payment: CheckoutClientPayment = serde_json::from_value(serde_json::json!({
-        "id": "pay_1", "method": "pix", "state": "pending", "unresolved": false, "card_brand": "", "card_kind": "",
-        "installments": 1,
-        "pix": {"copia_e_cola": "000201", "qr_code_svg": "<svg/>", "expires_at": null},
-        "boleto": null
-    }))
-    .unwrap();
-    assert!(payment.boleto.is_none());
-    let pix = payment.pix.unwrap();
-    assert_eq!(pix.copia_e_cola, "000201");
-    assert_eq!(pix.expires_at, None);
+fn an_emails_recipients_may_come_as_one_string_or_a_list() {
+    let (client, _) = client(|_| {
+        json(
+            200,
+            serde_json::json!({"id": "em_1", "teamId": 1, "to": "a@x.com", "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "createdAt": "x", "updatedAt": "x", "emailEvents": []}),
+        )
+    });
+    assert_eq!(
+        client.emails().get("em_1").unwrap().to,
+        vec!["a@x.com".to_owned()]
+    );
 }
 
 #[test]
-fn a_base_url_must_be_https_unless_it_is_loopback() {
-    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    for (base, accepted) in [
-        ("https://meeng.dev", true),
-        ("http://localhost:8080", true),
-        ("http://LOCALHOST", true),
-        ("http://127.0.0.1:1", true),
-        ("http://127.255.0.3", true),
-        ("http://[::1]:8080", true),
-        ("http://meeng.dev", false),
-        ("http://localhost.evil.test", false),
-        ("http://127.0.0.1.evil.test", false),
-        ("http://10.0.0.1", false),
-        ("ftp://localhost", false),
-        ("meeng.dev", false),
-        ("", false),
-        ("http://[::2]", false),
+fn the_address_must_be_https_except_to_localhost() {
+    for base in [
+        "http://app.meeng.test",
+        "ftp://app.meeng.test",
+        "app.meeng.test",
+        "http://localhost.evil.test",
     ] {
-        let counted = Arc::clone(&calls);
         let client = Client::builder("k")
             .base_url(base)
-            .transport(move |_: HttpRequest| -> Result<HttpResponse, BoxError> {
-                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                Ok(json(200, serde_json::json!({"data": product("prod_1")})))
-            })
+            .transport(|_: HttpRequest| -> Result<HttpResponse, BoxError> { panic!("sent") })
             .build();
-        let answer = client.products().get("prod_1");
-        assert_eq!(
-            !matches!(answer, Err(Error::InsecureBaseUrl)),
-            accepted,
+        assert!(
+            matches!(client.emails().get("em_1"), Err(Error::InsecureBaseUrl)),
             "{base}"
         );
     }
-    // Only the accepted ones sent anything.
-    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 6);
-}
-
-#[test]
-fn a_discount_goes_through_create_get_list_and_delete() {
-    let discount = |id: &str| -> serde_json::Value {
-        serde_json::from_str(&r#"{"id":"__ID__","name":"Black","code":null,"type":"percentage","basis_points":1000,"amount_cents":0,"currency":"BRL","duration":"once","duration_in_months":0,"max_redemptions":null,"max_redemptions_per_customer":null,"redemptions_count":0,"starts_at":"2026-10-17T00:00:00Z","ends_at":null,"status":"active","product_ids":["prod_1"],"created_at":"2026-10-17T00:00:00Z","modified_at":"2026-10-17T00:00:00Z"}"#.replace("__ID__", id)).unwrap()
-    };
-    let (client, seen) = client(move |request| {
-        if request.method == "POST" {
-            return json(201, serde_json::json!({ "data": discount("disc_1") }));
-        }
-        if request.method == "DELETE" {
-            return HttpResponse::new(204, "");
-        }
-        if request.url.contains("/api/v1/discounts?") {
-            let page = query(&request.url, "page").unwrap();
-            return json(
-                200,
-                serde_json::json!({"data": {"items": [discount(&format!("disc_{page}"))], "pagination": {"total_count": 2, "max_page": 2}}}),
-            );
-        }
-        json(200, serde_json::json!({ "data": discount("disc_1") }))
-    });
-    let created = client
-        .discounts()
-        .create(
-            &DiscountsCreateParams::new(
-                DiscountsCreateParamsDuration::Once,
-                "Black",
-                DiscountsCreateParamsType::Percentage,
-            )
-            .basis_points(1000),
-        )
-        .unwrap();
-    assert_eq!(created.id, "disc_1");
-    assert_eq!(created.code, None);
-    assert_eq!(created.product_ids, ["prod_1"]);
-    assert_eq!(client.discounts().get("disc_1").unwrap().name, "Black");
-    let ids: Vec<String> = client
-        .discounts()
-        .list_iter(DiscountsListParams::new().limit(1))
-        .map(|each| each.unwrap().id)
-        .collect();
-    assert_eq!(ids, ["disc_1", "disc_2"]);
-    // A 204 has no body, and the method answers nothing.
-    client.discounts().delete("disc_1").unwrap();
-    let seen = seen.lock().unwrap();
-    let requests: Vec<String> = seen
-        .iter()
-        .map(|request| {
-            let path = request.url.split('?').next().unwrap_or_default();
-            format!(
-                "{} {}",
-                request.method,
-                path.trim_start_matches("https://meeng.test")
-            )
-        })
-        .collect();
     assert_eq!(
-        requests,
-        [
-            "POST /api/v1/discounts",
-            "GET /api/v1/discounts/disc_1",
-            "GET /api/v1/discounts",
-            "GET /api/v1/discounts",
-            "DELETE /api/v1/discounts/disc_1"
-        ]
-    );
-    let body: serde_json::Value = serde_json::from_slice(seen[0].body.as_deref().unwrap()).unwrap();
-    assert_eq!(
-        body,
-        serde_json::json!({"name": "Black", "type": "percentage", "duration": "once", "basis_points": 1000})
+        Client::builder("k")
+            .base_url("https://app.meeng.test/")
+            .build()
+            .url(),
+        "https://app.meeng.test/api"
     );
 }
 
 #[test]
-fn a_free_form_value_decodes_nested() {
-    let state: serde_json::Value = serde_json::from_str(
-        r#"{"id":"cus_1","showcase_id":"shw_1","name":"Ana","email":"ana@example.com","external_id":"","status":"active","created_at":"2026-10-17T00:00:00Z","active_subscriptions":[],"granted_benefits":[{"id":"gr_1","granted_at":"2026-10-17T00:00:00Z","benefit_id":"ben_1","benefit_type":"feature_flag","benefit_metadata":{"flags":{"beta":true,"limits":{"seats":5,"tiers":["a",2,null,1.5]}}},"properties":{"links":[{"url":"https://example.com","expires":null}]}}]}"#,
-    )
-    .unwrap();
-    let (client, _) = client(move |_| json(200, serde_json::json!({ "data": state.clone() })));
-    let state = client.customers().get_state("cus_1").unwrap();
-    let grant = &state.granted_benefits[0];
-    assert_eq!(
-        serde_json::to_value(&grant.benefit_metadata).unwrap(),
-        serde_json::json!({"flags": {"beta": true, "limits": {"seats": 5, "tiers": ["a", 2, null, 1.5]}}})
-    );
-    assert_eq!(
-        serde_json::to_value(&grant.properties).unwrap(),
-        serde_json::json!({"links": [{"url": "https://example.com", "expires": null}]})
-    );
-}
-
-#[test]
-fn a_post_without_a_key_is_sent_with_its_own_a_get_with_none() {
-    let (client, seen) = client(|_| json(201, serde_json::json!({"data": product("prod_1")})));
-    let params = ProductsCreateParams::new("Curso");
-    client.products().create(&params).unwrap();
-    client.products().create(&params).unwrap();
-    client
-        .products()
-        .idempotency_key("mine")
-        .create(&params)
-        .unwrap();
-    client.products().get("prod_1").unwrap();
-    let seen = seen.lock().unwrap();
-    let keys: Vec<Option<&str>> = seen
-        .iter()
-        .map(|request| request.header("idempotency-key"))
-        .collect();
-    for key in &keys[..2] {
-        let key = key.unwrap();
-        let groups: Vec<&str> = key.split('-').collect();
-        assert_eq!(
-            groups.iter().map(|group| group.len()).collect::<Vec<_>>(),
-            [8, 4, 4, 4, 12]
-        );
-        assert!(key
-            .chars()
-            .all(|c| c == '-' || c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
-        assert!(groups[2].starts_with('4') && "89ab".contains(&groups[3][..1]));
-    }
-    assert_ne!(keys[0], keys[1]);
-    assert_eq!(keys[2], Some("mine"));
-    assert_eq!(keys[3], None);
-}
-
-#[test]
-fn iterating_walks_every_page() {
-    let (client, seen) = client(|request| {
-        let page = query(&request.url, "page").unwrap();
-        json(
-            200,
-            serde_json::json!({"data": {"items": [product(&format!("prod_{page}"))], "pagination": {"total_count": 3, "max_page": 3}}}),
-        )
-    });
-    let ids: Vec<String> = client
-        .products()
-        .list_iter(ProductsListParams::new().limit(1))
-        .map(|product| product.unwrap().id)
-        .collect();
-    assert_eq!(ids, ["prod_1", "prod_2", "prod_3"]);
-    assert_eq!(
-        query(&seen.lock().unwrap()[0].url, "limit").as_deref(),
-        Some("1")
-    );
-}
-
-#[test]
-fn a_metadata_filter_is_sent_as_one_pair_a_key_the_keys_sorted_and_escaped() {
-    let (client, seen) = client(|_| {
-        json(
-            200,
-            serde_json::json!({"data": {"items": [], "pagination": {"total_count": 0, "max_page": 1}}}),
-        )
-    });
-    let metadata = [("pedido", "123"), ("camera id", "a/b")];
-    client
-        .orders()
-        .list(
-            &OrdersListParams::new()
-                .client_reference_id("pedido-1")
-                .metadata(metadata),
-        )
-        .unwrap();
-    let walked = client
-        .checkouts()
-        .list_iter(CheckoutsListParams::new().limit(1).metadata(metadata))
-        .count();
-    assert_eq!(walked, 0);
-    let seen = seen.lock().unwrap();
-    assert_eq!(
-        seen[0].url,
-        "https://meeng.test/api/v1/orders?client_reference_id=pedido-1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123"
-    );
-    assert_eq!(
-        seen[1].url,
-        "https://meeng.test/api/v1/checkouts?page=1&limit=1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123"
-    );
-}
-
-#[test]
-fn customers_are_listed_by_email() {
-    let (client, seen) = client(|_| {
-        json(
-            200,
-            serde_json::json!({"data": {"items": [], "pagination": {"total_count": 0, "max_page": 1}}}),
-        )
-    });
-    client
-        .customers()
-        .list(&CustomersListParams::new().email("ana@example.com"))
-        .unwrap();
-    assert_eq!(
-        seen.lock().unwrap()[0].url,
-        "https://meeng.test/api/v1/customers?email=ana%40example.com"
-    );
-}
-
-// A graduated price goes out with its tiers and without the fixed amount, and a
-// subscription reads back the quantity it bills and the order reference it came
-// from; amount_cents is the cycle's total for that quantity.
-#[test]
-fn a_graduated_price_carries_its_tiers_and_a_subscription_its_quantity() {
-    let tiers = serde_json::json!([{"up_to": 1, "unit_amount_cents": 25000}, {"up_to": null, "unit_amount_cents": 15000}]);
-    let price = serde_json::json!({"id": "price_1", "product_id": "prod_1", "type": "recurring", "interval": "month", "interval_count": 1, "currency": "BRL", "status": "active", "amount_cents": 0, "pricing_model": "graduated", "unit_amount_cents": null, "unit_label": "câmera", "unit_label_plural": "câmeras", "tiers": tiers});
-    let subscription = serde_json::json!({"id": "sub_1", "amount_cents": 55000, "cancel_at_period_end": false, "client_reference_id": "pedido-9", "currency": "BRL", "current_period_end": "2026-12-20T00:00:00Z", "current_period_start": "2026-11-20T00:00:00Z", "customer_id": "cus_1", "interval": "month", "metadata": {"camera": "c1"}, "price_id": "price_1", "product_id": "prod_1", "quantity": 3, "showcase_id": "shw_1", "status": "active", "suspended_at": null, "suspension_reason": null, "trial_end": null, "trial_start": null});
-    let (client, seen) = client(move |request| {
-        if request.method == "POST" {
-            json(201, serde_json::json!({"data": price.clone()}))
-        } else {
-            json(200, serde_json::json!({"data": subscription.clone()}))
-        }
-    });
-    let created = client
-        .prices()
-        .create(
-            &PricesCreateParams::new("prod_1", PricesCreateParamsType::Recurring)
-                .interval(PricesCreateParamsInterval::Month)
-                .pricing_model(PricesCreateParamsPricingModel::Graduated)
-                .tiers(vec![
-                    PricesCreateTier::new(25000).up_to(1),
-                    PricesCreateTier::new(15000),
-                ])
-                .unit_label("câmera")
-                .unit_label_plural("câmeras"),
-        )
-        .unwrap();
-    let got = client.subscriptions().get("sub_1").unwrap();
-    let seen = seen.lock().unwrap();
-    assert_eq!(seen[0].url, "https://meeng.test/api/v1/prices");
-    let sent: serde_json::Value = serde_json::from_slice(seen[0].body.as_deref().unwrap()).unwrap();
-    assert_eq!(sent["pricing_model"], "graduated");
-    assert_eq!(
-        sent["tiers"],
-        serde_json::json!([{"up_to": 1, "unit_amount_cents": 25000}, {"unit_amount_cents": 15000}])
-    );
-    assert!(sent.get("amount_cents").is_none());
-    assert_eq!(created.pricing_model, PricePricingModel::Graduated);
-    assert_eq!(created.amount_cents, 0);
-    assert_eq!(created.unit_amount_cents, None);
-    assert_eq!(created.tiers.len(), 2);
-    assert_eq!(created.tiers[0].up_to, Some(1));
-    assert_eq!(created.tiers[1].up_to, None);
-    assert_eq!(created.tiers[1].unit_amount_cents, 15000);
-    assert_eq!(
-        seen[1].url,
-        "https://meeng.test/api/v1/subscriptions/sub_1"
-    );
-    assert_eq!((got.quantity, got.amount_cents), (3, 55000));
-    assert_eq!(got.client_reference_id, "pedido-9");
-}
-
-#[test]
-fn usage_ingestion_carries_the_source_credential_and_its_events() {
-    let seen: Seen = Arc::default();
+fn the_standard_http_transport_sends_a_body_on_a_delete_and_never_follows_a_redirect() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let seen = Arc::new(Mutex::new(Vec::<String>::new()));
     let record = Arc::clone(&seen);
-    let transport = move |request: HttpRequest| -> Result<HttpResponse, BoxError> {
-        record.lock().unwrap().push(request);
-        Ok(json(
-            200,
-            serde_json::json!({"data": {"created": 1, "replayed": 0}}),
-        ))
-    };
-    let usage = Client::builder("pus_live_source")
-        .base_url("https://meeng.test/")
-        .transport(transport)
-        .build();
-    let mut event =
-        UsageIngestEvent::new("0", "cus_1", "req-1", "1200", "2026-11-13T12:00:00Z", "300");
-    event._cost = Some(UsageIngestEventCost::new(
-        "1.250000",
-        UsageIngestEventCostCurrency::Brl,
-    ));
-    let receipt = usage
-        .usage()
-        .ingest(&UsageIngestParams::new(vec![event]))
-        .unwrap();
-    assert_eq!((receipt.created, receipt.replayed), (1, 0));
-    let seen = seen.lock().unwrap();
-    assert_eq!(seen[0].method, "POST");
-    assert_eq!(seen[0].url, "https://meeng.test/api/v1/usage/token-events");
-    assert_eq!(
-        seen[0].header("authorization"),
-        Some("Bearer pus_live_source")
-    );
-    let sent: serde_json::Value = serde_json::from_slice(seen[0].body.as_ref().unwrap()).unwrap();
-    let events = sent["events"].as_array().unwrap();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0]["customer_id"], "cus_1");
-    assert_eq!(
-        events[0]["_cost"],
-        serde_json::json!({"amount": "1.250000", "currency": "brl"})
-    );
-    assert!(events[0].get("_llm").is_none());
-    assert!(events[0].get("parent_id").is_none());
-}
-
-#[test]
-fn usage_ingestion_errors_are_the_flat_error_document() {
-    let cases = [
-        (
-            401,
-            serde_json::json!({"error": "invalid_credential"}),
-            "invalid_credential",
-            0,
-            "",
-        ),
-        (
-            409,
-            serde_json::json!({"error": "conflict", "record": 2, "message": "conflict"}),
-            "conflict",
-            2,
-            "conflict",
-        ),
-        (
-            422,
-            serde_json::json!({"error": "invalid_request", "record": 3, "message": "validation failed: customer_id", "fields": {"customer_id": ["unknown"]}}),
-            "invalid_request",
-            3,
-            "validation failed: customer_id",
-        ),
-        (
-            400,
-            serde_json::json!({"error": "invalid_request", "message": "malformed JSON"}),
-            "invalid_request",
-            0,
-            "malformed JSON",
-        ),
-        (
-            415,
-            serde_json::json!({"error": "unsupported_media_type"}),
-            "unsupported_media_type",
-            0,
-            "",
-        ),
-        (
-            500,
-            serde_json::json!({"error": "unavailable"}),
-            "unavailable",
-            0,
-            "",
-        ),
-    ];
-    for (status, problem, code, record, message) in cases {
-        let (usage, _) = client(move |_| json(status, problem.clone()));
-        let event = UsageIngestEvent::new("0", "cus_1", "req-1", "1", "2026-11-13T12:00:00Z", "0");
-        let Err(Error::Api(refused)) = usage.usage().ingest(&UsageIngestParams::new(vec![event]))
-        else {
-            panic!("a {status} was not refused");
-        };
-        assert_eq!(refused.status, status);
-        assert_eq!(refused.code, code);
-        assert_eq!(refused.record, record);
-        assert_eq!(refused.message, message);
-        if status == 422 {
-            assert_eq!(refused.fields["customer_id"], ["unknown"]);
-        }
-    }
-}
-
-#[test]
-fn an_error_wrapped_in_data_by_an_older_server_is_still_read() {
-    let (usage, _) = client(|_| {
-        json(
-            409,
-            serde_json::json!({"data": {"error": "event_conflict", "record": 2, "message": "conflict"}}),
-        )
-    });
-    let event = UsageIngestEvent::new("0", "cus_1", "req-1", "1", "2026-11-13T12:00:00Z", "0");
-    let Err(Error::Api(refused)) = usage.usage().ingest(&UsageIngestParams::new(vec![event]))
-    else {
-        panic!("a 409 was not refused");
-    };
-    assert_eq!(refused.status, 409);
-    assert_eq!(refused.code, "event_conflict");
-    assert_eq!(refused.record, 2);
-}
-
-#[test]
-fn a_refusal_is_a_typed_error() {
-    let (client, _) = client(|request| {
-        if request.url.ends_with("/api/v1/customers") {
-            return json(
-                422,
-                serde_json::json!({"error": "invalid_request", "fields": {"email": ["send an e-mail"]}}),
-            );
-        }
-        HttpResponse::new(429, "").with_header("Retry-After", "7")
-    });
-    let Err(Error::Api(refused)) = client
-        .customers()
-        .create(&CustomersCreateParams::new("x", "x"))
-    else {
-        panic!("a 422 was not refused");
-    };
-    assert_eq!(
-        (refused.status, refused.code.as_str()),
-        (422, "invalid_request")
-    );
-    assert_eq!(refused.fields["email"], ["send an e-mail"]);
-    let Err(Error::Api(limited)) = client.products().list(&ProductsListParams::new()) else {
-        panic!("a 429 was not refused");
-    };
-    assert_eq!(
-        (limited.status, limited.retry_after),
-        (429, Some(Duration::from_secs(7)))
-    );
-}
-
-// The webhook vectors every SDK checks: Standard Webhooks' own example, and
-// meeng events signed under two secrets, as while one is rotated.
-const REFERENCE_SECRET: &str = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
-const OLD_SECRET: &str = "whsec_cGVyYXRhLXNkay1vbGQta2V5LTAxMjM0NTY3ODlhYmM=";
-const NEW_SECRET: &str = "whsec_cGVyYXRhLXNkay1uZXcta2V5LTAxMjM0NTY3ODlhYmM=";
-const ORDER_PAID: &[u8] = br#"{"id":"msg_2","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}"#;
-const USAGE_RECORDED: &[u8] = br#"{"id":"msg_3","type":"usage_event.recorded","timestamp":"2026-10-22T12:00:00Z","data":{"event_id":"ue_1","aggregate":"usage_event","aggregate_id":"ue_1","merchant_id":"mer_1","environment":"test"}}"#;
-const ORDER_PAID_LIVE: &[u8] = br#"{"id":"msg_5","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","environment":"live","showcase_id":"shw_1","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}"#;
-const PAYOUT_SENT_TEST: &[u8] = br#"{"id":"msg_6","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","environment":"test","data":{"payout_id":"po_1","amount_cents":5000}}"#;
-const PAYOUT_SENT: &[u8] = br#"{"id":"msg_4","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","data":{"payout_id":"po_1","amount_cents":5000}}"#;
-const SIGNED_AT: u64 = 1_792_670_400;
-
-fn webhook_headers(id: &str, at: u64, signature: &str) -> Vec<(String, String)> {
-    vec![
-        ("Webhook-Id".to_owned(), id.to_owned()),
-        ("webhook-timestamp".to_owned(), at.to_string()),
-        ("webhook-signature".to_owned(), signature.to_owned()),
-    ]
-}
-
-#[test]
-fn the_standard_webhooks_vector_verifies() {
-    let body: &[u8] = br#"{"test": 2432232314}"#;
-    let headers = webhook_headers(
-        "msg_p5jXN8AQM9LWM0D4loKWxJek",
-        1_614_265_330,
-        "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=",
-    );
-    let at = UNIX_EPOCH + Duration::from_secs(1_614_265_330);
-    verify_webhook_signature_at(REFERENCE_SECRET, headers.clone(), body, at).unwrap();
-    let changed = [body, b" "].concat();
-    for (secret, payload, now) in [
-        (REFERENCE_SECRET, changed.as_slice(), at),
-        (REFERENCE_SECRET, body, at + Duration::from_secs(301)),
-        (NEW_SECRET, body, at),
-    ] {
-        assert!(matches!(
-            verify_webhook_signature_at(secret, headers.clone(), payload, now),
-            Err(WebhookError::InvalidSignature)
-        ));
-    }
-}
-
-#[test]
-fn a_timestamp_that_is_not_plain_digits_is_refused() {
-    let body: &[u8] = br#"{"test": 2432232314}"#;
-    let at = UNIX_EPOCH + Duration::from_secs(1_614_265_330);
-    for (stamp, signature) in [
-        (
-            "+1614265330",
-            "JQsSpSSK1m9NI2FueDRZN3FL/jU9336idQcq6VmF+c8=",
-        ),
-        ("²", "PEggIsKE32VQ8J4ZIk9apRhPy7w+a20bxGpjk1K4/HY="),
-        ("", "x"),
-        ("1_6", "x"),
-    ] {
-        let headers = vec![
-            (
-                "Webhook-Id".to_owned(),
-                "msg_p5jXN8AQM9LWM0D4loKWxJek".to_owned(),
-            ),
-            ("webhook-timestamp".to_owned(), stamp.to_owned()),
-            ("webhook-signature".to_owned(), format!("v1,{signature}")),
-        ];
-        assert!(
-            matches!(
-                verify_webhook_signature_at(REFERENCE_SECRET, headers, body, at),
-                Err(WebhookError::InvalidSignature)
-            ),
-            "{stamp:?} verified"
-        );
-    }
-}
-
-#[test]
-fn a_webhook_carries_the_environment_it_happened_in() {
-    let now = UNIX_EPOCH + Duration::from_secs(SIGNED_AT + 120);
-    let older: [(&str, &str, &[u8]); 3] = [
-        ("msg_2", "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=", ORDER_PAID),
-        ("msg_3", "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=", USAGE_RECORDED),
-        ("msg_4", "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=", PAYOUT_SENT),
-    ];
-    for (id, signature, body) in older {
-        let event = verify_webhook_at(
-            NEW_SECRET,
-            webhook_headers(id, SIGNED_AT, signature),
-            body,
-            now,
-        )
-        .unwrap();
-        assert_eq!(event.environment(), "", "{id}");
-        assert_eq!(event.showcase_id(), "", "{id}");
-    }
-    let order = verify_webhook_at(
-        NEW_SECRET,
-        webhook_headers(
-            "msg_5",
-            SIGNED_AT,
-            "v1,9CgfDokxQ7tBEd7vvv32TI4QUdqkaHrxgUo2UUNQpOY=",
-        ),
-        ORDER_PAID_LIVE,
-        now,
-    )
-    .unwrap();
-    assert!(matches!(order, WebhookEvent::Order(_)));
-    assert_eq!(order.environment(), "live");
-    assert_eq!(order.showcase_id(), "shw_1");
-    let WebhookEvent::Order(sale) = &order else {
-        panic!("not an order event");
-    };
-    assert_eq!(sale.data.showcase_id, "shw_1");
-    let unknown = verify_webhook_at(
-        NEW_SECRET,
-        webhook_headers(
-            "msg_6",
-            SIGNED_AT,
-            "v1,6He63m1rUlB789sgtRAHqex4wyKkzAwdHt6uRsp8YQM=",
-        ),
-        PAYOUT_SENT_TEST,
-        now,
-    )
-    .unwrap();
-    assert!(matches!(unknown, WebhookEvent::Unknown(_)));
-    assert_eq!(unknown.environment(), "test");
-    assert_eq!(unknown.showcase_id(), "");
-}
-
-#[test]
-fn a_webhook_answers_its_typed_event() {
-    let now = UNIX_EPOCH + Duration::from_secs(SIGNED_AT + 120);
-    let headers = webhook_headers(
-        "msg_2",
-        SIGNED_AT,
-        "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=",
-    );
-    for secret in [NEW_SECRET, OLD_SECRET] {
-        let WebhookEvent::Order(order) =
-            verify_webhook_at(secret, headers.clone(), ORDER_PAID, now).unwrap()
-        else {
-            panic!("not an order event");
-        };
-        assert_eq!(
-            (
-                order.type_.as_str(),
-                order.data.id.as_str(),
-                order.data.installments,
-                order.data.installment_interest_cents
-            ),
-            ("order.paid", "ord_1", 3, 360)
-        );
-    }
-    assert!(matches!(
-        verify_webhook_at(REFERENCE_SECRET, headers, ORDER_PAID, now),
-        Err(WebhookError::InvalidSignature)
-    ));
-    let usage = verify_webhook_at(
-        NEW_SECRET,
-        webhook_headers(
-            "msg_3",
-            SIGNED_AT,
-            "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=",
-        ),
-        USAGE_RECORDED,
-        now,
-    )
-    .unwrap();
-    assert_eq!(usage.id(), "msg_3");
-    let WebhookEvent::Identifiers(usage) = usage else {
-        panic!("not an identifiers event");
-    };
-    assert_eq!(usage.data["merchant_id"], "mer_1");
-    let unknown = verify_webhook_at(
-        NEW_SECRET,
-        webhook_headers(
-            "msg_4",
-            SIGNED_AT,
-            "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=",
-        ),
-        PAYOUT_SENT,
-        now,
-    )
-    .unwrap();
-    assert_eq!(unknown.type_(), "payout.sent");
-    let WebhookEvent::Unknown(unknown) = unknown else {
-        panic!("not an unknown event");
-    };
-    assert_eq!(
-        unknown.data,
-        serde_json::json!({"payout_id": "po_1", "amount_cents": 5000})
-    );
-}
-
-/// Answers what it was sent, wrapped as the API wraps a resource; a request
-/// without the test key is refused with a 401 and Retry-After 3.
-fn echo_server() -> String {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    thread::spawn(move || {
-        for stream in listener.incoming() {
-            let Ok(mut stream) = stream else { continue };
+    let server = thread::spawn(move || {
+        for answer in [
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 26\r\nConnection: close\r\n\r\n{\"success\":true,\"count\":2}",
+            "HTTP/1.1 302 Found\r\nLocation: https://elsewhere.test/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        ] {
+            let (mut stream, _) = listener.accept().unwrap();
             let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut line = String::new();
-            reader.read_line(&mut line).unwrap();
-            let mut parts = line.split_whitespace();
-            let (method, target) = (
-                parts.next().unwrap_or("").to_owned(),
-                parts.next().unwrap_or("").to_owned(),
-            );
-            let (mut length, mut authorization, mut idempotency) =
-                (0, String::new(), String::new());
+            let mut head = String::new();
+            let mut length = 0usize;
             loop {
-                let mut header = String::new();
-                reader.read_line(&mut header).unwrap();
-                let header = header.trim_end();
-                if header.is_empty() {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                if line == "\r\n" || line.is_empty() {
                     break;
                 }
-                let (name, value) = header.split_once(':').unwrap();
-                match name.to_ascii_lowercase().as_str() {
-                    "content-length" => length = value.trim().parse().unwrap(),
-                    "authorization" => authorization = value.trim().to_owned(),
-                    "idempotency-key" => idempotency = value.trim().to_owned(),
-                    _ => {}
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    length = value.trim().parse().unwrap();
                 }
+                head.push_str(&line);
             }
-            let mut body = vec![0; length];
+            let mut body = vec![0u8; length];
             reader.read_exact(&mut body).unwrap();
-            let (status, extra, answer) = if authorization != "Bearer prk_test_key" {
-                (
-                    "401 Unauthorized",
-                    "Retry-After: 3\r\n",
-                    serde_json::json!({"error": "invalid_credential"}),
-                )
-            } else {
-                let sent: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
-                let data = serde_json::json!({
-                    "id": "prod_1",
-                    "name": sent["name"].as_str().unwrap_or(""),
-                    "description": idempotency,
-                    "status": "active",
-                    "showcase_id": "shw_1",
-                    "created_at": format!("{method} {target}"),
-                });
-                ("201 Created", "", serde_json::json!({ "data": data }))
-            };
-            let answer = answer.to_string();
-            let _ = write!(
-                stream,
-                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{answer}",
-                answer.len()
-            );
+            record.lock().unwrap().push(format!("{head}{}", String::from_utf8_lossy(&body)));
+            stream.write_all(answer.as_bytes()).unwrap();
         }
     });
-    format!("http://{address}")
-}
-
-#[test]
-fn the_real_http_sends_and_reads_through_ureq() {
-    let base_url = echo_server();
-    let client = Client::builder("prk_test_key").base_url(&base_url).build();
-    let product = client
-        .products()
-        .idempotency_key("create-1")
-        .create(&ProductsCreateParams::new("Curso"))
-        .unwrap();
-    assert_eq!(product.name, "Curso");
-    assert_eq!(product.description, "create-1");
-    assert_eq!(product.created_at, "POST /api/v1/products");
-    let other = Client::builder("prk_test_other")
-        .base_url(&base_url)
+    let client = Client::builder("mg_test_key")
+        .base_url(format!("http://127.0.0.1:{port}"))
         .build();
-    let Err(Error::Api(refused)) = other.products().get("prod_1") else {
-        panic!("a 401 was not refused");
-    };
-    assert_eq!(refused.status, 401);
-    assert_eq!(refused.code, "invalid_credential");
-    assert_eq!(refused.retry_after, Some(Duration::from_secs(3)));
+    let got = client
+        .contacts()
+        .bulk_delete(
+            "cb_1",
+            &meeng::ContactsBulkDeleteParams::new(vec!["c1".to_owned()]),
+        )
+        .unwrap();
+    assert_eq!(got.count, 2);
+    let error = client.emails().cancel("em_1").unwrap_err();
+    assert_eq!(error.api().map(|e| e.status), Some(302));
+    server.join().unwrap();
+    let seen = seen.lock().unwrap();
+    assert!(
+        seen[0].starts_with("DELETE /api/v1/contactBooks/cb_1/contacts/bulk HTTP/1.1"),
+        "{}",
+        seen[0]
+    );
+    assert!(
+        seen[0].ends_with("{\"contactIds\":[\"c1\"]}"),
+        "{}",
+        seen[0]
+    );
 }
 
-/// Answers every request with `response` and counts the connections it gets.
-fn canned_server(response: String) -> (String, Arc<std::sync::atomic::AtomicUsize>) {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    let hits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let count = Arc::clone(&hits);
-    thread::spawn(move || {
-        for stream in listener.incoming() {
-            let Ok(mut stream) = stream else { continue };
-            count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            loop {
-                let mut header = String::new();
-                if reader.read_line(&mut header).unwrap_or(0) == 0 || header.trim_end().is_empty() {
-                    break;
-                }
-            }
-            let _ = stream.write_all(response.as_bytes());
-        }
-    });
-    (format!("http://{address}"), hits)
+const SECRET: &str = "whsec_test";
+const BODY: &str = r#"{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}"#;
+
+fn sign(timestamp: &str, body: &str, secret: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+    mac.update(format!("{timestamp}.{body}").as_bytes());
+    let hex: String = mac
+        .finalize()
+        .into_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("v1={hex}")
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
 }
 
 #[test]
-fn a_redirect_is_refused_and_the_key_never_follows_it() {
-    let (elsewhere, hits) = canned_server(
-        "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}".to_owned(),
-    );
-    let (first, _) = canned_server(format!(
-        "HTTP/1.1 302 Found\r\nLocation: {elsewhere}/steal\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-    ));
-    let client = Client::builder("prk_test_key").base_url(&first).build();
-    let Err(Error::Api(refused)) = client.products().get("prod_1") else {
-        panic!("a redirect was followed");
+fn a_signed_webhook_is_verified_and_read_as_a_typed_event() {
+    let timestamp = now_ms().to_string();
+    let webhooks = Client::new("k").webhooks(SECRET);
+    let headers = [
+        ("X-Meeng-Signature", sign(&timestamp, BODY, SECRET)),
+        ("X-Meeng-Timestamp", timestamp.clone()),
+    ];
+    assert!(webhooks.verify(BODY.as_bytes(), headers.clone()));
+    match webhooks.construct_event(BODY.as_bytes(), headers).unwrap() {
+        WebhookEvent::Email(event) => {
+            assert_eq!(event.type_, "email.delivered");
+            assert_eq!(event.data.to, vec!["a@x.com".to_owned()]);
+            assert_eq!(event.data.status.as_str(), "DELIVERED");
+        }
+        other => panic!("not an email event: {other:?}"),
+    }
+}
+
+#[test]
+fn the_usesend_headers_are_accepted_as_well_in_any_case() {
+    let timestamp = now_ms().to_string();
+    let headers = [
+        ("x-usesend-signature", sign(&timestamp, BODY, SECRET)),
+        ("X-UseSend-Timestamp", timestamp),
+    ];
+    assert!(Webhooks::new(SECRET).verify(BODY.as_bytes(), headers));
+}
+
+#[test]
+fn a_webhook_is_refused_with_the_code_that_says_why() {
+    let now: i64 = 1_800_000_000_000;
+    let timestamp = now.to_string();
+    let old = (now - 6 * 60 * 1000).to_string();
+    let webhooks = Webhooks::new(SECRET);
+    let refused = |headers: Vec<(&str, String)>, body: &str, options: WebhookOptions| -> String {
+        let options = WebhookOptions {
+            now_ms: Some(now),
+            ..options
+        };
+        match webhooks.construct_event_with(body.as_bytes(), headers, &options) {
+            Ok(_) => "ACCEPTED".to_owned(),
+            Err(error) => error.code.to_owned(),
+        }
     };
-    assert_eq!(refused.status, 302);
-    assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 0);
+    let good = || {
+        vec![
+            ("X-Meeng-Signature", sign(&timestamp, BODY, SECRET)),
+            ("X-Meeng-Timestamp", timestamp.clone()),
+        ]
+    };
+    let stale = || {
+        vec![
+            ("X-Meeng-Signature", sign(&old, BODY, SECRET)),
+            ("X-Meeng-Timestamp", old.clone()),
+        ]
+    };
+    let default = WebhookOptions::default;
+    assert_eq!(refused(good(), BODY, default()), "ACCEPTED");
+    assert_eq!(
+        refused(
+            vec![("X-Meeng-Timestamp", timestamp.clone())],
+            BODY,
+            default()
+        ),
+        "MISSING_SIGNATURE"
+    );
+    assert_eq!(
+        refused(
+            vec![("X-Meeng-Signature", sign(&timestamp, BODY, SECRET))],
+            BODY,
+            default()
+        ),
+        "MISSING_TIMESTAMP"
+    );
+    assert_eq!(
+        refused(
+            vec![
+                (
+                    "X-Meeng-Signature",
+                    sign(&timestamp, BODY, SECRET)[3..].to_owned()
+                ),
+                ("X-Meeng-Timestamp", timestamp.clone())
+            ],
+            BODY,
+            default()
+        ),
+        "INVALID_SIGNATURE_FORMAT"
+    );
+    assert_eq!(
+        refused(
+            vec![
+                ("X-Meeng-Signature", sign(&timestamp, BODY, SECRET)),
+                ("X-Meeng-Timestamp", "yesterday".to_owned())
+            ],
+            BODY,
+            default()
+        ),
+        "INVALID_TIMESTAMP"
+    );
+    assert_eq!(refused(stale(), BODY, default()), "TIMESTAMP_OUT_OF_RANGE");
+    assert_eq!(
+        refused(
+            stale(),
+            BODY,
+            WebhookOptions {
+                tolerance_ms: Some(-1),
+                ..default()
+            }
+        ),
+        "ACCEPTED"
+    );
+    assert_eq!(
+        refused(
+            stale(),
+            BODY,
+            WebhookOptions {
+                tolerance_ms: Some(10 * 60 * 1000),
+                ..default()
+            }
+        ),
+        "ACCEPTED"
+    );
+    assert_eq!(
+        refused(
+            good(),
+            BODY,
+            WebhookOptions {
+                secret: Some("another".to_owned()),
+                ..default()
+            }
+        ),
+        "SIGNATURE_MISMATCH"
+    );
+    assert_eq!(
+        refused(good(), &BODY.replace("em_1", "em_2"), default()),
+        "SIGNATURE_MISMATCH"
+    );
+    assert_eq!(
+        refused(
+            vec![
+                ("X-Meeng-Signature", sign(&timestamp, "not json", SECRET)),
+                ("X-Meeng-Timestamp", timestamp.clone())
+            ],
+            "not json",
+            default()
+        ),
+        "INVALID_JSON"
+    );
 }
