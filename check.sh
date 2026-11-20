@@ -10,6 +10,12 @@
 # Every step prints "== <language>" first, and a language whose toolchain is not
 # installed is named and skipped only when SKIP_MISSING=1; without it the gate
 # stops there, because a language nobody checked is not checked.
+#
+# The last step, "== skills", checks skills/: each SKILL.md has valid frontmatter
+# and links that resolve, and every Go, TypeScript, Python and PHP example in them
+# compiles against the SDKs of this repository (so it runs after the steps above
+# installed typescript/node_modules). Examples are whole programs; a fragment is
+# fenced as "<lang> nocheck" and counted in the report.
 set -eu
 cd "$(dirname "$0")"
 export GOWORK=off
@@ -66,10 +72,10 @@ if need php php; then
 	(cd php && php tests/run.php)
 	phpstan="${PHPSTAN:-phpstan}"
 	case "$phpstan" in
-	*.phar) (cd php && php "$phpstan" analyse --no-progress --level 8 src) ;;
+	*.phar) (cd php && php "$phpstan" analyse --no-progress --memory-limit=1G --level 8 src) ;;
 	*)
 		if command -v "$phpstan" >/dev/null 2>&1; then
-			(cd php && "$phpstan" analyse --no-progress --level 8 src)
+			(cd php && "$phpstan" analyse --no-progress --memory-limit=1G --level 8 src)
 		else
 			echo "-- php: phpstan is not installed, so the types were not checked (PHPSTAN names it)"
 			[ "${SKIP_MISSING:-}" = 1 ] || exit 1
@@ -118,3 +124,6 @@ if [ "${SKIP_SWIFT:-}" != 1 ]; then
 		(cd swift && $swift test) && $swift build
 	fi
 fi
+
+echo "== skills"
+go run ./cmd/skillscheck

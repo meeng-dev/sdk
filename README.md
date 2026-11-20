@@ -40,6 +40,10 @@ const { data, error } = await meeng.emails.send({
 
 O README de cada pasta mostra o equivalente na linguagem.
 
+## Skills
+
+A pasta [`skills/`](skills) tem as skills do Meeng.dev para assistentes de código: enviar e-mail, domínios, webhooks, contatos e campanhas, SMTP, MCP e migração de outro provedor. Cada uma traz exemplos nos SDKs deste repositório, e o `./check.sh` compila esses exemplos contra os SDKs, para que uma skill nunca ensine uma chamada que não existe. Veja [`skills/README.md`](skills/README.md).
+
 ## Como funciona
 
 `openapi.json` é o contrato do useSend v1 com a marca trocada (título e servidor; o resto é idêntico). O gerador (`generator/`, em Go) lê o contrato num modelo neutro e escreve cada SDK a partir de `generator/templates/<linguagem>/`. Os nomes dos métodos e os eventos de webhook, que o contrato não traz, estão em `generator/surface.go` e `generator/webhooks.go`.

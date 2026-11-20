@@ -14,6 +14,7 @@ Antes de mexer, leia: este arquivo, `generator/surface.go`, `generator/webhooks.
 - `generator/templates/<linguagem>/` é a parte escrita à mão de cada SDK: cliente, erros, webhooks, testes, README. Um arquivo `.tmpl` é renderizado com o IR; qualquer outro é copiado. `_dot_` num nome vira `.`; `__model__`, `__service__` e `__webhook__` escrevem o arquivo uma vez por modelo, por serviço ou por grupo de webhook.
 - `generator/` (Go) lê o `openapi.json` num IR neutro (`ir.go`) e o renderiza (`emit.go`, `lang_<linguagem>.go`).
 - `generator/surface.go` e `generator/webhooks.go` existem porque o contrato do useSend **não traz** `operationId`, tags, schemas nomeados nem webhooks. O primeiro dá o nome de cada método (`emails.send`, `contacts.bulkCreate`…), os apelidos (`emails.create`, `campaigns.getAll`) e o nome dos modelos de resposta que se repetem (`Domain`, `Contact`, `ContactBook`, `Campaign`, `Email`); o segundo descreve os 21 eventos de webhook e seus dados. Uma rota do contrato que o `surface.go` não nomeia, ou uma do `surface.go` que o contrato não tem, **para a geração**: nenhum SDK perde ou renomeia uma rota em silêncio.
+- `skills/` são as **skills** para assistentes de código (uma pasta por skill, formato do `perata-sh/sdk/skills`), escritas à mão em português. Os exemplos delas são programas inteiros que o gate compila contra estes SDKs; veja "The gates" e `skills/README.md`.
 - `Package.swift` e `composer.json` na raiz são escritos à mão (SwiftPM e Packagist leem a raiz do repositório); mantenha-os iguais a `swift/Package.swift` e `php/composer.json`.
 
 ## The contract
@@ -51,6 +52,7 @@ Diferenças deliberadas entre os SDKs e o contrato escrito, todas vindas do cód
 - dart: `dart format --language-version=3.8 --set-exit-if-changed`, `dart analyze --fatal-infos` e `dart test`;
 - rust: `cargo fmt --check`, `cargo clippy -D warnings` e `cargo test`;
 - swift: `swift test` em `swift/` e `swift build` na raiz (só macOS: CryptoKit e Network).
+- skills: `go run ./cmd/skillscheck` (o passo `== skills`, o último, e um job da CI): o cabeçalho de cada `SKILL.md` só com `name` e `description`, os links relativos, todo arquivo de `referencias/` citado, nenhum nome de outro produto de e-mail, os blocos `json` válidos, e cada exemplo em Go e em TypeScript compilado contra `go/` e `typescript/src` (Python por `compile` e `mypy --strict`, PHP por `php -l`). Um exemplo é um programa inteiro; um trecho vai num bloco `<linguagem> nocheck`, que o relatório conta. Mudou o contrato ou um SDK: rode o passo e corrija a skill no mesmo commit.
 
 Uma ferramenta que falta **para o gate** (sai com erro), a não ser que se passe `SKIP_MISSING=1`, e então ela é nomeada e pulada: uma linguagem que ninguém verificou não está verificada. `MYPY` e `PHPSTAN` apontam essas ferramentas quando não estão no `PATH` (o `PHPSTAN` pode ser um `.phar`). `CHECK_DRIFT=1` (na CI) também falha quando um SDK commitado difere do que o gerador escreve. Use `GOWORK=off`: o `go.work` do vault não vale aqui. Use `$(go env GOROOT)/bin/gofmt`.
 
