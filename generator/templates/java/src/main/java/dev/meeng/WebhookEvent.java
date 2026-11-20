@@ -2,48 +2,34 @@ package dev.meeng;
 
 /**
  * A webhook meeng sent, verified: one subclass a kind of data
- * ({@link OrderWebhookEvent} carries a {@link WebhookOrder}…), or
+ * ({@link EmailWebhookEvent} carries an {@link EmailBasePayload}…), or
  * {@link UnknownWebhookEvent} for a type this SDK does not know yet. Within a
  * class, {@link #getType()} says what happened.
  */
 public abstract class WebhookEvent {
     private final String id;
     private final String type;
-    private final String timestamp;
-    private final String environment;
-    private final String showcaseId;
+    private final String createdAt;
 
-    WebhookEvent(String id, String type, String timestamp, String environment, String showcaseId) {
+    WebhookEvent(String id, String type, String createdAt) {
         this.id = id;
         this.type = type;
-        this.timestamp = timestamp;
-        this.environment = environment;
-        this.showcaseId = showcaseId;
+        this.createdAt = createdAt;
     }
 
-    /** @return the message's id, the same as the webhook-id header and on every delivery of it */
+    /** @return the event's id */
     public String getId() {
         return id;
     }
 
-    /** @return what happened: order.paid… */
+    /** @return what happened: email.delivered… */
     public String getType() {
         return type;
     }
 
-    /** @return when it happened, RFC 3339 */
-    public String getTimestamp() {
-        return timestamp;
-    }
-
-    /** @return the environment it happened in, test or live; empty when an older server did not send it */
-    public String getEnvironment() {
-        return environment;
-    }
-
-    /** @return the showcase of the sale, the same showcase_id the API's objects carry; empty when an older server did not send it */
-    public String getShowcaseId() {
-        return showcaseId;
+    /** @return when the event was created, RFC 3339 */
+    public String getCreatedAt() {
+        return createdAt;
     }
 
     /** @return what the event carries */
@@ -51,6 +37,6 @@ public abstract class WebhookEvent {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + "{id=" + id + ", type=" + type + ", timestamp=" + timestamp + ", environment=" + environment + ", showcaseId=" + showcaseId + ", data=" + getData() + "}";
+        return getClass().getSimpleName() + "{id=" + id + ", type=" + type + ", createdAt=" + createdAt + ", data=" + getData() + "}";
     }
 }

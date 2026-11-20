@@ -17,7 +17,7 @@ public class MeengTests
 {
     private sealed record Seen(HttpMethod Method, Uri Url, Dictionary<string, string> Headers, string? Body);
 
-    private sealed record Answer(HttpStatusCode Status, string? Json, Dictionary<string, string>? Headers = null);
+    private sealed record Answer(HttpStatusCode Status, string? Json);
 
     /// <summary>Answers every request with what answer says, recording what was sent.</summary>
     private sealed class Recorder(Func<Seen, Answer> answer) : HttpMessageHandler
@@ -40,525 +40,259 @@ public class MeengTests
             Requests.Add(seen);
             var reply = answer(seen);
             var response = new HttpResponseMessage(reply.Status) { Content = new StringContent(reply.Json ?? "", Encoding.UTF8, "application/json") };
-            foreach (var (name, value) in reply.Headers ?? [])
-            {
-                response.Headers.TryAddWithoutValidation(name, value);
-            }
+            response.Headers.TryAddWithoutValidation("Retry-After", "7");
             return response;
         }
     }
 
     private static MeengClient Client(Recorder recorder) =>
-        new("prk_test_key", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = recorder });
+        new("mg_test_key", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = recorder });
 
-    private static string ProductJson(string id) =>
-        $$"""{"id":"{{id}}","name":"Curso","description":"","status":"active","showcase_id":"shw_1","created_at":"2026-10-17T00:00:00Z"}""";
-
-    private static Dictionary<string, string> Query(Uri url) =>
-        url.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
-            .Select(pair => pair.Split('=', 2))
-            .ToDictionary(parts => parts[0], parts => parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : "");
+    private static Recorder Replying(HttpStatusCode status, string json) => new(_ => new Answer(status, json));
 
     [Fact]
-    public async Task ACallCarriesTheKeyAndUnwrapsTheData()
+    public async Task SendingAnEmailCarriesTheKeyTheBodyAndTheIdempotencyKey()
     {
-        var recorder = new Recorder(_ => new Answer(HttpStatusCode.OK, $$"""{"data":{{ProductJson("prod_1")}}}"""));
-        var got = await Client(recorder).Products.GetAsync("prod_1");
-        Assert.Equal("prod_1", got.Id);
-        Assert.Equal(Product.StatusActive, got.Status);
+        var recorder = Replying(HttpStatusCode.OK, """{"emailId":"em_1"}""");
+        var sent = await Client(recorder).Emails.SendAsync(
+            new EmailsSendParams { From = "hello@acme.com", To = ["a@x.com", "b@x.com"], Subject = "Hi", Html = "<p>Hi</p>" },
+            new RequestOptions { IdempotencyKey = "order-1" });
+        Assert.Equal("em_1", sent.EmailId);
+        var seen = Assert.Single(recorder.Requests);
+        Assert.Equal(HttpMethod.Post, seen.Method);
+        Assert.Equal("https://meeng.test/api/v1/emails", seen.Url.ToString());
+        Assert.Equal("Bearer mg_test_key", seen.Headers["Authorization"]);
+        Assert.Equal("order-1", seen.Headers["Idempotency-Key"]);
+        Assert.Equal("application/json", seen.Headers["Content-Type"]);
+        Assert.Equal("meeng-csharp/" + MeengClient.Version, seen.Headers["User-Agent"]);
+        using var body = JsonDocument.Parse(seen.Body!);
+        Assert.Equal("hello@acme.com", body.RootElement.GetProperty("from").GetString());
+        Assert.Equal(["a@x.com", "b@x.com"], body.RootElement.GetProperty("to").EnumerateArray().Select(e => e.GetString()!).ToArray());
+        Assert.False(body.RootElement.TryGetProperty("cc", out _));
+    }
+
+    [Fact]
+    public async Task AWriteWithNoBodyOfItsOwnSendsAnEmptyObject()
+    {
+        var recorder = Replying(HttpStatusCode.OK, """{"emailId":"em_1"}""");
+        await Client(recorder).Emails.CancelAsync("em_1");
+        var seen = Assert.Single(recorder.Requests);
+        Assert.Equal(HttpMethod.Post, seen.Method);
+        Assert.Equal("/api/v1/emails/em_1/cancel", seen.Url.AbsolutePath);
+        Assert.Equal("{}", seen.Body);
+    }
+
+    [Fact]
+    public async Task ASendWithoutAnIdempotencyKeySendsNone()
+    {
+        var recorder = Replying(HttpStatusCode.OK, """{"emailId":"em_1"}""");
+        await Client(recorder).Emails.SendAsync(new EmailsSendParams { From = "hello@acme.com", To = ["a@x.com"], Text = "Hi" });
+        Assert.False(recorder.Requests[0].Headers.ContainsKey("Idempotency-Key"));
+    }
+
+    [Fact]
+    public async Task ABatchAnswersTheListOfIds()
+    {
+        var recorder = Replying(HttpStatusCode.OK, """{"data":[{"emailId":"em_1"},{"emailId":"em_2"}]}""");
+        var got = await Client(recorder).Emails.BatchAsync(
+        [
+            new EmailsBatchParams { From = "hello@acme.com", To = ["a@x.com"], Subject = "One", Text = "1" },
+            new EmailsBatchParams { From = "hello@acme.com", To = ["b@x.com"], Subject = "Two", Text = "2" },
+        ]);
+        Assert.Equal("em_2", got.Data[1].EmailId);
+        var seen = Assert.Single(recorder.Requests);
+        Assert.Equal("/api/v1/emails/batch", seen.Url.AbsolutePath);
+        using var body = JsonDocument.Parse(seen.Body!);
+        Assert.Equal(2, body.RootElement.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task ListingEmailsSendsTheFiltersAListOnceForEachValue()
+    {
+        var recorder = Replying(HttpStatusCode.OK, """{"data":[{"id":"em_1","to":"a@x.com","from":"h@acme.com","subject":"Hi","html":null,"text":"Hi","createdAt":"x","updatedAt":"x","latestStatus":"DELIVERED","scheduledAt":null,"domainId":3}],"count":1}""");
+        var got = await Client(recorder).Emails.ListAsync(new EmailsListQuery { Page = 2, Limit = 10, StartDate = "2026-11-01T00:00:00Z", DomainId = ["1", "2"] });
+        Assert.Equal(1, got.Count);
+        Assert.Equal(["a@x.com"], got.Data[0].To);
+        Assert.Equal(EmailsListItem.LatestStatusDelivered, got.Data[0].LatestStatus);
         var seen = Assert.Single(recorder.Requests);
         Assert.Equal(HttpMethod.Get, seen.Method);
-        Assert.Equal("/api/v1/products/prod_1", seen.Url.AbsolutePath);
-        Assert.Equal("Bearer prk_test_key", seen.Headers["Authorization"]);
-        Assert.Equal("meeng-csharp/" + MeengClient.Version, seen.Headers["User-Agent"]);
+        Assert.Equal("https://meeng.test/api/v1/emails?page=2&limit=10&startDate=2026-11-01T00%3A00%3A00Z&domainId=1&domainId=2", seen.Url.ToString());
     }
 
     [Fact]
-    public async Task AWriteSendsItsBodyAndIdempotencyKey()
+    public async Task APathParameterIsEscaped()
     {
-        var recorder = new Recorder(_ => new Answer(HttpStatusCode.Created, $$"""{"data":{{ProductJson("prod_1")}}}"""));
-        await Client(recorder).Products.CreateAsync(new ProductsCreateParams { Name = "Curso" }, new RequestOptions { IdempotencyKey = "create-1" });
+        var recorder = Replying(HttpStatusCode.OK, """{"id":"a/b c","teamId":1,"to":["a@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[{"emailId":"a/b c","status":"SENT","createdAt":"x","data":{"ip":"1.2.3.4"}}]}""");
+        var email = await Client(recorder).Emails.GetAsync("a/b c");
+        Assert.Equal("https://meeng.test/api/v1/emails/a%2Fb%20c", recorder.Requests[0].Url.AbsoluteUri);
+        Assert.Equal(EmailEvent.StatusSent, email.EmailEvents[0].Status);
+    }
+
+    [Fact]
+    public async Task AListTheApiAnswersWithoutAnObjectAroundItIsAList()
+    {
+        var recorder = Replying(HttpStatusCode.OK, """[{"id":"cb_1","name":"News","teamId":1,"properties":{"plan":"string"},"variables":["plan"],"emoji":"x","createdAt":"x","updatedAt":"x","_count":{"contacts":4}}]""");
+        var books = await Client(recorder).ContactBooks.ListAsync();
+        Assert.Equal("News", Assert.Single(books).Name);
+        Assert.Equal(4, books[0].Count!.Contacts);
+    }
+
+    [Fact]
+    public async Task ADeleteCanCarryABody()
+    {
+        var recorder = Replying(HttpStatusCode.OK, """{"success":true,"count":2}""");
+        var got = await Client(recorder).Contacts.BulkDeleteAsync("cb_1", new ContactsBulkDeleteParams { ContactIds = ["c1", "c2"] });
+        Assert.Equal(2, got.Count);
         var seen = Assert.Single(recorder.Requests);
-        Assert.Equal(HttpMethod.Post, seen.Method);
-        Assert.Equal("create-1", seen.Headers["Idempotency-Key"]);
-        Assert.Equal("application/json", seen.Headers["Content-Type"]);
-        using var body = JsonDocument.Parse(seen.Body!);
-        Assert.Equal("Curso", body.RootElement.GetProperty("name").GetString());
-        Assert.False(body.RootElement.TryGetProperty("description", out _), "an optional field left out was sent");
-    }
-
-    private static string SessionJson(string clientSecret) =>
-        $$"""{"id":"pcl_1","url":"https://meeng.dev/pagamento/pcl_1","product_id":"prod_1","price_id":"price_1","status":"active","label":"","quantity":1,"success_url":"https://loja.example/obrigado","cancel_url":"","expires_at":null,"created_at":"2026-11-16T12:00:00Z","session_id":"cs_1","client_secret":"{{clientSecret}}","client_secret_expires_at":"2026-11-16T12:30:00Z","status_key":"sk_1","amount_cents":null,"items":[],"metadata":{},"client_reference_id":"","discount_id":"","showcase_id":"shw_1","subscription_start_at":null}""";
-
-    [Fact]
-    public async Task ACheckoutSessionHandsBackTheClientSecretForTheBrowser()
-    {
-        var calls = 0;
-        var recorder = new Recorder(_ => calls++ == 0
-            ? new Answer(HttpStatusCode.Created, $$"""{"data":{{SessionJson("cs_secret_1")}}}""")
-            : new Answer(HttpStatusCode.Created, $$"""{"data":{{SessionJson("")}}}""", new Dictionary<string, string> { ["Idempotent-Replayed"] = "true" }));
-        var meeng = Client(recorder);
-        var parameters = new CheckoutsCreateParams { ProductId = "prod_1", PriceId = "price_1", SuccessUrl = "https://loja.example/obrigado" };
-        var options = new RequestOptions { IdempotencyKey = "pedido-1" };
-        var checkout = await meeng.Checkouts.CreateAsync(parameters, options);
-        Assert.Equal("cs_secret_1", checkout.ClientSecret);
-        Assert.Equal("cs_1", checkout.SessionId);
-        Assert.Equal("sk_1", checkout.StatusKey);
-        Assert.Equal("2026-11-16T12:30:00Z", checkout.ClientSecretExpiresAt);
-        Assert.Equal("https://meeng.dev/pagamento/pcl_1", checkout.Url);
-        Assert.Null(checkout.ExpiresAt);
-        var seen = recorder.Requests[0];
-        Assert.Equal(HttpMethod.Post, seen.Method);
-        Assert.Equal("/api/v1/checkouts", seen.Url.AbsolutePath);
-        Assert.Equal("pedido-1", seen.Headers["Idempotency-Key"]);
-        using var body = JsonDocument.Parse(seen.Body!);
-        Assert.Equal("prod_1", body.RootElement.GetProperty("product_id").GetString());
-        Assert.Equal("price_1", body.RootElement.GetProperty("price_id").GetString());
-        Assert.Equal("https://loja.example/obrigado", body.RootElement.GetProperty("success_url").GetString());
-        var again = await meeng.Checkouts.CreateAsync(parameters, options);
-        Assert.Equal("", again.ClientSecret);
-        Assert.Equal("cs_1", again.SessionId);
+        Assert.Equal(HttpMethod.Delete, seen.Method);
+        Assert.Equal("/api/v1/contactBooks/cb_1/contacts/bulk", seen.Url.AbsolutePath);
+        Assert.Equal("""{"contactIds":["c1","c2"]}""", seen.Body);
     }
 
     [Fact]
-    public void AModelThatMayBeNullDecodesBothWays()
+    public async Task UpsertTakesTheContactsIdInThePath()
     {
-        const string json = """{"id":"pay_1","method":"pix","state":"pending","unresolved":false,"card_brand":"","card_kind":"","installments":1,"pix":{"copia_e_cola":"000201","qr_code_svg":"<svg/>","expires_at":null},"boleto":null}""";
-        var got = JsonSerializer.Deserialize<CheckoutClientPayment>(json)!;
-        Assert.Null(got.Boleto);
-        Assert.Equal("000201", got.Pix!.CopiaECola);
-        Assert.Null(got.Pix.ExpiresAt);
+        var recorder = Replying(HttpStatusCode.OK, """{"contactId":"c_1"}""");
+        var got = await Client(recorder).Contacts.UpsertAsync("cb_1", "c_1", new ContactsUpsertParams { Email = "a@x.com", FirstName = "Ana" });
+        Assert.Equal("c_1", got.ContactId);
+        Assert.Equal(HttpMethod.Put, recorder.Requests[0].Method);
+        Assert.Equal("/api/v1/contactBooks/cb_1/contacts/c_1", recorder.Requests[0].Url.AbsolutePath);
     }
 
     [Theory]
-    [InlineData("https://meeng.dev", true)]
-    [InlineData("http://localhost:8080", true)]
-    [InlineData("http://LOCALHOST", true)]
-    [InlineData("http://127.0.0.1:1", true)]
-    [InlineData("http://127.255.0.3", true)]
-    [InlineData("http://[::1]:8080", true)]
-    [InlineData("http://meeng.dev", false)]
-    [InlineData("http://localhost.evil.test", false)]
-    [InlineData("http://127.0.0.1.evil.test", false)]
-    [InlineData("http://10.0.0.1", false)]
-    [InlineData("ftp://localhost", false)]
-    [InlineData("meeng.dev", false)]
-    [InlineData("", false)]
-    [InlineData("http://[::2]", false)]
-    public void ABaseUrlMustBeHttpsUnlessItIsLoopback(string baseUrl, bool accepted)
+    [InlineData(409, """{"error":{"code":"NOT_UNIQUE","message":"Idempotency-Key already used"}}""", "NOT_UNIQUE", "Idempotency-Key already used")]
+    [InlineData(403, """{"error":"Forbidden"}""", "INTERNAL_SERVER_ERROR", "Forbidden")]
+    [InlineData(400, """{"code":"BAD_REQUEST","message":"bad"}""", "BAD_REQUEST", "bad")]
+    [InlineData(502, "<html>", "INTERNAL_SERVER_ERROR", "Bad Gateway")]
+    public async Task ARefusalThrowsInEveryShapeTheApiWritesIt(int status, string body, string code, string message)
     {
-        if (accepted)
-        {
-            _ = new MeengClient("k", new MeengClientOptions { BaseUrl = baseUrl });
-            return;
-        }
-        var refused = Assert.Throws<ArgumentException>(() => new MeengClient("k", new MeengClientOptions { BaseUrl = baseUrl }));
-        Assert.Contains("must be https", refused.Message);
-    }
-
-    // A graduated price goes out with its tiers and without the fixed amount, and
-    // a subscription reads back the quantity it bills and the order reference it
-    // came from; AmountCents is the cycle's total for that quantity.
-    [Fact]
-    public async Task AGraduatedPriceCarriesItsTiersAndASubscriptionItsQuantity()
-    {
-        const string price = """{"id":"price_1","product_id":"prod_1","type":"recurring","interval":"month","interval_count":1,"currency":"BRL","status":"active","amount_cents":0,"pricing_model":"graduated","unit_amount_cents":null,"unit_label":"câmera","unit_label_plural":"câmeras","tiers":[{"up_to":1,"unit_amount_cents":25000},{"up_to":null,"unit_amount_cents":15000}]}""";
-        const string subscription = """{"id":"sub_1","amount_cents":55000,"cancel_at_period_end":false,"client_reference_id":"pedido-9","currency":"BRL","current_period_end":"2026-12-20T00:00:00Z","current_period_start":"2026-11-20T00:00:00Z","customer_id":"cus_1","interval":"month","metadata":{"camera":"c1"},"price_id":"price_1","product_id":"prod_1","quantity":3,"showcase_id":"shw_1","status":"active","suspended_at":null,"suspension_reason":null,"trial_end":null,"trial_start":null}""";
-        var recorder = new Recorder(seen => seen.Method == HttpMethod.Post
-            ? new Answer(HttpStatusCode.Created, $$"""{"data":{{price}}}""")
-            : new Answer(HttpStatusCode.OK, $$"""{"data":{{subscription}}}"""));
-        var meeng = Client(recorder);
-        var created = await meeng.Prices.CreateAsync(new PricesCreateParams
-        {
-            ProductId = "prod_1",
-            Type = PricesCreateParams.TypeRecurring,
-            Interval = PricesCreateParams.IntervalMonth,
-            PricingModel = PricesCreateParams.PricingModelGraduated,
-            Tiers = [new PricesCreateTier { UpTo = 1, UnitAmountCents = 25000 }, new PricesCreateTier { UnitAmountCents = 15000 }],
-            UnitLabel = "câmera",
-            UnitLabelPlural = "câmeras",
-        });
-        Assert.Equal("/api/v1/prices", recorder.Requests[0].Url.AbsolutePath);
-        using var body = JsonDocument.Parse(recorder.Requests[0].Body!);
-        Assert.Equal("graduated", body.RootElement.GetProperty("pricing_model").GetString());
-        var tiers = body.RootElement.GetProperty("tiers");
-        Assert.Equal(2, tiers.GetArrayLength());
-        Assert.Equal(1, tiers[0].GetProperty("up_to").GetInt64());
-        Assert.Equal(25000, tiers[0].GetProperty("unit_amount_cents").GetInt64());
-        Assert.False(tiers[1].TryGetProperty("up_to", out var last) && last.ValueKind != JsonValueKind.Null, "the last tier has no limit");
-        Assert.False(body.RootElement.TryGetProperty("amount_cents", out _), "a graduated price was sent with a fixed amount");
-        Assert.Equal(Price.PricingModelGraduated, created.PricingModel);
-        Assert.Equal(0, created.AmountCents);
-        Assert.Null(created.UnitAmountCents);
-        Assert.Equal([(1L, 25000L), (null, 15000L)], created.Tiers.Select(tier => (tier.UpTo, tier.UnitAmountCents)).ToArray());
-        var got = await meeng.Subscriptions.GetAsync("sub_1");
-        Assert.Equal("/api/v1/subscriptions/sub_1", recorder.Requests[1].Url.AbsolutePath);
-        Assert.Equal(3, got.Quantity);
-        Assert.Equal(55000, got.AmountCents);
-        Assert.Equal("pedido-9", got.ClientReferenceId);
+        var refusal = await Assert.ThrowsAsync<MeengException>(() => Client(Replying((HttpStatusCode)status, body)).Emails.CancelAsync("em_1"));
+        Assert.Equal(status, refusal.Status);
+        Assert.Equal(code, refusal.Code);
+        Assert.Equal(7, refusal.RetryAfter);
+        Assert.Equal($"meeng: {status} {code}: {message}", refusal.Message);
     }
 
     [Fact]
-    public async Task ADiscountGoesThroughCreateGetListAndDelete()
+    public async Task AnEmailsRecipientsMayComeAsOneStringOrAList()
     {
-        const string template = """{"id":"__ID__","name":"Black","code":null,"type":"percentage","basis_points":1000,"amount_cents":0,"currency":"BRL","duration":"once","duration_in_months":0,"max_redemptions":null,"max_redemptions_per_customer":null,"redemptions_count":0,"starts_at":"2026-10-17T00:00:00Z","ends_at":null,"status":"active","product_ids":["prod_1"],"created_at":"2026-10-17T00:00:00Z","modified_at":"2026-10-17T00:00:00Z"}""";
-        string Discount(string id) => template.Replace("__ID__", id);
-        var recorder = new Recorder(seen =>
-        {
-            if (seen.Method == HttpMethod.Post)
-            {
-                return new Answer(HttpStatusCode.Created, $$"""{"data":{{Discount("disc_1")}}}""");
-            }
-            if (seen.Method == HttpMethod.Delete)
-            {
-                return new Answer(HttpStatusCode.NoContent, null);
-            }
-            if (seen.Url.AbsolutePath == "/api/v1/discounts")
-            {
-                return new Answer(HttpStatusCode.OK, """{"data":{"items":[""" + Discount("disc_" + Query(seen.Url)["page"]) + """],"pagination":{"total_count":2,"max_page":2}}}""");
-            }
-            return new Answer(HttpStatusCode.OK, $$"""{"data":{{Discount("disc_1")}}}""");
-        });
-        var meeng = Client(recorder);
-        var created = await meeng.Discounts.CreateAsync(new DiscountsCreateParams { Name = "Black", Type = "percentage", Duration = "once", BasisPoints = 1000 });
-        Assert.Equal("disc_1", created.Id);
-        Assert.Null(created.Code);
-        Assert.Equal(["prod_1"], created.ProductIds);
-        Assert.Equal("Black", (await meeng.Discounts.GetAsync("disc_1")).Name);
-        var ids = new List<string>();
-        await foreach (var each in meeng.Discounts.ListIterAsync(new DiscountsListParams { Limit = 1 }))
-        {
-            ids.Add(each.Id);
-        }
-        Assert.Equal(["disc_1", "disc_2"], ids);
-        await meeng.Discounts.DeleteAsync("disc_1");
-        Assert.Equal(
-            ["POST /api/v1/discounts", "GET /api/v1/discounts/disc_1", "GET /api/v1/discounts", "GET /api/v1/discounts", "DELETE /api/v1/discounts/disc_1"],
-            recorder.Requests.Select(seen => seen.Method + " " + seen.Url.AbsolutePath).ToArray());
-        using var body = JsonDocument.Parse(recorder.Requests[0].Body!);
-        Assert.Equal(1000, body.RootElement.GetProperty("basis_points").GetInt32());
+        var recorder = Replying(HttpStatusCode.OK, """{"id":"em_1","teamId":1,"to":"a@x.com","from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[]}""");
+        var email = await Client(recorder).Emails.GetAsync("em_1");
+        Assert.Equal(["a@x.com"], email.To);
     }
 
     [Fact]
-    public async Task AFreeFormValueDecodesNested()
+    public void TheKeyAndTheAddressComeFromTheEnvironment()
     {
-        var recorder = new Recorder(_ => new Answer(HttpStatusCode.OK, """{"data":{"id":"cus_1","showcase_id":"shw_1","name":"Ana","email":"ana@example.com","external_id":"","status":"active","created_at":"2026-10-17T00:00:00Z","active_subscriptions":[],"granted_benefits":[{"id":"gr_1","granted_at":"2026-10-17T00:00:00Z","benefit_id":"ben_1","benefit_type":"feature_flag","benefit_metadata":{"flags":{"beta":true,"limits":{"seats":5,"tiers":["a",2,null,1.5]}}},"properties":{"links":[{"url":"https://example.com","expires":null}]}}]}}"""));
-        var grant = (await Client(recorder).Customers.GetStateAsync("cus_1")).GrantedBenefits[0];
-        var limits = grant.BenefitMetadata["flags"].GetProperty("limits");
-        Assert.True(grant.BenefitMetadata["flags"].GetProperty("beta").GetBoolean());
-        Assert.Equal(5, limits.GetProperty("seats").GetInt32());
-        var tiers = limits.GetProperty("tiers").EnumerateArray().ToArray();
-        Assert.Equal("a", tiers[0].GetString());
-        Assert.Equal(2, tiers[1].GetInt32());
-        Assert.Equal(JsonValueKind.Null, tiers[2].ValueKind);
-        Assert.Equal(1.5, tiers[3].GetDouble());
-        var link = grant.Properties["links"][0];
-        Assert.Equal("https://example.com", link.GetProperty("url").GetString());
-        Assert.Equal(JsonValueKind.Null, link.GetProperty("expires").ValueKind);
-    }
-
-    [Fact]
-    public async Task APostWithoutAKeyIsSentWithItsOwnAGetWithNone()
-    {
-        var recorder = new Recorder(_ => new Answer(HttpStatusCode.Created, $$"""{"data":{{ProductJson("prod_1")}}}"""));
-        var meeng = Client(recorder);
-        await meeng.Products.CreateAsync(new ProductsCreateParams { Name = "Curso" });
-        await meeng.Products.CreateAsync(new ProductsCreateParams { Name = "Curso" });
-        await meeng.Products.CreateAsync(new ProductsCreateParams { Name = "Curso" }, new RequestOptions { IdempotencyKey = "mine" });
-        await meeng.Products.GetAsync("prod_1");
-        var keys = recorder.Requests.Select(seen => seen.Headers.GetValueOrDefault("Idempotency-Key")).ToArray();
-        var uuid = @"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
-        Assert.Matches(uuid, keys[0]!);
-        Assert.Matches(uuid, keys[1]!);
-        Assert.NotEqual(keys[0], keys[1]);
-        Assert.Equal("mine", keys[2]);
-        Assert.Null(keys[3]);
-    }
-
-    [Fact]
-    public async Task IteratingWalksEveryPage()
-    {
-        var recorder = new Recorder(seen =>
-        {
-            var page = Query(seen.Url)["page"];
-            return new Answer(HttpStatusCode.OK, """{"data":{"items":[""" + ProductJson("prod_" + page) + """],"pagination":{"total_count":3,"max_page":3}}}""");
-        });
-        var ids = new List<string>();
-        await foreach (var product in Client(recorder).Products.ListIterAsync(new ProductsListParams { Limit = 1 }))
-        {
-            ids.Add(product.Id);
-        }
-        Assert.Equal(["prod_1", "prod_2", "prod_3"], ids);
-        Assert.Equal("1", Query(recorder.Requests[0].Url)["limit"]);
-    }
-
-    [Fact]
-    public async Task AMetadataFilterIsSentAsOnePairAKeyTheKeysSortedAndEscaped()
-    {
-        var recorder = new Recorder(_ => new Answer(HttpStatusCode.OK, """{"data":{"items":[],"pagination":{"total_count":0,"max_page":1}}}"""));
-        var metadata = new Dictionary<string, string> { ["pedido"] = "123", ["camera id"] = "a/b" };
-        await Client(recorder).Orders.ListAsync(new OrdersListParams { ClientReferenceId = "pedido-1", Metadata = metadata });
-        Assert.Equal("?client_reference_id=pedido-1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123", recorder.Requests[0].Url.Query);
-        await foreach (var _ in Client(recorder).Checkouts.ListIterAsync(new CheckoutsListParams { Limit = 1, Metadata = metadata }))
-        {
-            Assert.Fail("an empty page has no items");
-        }
-        Assert.Equal("?page=1&limit=1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123", recorder.Requests[1].Url.Query);
-    }
-
-    [Fact]
-    public async Task CustomersAreListedByEmail()
-    {
-        var recorder = new Recorder(_ => new Answer(HttpStatusCode.OK, """{"data":{"items":[],"pagination":{"total_count":0,"max_page":1}}}"""));
-        await Client(recorder).Customers.ListAsync(new CustomersListParams { Email = "ana@example.com" });
-        var seen = Assert.Single(recorder.Requests);
-        Assert.Equal("/api/v1/customers", seen.Url.AbsolutePath);
-        Assert.Equal("?email=ana%40example.com", seen.Url.Query);
-    }
-
-    [Fact]
-    public async Task UsageIngestionCarriesTheSourceCredentialAndItsEvents()
-    {
-        var recorder = new Recorder(_ => new Answer(HttpStatusCode.OK, """{"data":{"created":1,"replayed":0}}"""));
-        var usage = new MeengClient("pus_live_source", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = recorder });
-        var receipt = await usage.Usage.IngestAsync(new UsageIngestParams
-        {
-            Events =
-            [
-                new UsageIngestEvent
-                {
-                    CustomerId = "cus_1", ExternalEventId = "req-1", InputTokens = "1200", OutputTokens = "300", CachedTokens = "0",
-                    OccurredAt = "2026-11-13T12:00:00Z", Cost = new UsageIngestEventCost { Amount = "1.250000", Currency = "brl" },
-                },
-            ],
-        });
-        Assert.Equal(1, receipt.Created);
-        Assert.Equal(0, receipt.Replayed);
-        var seen = Assert.Single(recorder.Requests);
-        Assert.Equal(HttpMethod.Post, seen.Method);
-        Assert.Equal("/api/v1/usage/token-events", seen.Url.AbsolutePath);
-        Assert.Equal("Bearer pus_live_source", seen.Headers["Authorization"]);
-        using var sent = JsonDocument.Parse(seen.Body!);
-        var events = sent.RootElement.GetProperty("events");
-        Assert.Equal(1, events.GetArrayLength());
-        var first = events[0];
-        Assert.Equal("cus_1", first.GetProperty("customer_id").GetString());
-        Assert.Equal("1.250000", first.GetProperty("_cost").GetProperty("amount").GetString());
-        Assert.Equal("brl", first.GetProperty("_cost").GetProperty("currency").GetString());
-        Assert.False(first.TryGetProperty("_llm", out _));
-        Assert.False(first.TryGetProperty("parent_id", out _));
-    }
-
-    [Theory]
-    [InlineData(401, """{"error":"invalid_credential"}""", "invalid_credential", 0, "")]
-    [InlineData(409, """{"error":"conflict","record":2,"message":"conflict"}""", "conflict", 2, "conflict")]
-    [InlineData(422, """{"error":"invalid_request","record":3,"message":"validation failed: customer_id","fields":{"customer_id":["unknown"]}}""", "invalid_request", 3, "validation failed: customer_id")]
-    [InlineData(400, """{"error":"invalid_request","message":"malformed JSON"}""", "invalid_request", 0, "malformed JSON")]
-    [InlineData(415, """{"error":"unsupported_media_type"}""", "unsupported_media_type", 0, "")]
-    [InlineData(500, """{"error":"unavailable"}""", "unavailable", 0, "")]
-    [InlineData(409, """{"data":{"error":"event_conflict","record":2,"message":"conflict"}}""", "event_conflict", 2, "conflict")]
-    public async Task UsageIngestionErrorsAreTheFlatErrorDocument(int status, string body, string code, int record, string message)
-    {
-        var recorder = new Recorder(_ => new Answer((HttpStatusCode)status, body));
-        var usage = new MeengClient("pus_test_source", new MeengClientOptions { BaseUrl = "https://meeng.test/", Handler = recorder });
-        var refused = await Assert.ThrowsAsync<MeengException>(() => usage.Usage.IngestAsync(new UsageIngestParams
-        {
-            Events = [new UsageIngestEvent { CustomerId = "cus_1", ExternalEventId = "req-1", InputTokens = "1", OutputTokens = "0", CachedTokens = "0", OccurredAt = "2026-11-13T12:00:00Z" }],
-        }));
-        Assert.Equal(status, refused.Status);
-        Assert.Equal(code, refused.Code);
-        Assert.Equal(record, refused.Record);
-        Assert.Equal(message, refused.ApiMessage);
-        if (status == 422)
-        {
-            Assert.Equal(["unknown"], refused.Fields["customer_id"]);
-        }
-    }
-
-    [Fact]
-    public async Task ARefusalIsATypedError()
-    {
-        var recorder = new Recorder(seen => seen.Url.AbsolutePath == "/api/v1/customers"
-            ? new Answer(HttpStatusCode.UnprocessableEntity, """{"error":"invalid_request","fields":{"email":["send an e-mail"]}}""")
-            : new Answer(HttpStatusCode.TooManyRequests, null, new() { ["Retry-After"] = "7" }));
-        var meeng = Client(recorder);
-        var refused = await Assert.ThrowsAsync<MeengException>(() => meeng.Customers.CreateAsync(new CustomersCreateParams { Name = "x", Email = "x" }));
-        Assert.Equal(422, refused.Status);
-        Assert.Equal("invalid_request", refused.Code);
-        Assert.Equal(["send an e-mail"], refused.Fields["email"]);
-        var limited = await Assert.ThrowsAsync<MeengException>(() => meeng.Products.ListAsync());
-        Assert.Equal(429, limited.Status);
-        Assert.Equal(7, limited.RetryAfter);
-    }
-
-    // The webhook vectors every SDK checks: Standard Webhooks' own example, and
-    // meeng events signed under two secrets, as while one is rotated.
-    private const string ReferenceSecret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
-    private const string OldSecret = "whsec_cGVyYXRhLXNkay1vbGQta2V5LTAxMjM0NTY3ODlhYmM=";
-    private const string NewSecret = "whsec_cGVyYXRhLXNkay1uZXcta2V5LTAxMjM0NTY3ODlhYmM=";
-    private const string OrderPaid = """{"id":"msg_2","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}""";
-    private const string UsageRecorded = """{"id":"msg_3","type":"usage_event.recorded","timestamp":"2026-10-22T12:00:00Z","data":{"event_id":"ue_1","aggregate":"usage_event","aggregate_id":"ue_1","merchant_id":"mer_1","environment":"test"}}""";
-    private const string OrderPaidLive = """{"id":"msg_5","type":"order.paid","timestamp":"2026-10-22T12:00:00Z","environment":"live","showcase_id":"shw_1","data":{"id":"ord_1","customer_id":"cus_1","product_id":"prod_1","price_id":"price_1","amount_cents":12000,"currency":"BRL","status":"succeeded","paid_at":"2026-10-22T12:00:00Z","order_status":"paid","refunded_amount_cents":0,"refund_id":null,"refund_amount_cents":null,"installments":3,"installment_interest_cents":360,"items":[],"metadata":{},"client_reference_id":"","showcase_id":"shw_1"}}""";
-    private const string PayoutSentTest = """{"id":"msg_6","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","environment":"test","data":{"payout_id":"po_1","amount_cents":5000}}""";
-    private const string PayoutSent = """{"id":"msg_4","type":"payout.sent","timestamp":"2026-10-22T12:00:00Z","data":{"payout_id":"po_1","amount_cents":5000}}""";
-    private const long SignedAt = 1792670400;
-
-    private static Dictionary<string, string> WebhookHeaders(string id, long at, string signature) => new()
-    {
-        ["Webhook-Id"] = id,
-        ["webhook-timestamp"] = at.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        ["webhook-signature"] = signature,
-    };
-
-    [Fact]
-    public void TheStandardWebhooksVectorVerifies()
-    {
-        var body = Encoding.UTF8.GetBytes("""{"test": 2432232314}""");
-        var headers = WebhookHeaders("msg_p5jXN8AQM9LWM0D4loKWxJek", 1614265330, "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=");
-        var at = DateTimeOffset.FromUnixTimeSeconds(1614265330);
-        Webhook.VerifySignature(ReferenceSecret, headers, body, at);
-        Assert.Throws<WebhookVerificationException>(() => Webhook.VerifySignature(ReferenceSecret, headers, [.. body, (byte)' '], at));
-        Assert.Throws<WebhookVerificationException>(() => Webhook.VerifySignature(ReferenceSecret, headers, body, at.AddSeconds(301)));
-        Assert.Throws<WebhookVerificationException>(() => Webhook.VerifySignature(NewSecret, headers, body, at));
-    }
-
-    [Theory]
-    [InlineData("+1614265330", "JQsSpSSK1m9NI2FueDRZN3FL/jU9336idQcq6VmF+c8=")]
-    [InlineData("\u00b2", "PEggIsKE32VQ8J4ZIk9apRhPy7w+a20bxGpjk1K4/HY=")]
-    [InlineData("", "x")]
-    [InlineData("1_6", "x")]
-    public void ATimestampThatIsNotPlainDigitsIsRefused(string stamp, string signature)
-    {
-        var headers = WebhookHeaders("msg_p5jXN8AQM9LWM0D4loKWxJek", 0, "v1," + signature);
-        headers["webhook-timestamp"] = stamp;
-        Assert.Throws<WebhookVerificationException>(() => Webhook.VerifySignature(ReferenceSecret, headers, "{\"test\": 2432232314}"u8.ToArray(), DateTimeOffset.FromUnixTimeSeconds(1614265330)));
-    }
-
-    [Fact]
-    public void AWebhookCarriesTheEnvironmentItHappenedIn()
-    {
-        var now = DateTimeOffset.FromUnixTimeSeconds(SignedAt + 120);
-        foreach (var (id, signature, body) in new[] { ("msg_2", "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=", OrderPaid), ("msg_3", "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=", UsageRecorded), ("msg_4", "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=", PayoutSent) })
-        {
-            Assert.Equal("", Webhook.Verify(NewSecret, WebhookHeaders(id, SignedAt, signature), body, now).Environment);
-            Assert.Equal("", Webhook.Verify(NewSecret, WebhookHeaders(id, SignedAt, signature), body, now).ShowcaseId);
-        }
-        var order = Assert.IsType<OrderWebhookEvent>(Webhook.Verify(NewSecret, WebhookHeaders("msg_5", SignedAt, "v1,9CgfDokxQ7tBEd7vvv32TI4QUdqkaHrxgUo2UUNQpOY="), OrderPaidLive, now));
-        Assert.Equal("live", order.Environment);
-        Assert.Equal("shw_1", order.ShowcaseId);
-        Assert.Equal("shw_1", order.Data.ShowcaseId);
-        var unknown = Assert.IsType<UnknownWebhookEvent>(Webhook.Verify(NewSecret, WebhookHeaders("msg_6", SignedAt, "v1,6He63m1rUlB789sgtRAHqex4wyKkzAwdHt6uRsp8YQM="), PayoutSentTest, now));
-        Assert.Equal("test", unknown.Environment);
-        Assert.Equal("", unknown.ShowcaseId);
-    }
-
-    [Fact]
-    public void AWebhookAnswersItsTypedEvent()
-    {
-        var now = DateTimeOffset.FromUnixTimeSeconds(SignedAt + 120);
-        var headers = WebhookHeaders("msg_2", SignedAt, "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=");
-        foreach (var secret in new[] { NewSecret, OldSecret })
-        {
-            var order = Assert.IsType<OrderWebhookEvent>(Webhook.Verify(secret, headers, OrderPaid, now));
-            Assert.Equal(("order.paid", "ord_1", 3L, 360L), (order.Type, order.Data.Id, order.Data.Installments, order.Data.InstallmentInterestCents));
-        }
-        Assert.Throws<WebhookVerificationException>(() => Webhook.Verify(ReferenceSecret, headers, OrderPaid, now));
-        var usage = Assert.IsType<IdentifiersWebhookEvent>(Webhook.Verify(NewSecret, WebhookHeaders("msg_3", SignedAt, "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU="), UsageRecorded, now));
-        Assert.Equal(("msg_3", "mer_1"), (usage.Id, usage.Data["merchant_id"]));
-        var unknown = Assert.IsType<UnknownWebhookEvent>(Webhook.Verify(NewSecret, WebhookHeaders("msg_4", SignedAt, "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY="), PayoutSent, now));
-        Assert.Equal("payout.sent", unknown.Type);
-        Assert.Equal("po_1", unknown.Data.GetProperty("payout_id").GetString());
-    }
-
-    [Fact]
-    public async Task TheRealHttpSendsAndReadsThroughHttpClient()
-    {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        var prefix = $"http://127.0.0.1:{port}/";
-        using var listener = new HttpListener();
-        listener.Prefixes.Add(prefix);
-        listener.Start();
-        var landed = false;
-        var serving = Task.Run(async () =>
-        {
-            while (listener.IsListening)
-            {
-                HttpListenerContext context;
-                try
-                {
-                    context = await listener.GetContextAsync();
-                }
-                catch (Exception e) when (e is HttpListenerException or ObjectDisposedException or InvalidOperationException)
-                {
-                    return;
-                }
-                string answer;
-                context.Response.ContentType = "application/json";
-                if (context.Request.RawUrl!.EndsWith("/moved", StringComparison.Ordinal))
-                {
-                    context.Response.StatusCode = 302;
-                    context.Response.AddHeader("Location", prefix + "api/v1/products/landed");
-                    answer = "{}";
-                }
-                else if (context.Request.RawUrl.EndsWith("/landed", StringComparison.Ordinal))
-                {
-                    landed = true;
-                    answer = "{}";
-                }
-                else if (context.Request.Headers["Authorization"] != "Bearer prk_test_key")
-                {
-                    context.Response.StatusCode = 401;
-                    context.Response.AddHeader("Retry-After", "3");
-                    answer = """{"error":"invalid_credential"}""";
-                }
-                else
-                {
-                    using var reader = new System.IO.StreamReader(context.Request.InputStream, Encoding.UTF8);
-                    using var sent = JsonDocument.Parse(await reader.ReadToEndAsync());
-                    var product = new Dictionary<string, string>
-                    {
-                        ["id"] = "prod_1",
-                        ["name"] = sent.RootElement.GetProperty("name").GetString()!,
-                        ["description"] = context.Request.Headers["Idempotency-Key"] ?? "",
-                        ["status"] = "active",
-                        ["showcase_id"] = "shw_1",
-                        ["created_at"] = context.Request.HttpMethod + " " + context.Request.RawUrl,
-                    };
-                    context.Response.StatusCode = 201;
-                    answer = "{\"data\":" + JsonSerializer.Serialize(product) + "}";
-                }
-                var bytes = Encoding.UTF8.GetBytes(answer);
-                context.Response.ContentLength64 = bytes.Length;
-                await context.Response.OutputStream.WriteAsync(bytes);
-                context.Response.Close();
-            }
-        });
+        var saved = (Environment.GetEnvironmentVariable("MEENG_API_KEY"), Environment.GetEnvironmentVariable("MEENG_BASE_URL"));
         try
         {
-            var product = await new MeengClient("prk_test_key", new MeengClientOptions { BaseUrl = prefix })
-                .Products.CreateAsync(new ProductsCreateParams { Name = "Curso" }, new RequestOptions { IdempotencyKey = "create-1" });
-            Assert.Equal("Curso", product.Name);
-            Assert.Equal("create-1", product.Description);
-            Assert.Equal("POST /api/v1/products", product.CreatedAt);
-
-            var refused = await Assert.ThrowsAsync<MeengException>(() =>
-                new MeengClient("prk_test_other", new MeengClientOptions { BaseUrl = prefix }).Products.GetAsync("prod_1"));
-            Assert.Equal(401, refused.Status);
-            Assert.Equal("invalid_credential", refused.Code);
-            Assert.Equal(3, refused.RetryAfter);
-
-            var redirected = await Assert.ThrowsAsync<MeengException>(() =>
-                new MeengClient("prk_test_key", new MeengClientOptions { BaseUrl = prefix }).Products.GetAsync("moved"));
-            Assert.Equal(302, redirected.Status);
-            Assert.False(landed, "a redirect was followed");
+            Environment.SetEnvironmentVariable("MEENG_API_KEY", "mg_env");
+            Environment.SetEnvironmentVariable("MEENG_BASE_URL", "https://self.hosted.test");
+            Assert.Equal("https://self.hosted.test/api", new MeengClient().Url);
+            Environment.SetEnvironmentVariable("MEENG_API_KEY", null);
+            Assert.Throws<ArgumentException>(() => new MeengClient());
         }
         finally
         {
-            listener.Stop();
-            await serving;
+            Environment.SetEnvironmentVariable("MEENG_API_KEY", saved.Item1);
+            Environment.SetEnvironmentVariable("MEENG_BASE_URL", saved.Item2);
         }
+    }
+
+    [Fact]
+    public void TheAddressMustBeHttpsExceptToLocalhost()
+    {
+        foreach (var bad in new[] { "http://app.meeng.test", "ftp://app.meeng.test", "app.meeng.test", "http://localhost.evil.test" })
+        {
+            Assert.Throws<ArgumentException>(() => new MeengClient("k", new MeengClientOptions { BaseUrl = bad }));
+        }
+        foreach (var good in new[] { "https://app.meeng.test", "http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000" })
+        {
+            _ = new MeengClient("k", new MeengClientOptions { BaseUrl = good });
+        }
+    }
+
+    [Fact]
+    public async Task TheDefaultHttpClientNeverFollowsARedirect()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var serving = Task.Run(async () =>
+        {
+            using var socket = await listener.AcceptTcpClientAsync();
+            var stream = socket.GetStream();
+            var buffer = new byte[4096];
+            _ = await stream.ReadAsync(buffer);
+            await stream.WriteAsync("HTTP/1.1 302 Found\r\nLocation: https://elsewhere.test/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"u8.ToArray());
+        });
+        var client = new MeengClient("k", new MeengClientOptions { BaseUrl = $"http://127.0.0.1:{port}" });
+        var refusal = await Assert.ThrowsAsync<MeengException>(() => client.Emails.CancelAsync("em_1"));
+        Assert.Equal(302, refusal.Status);
+        await serving;
+    }
+
+    private const string Secret = "whsec_test";
+    private const string Body = """{"id":"evt_1","type":"email.delivered","createdAt":"2026-11-20T12:00:00Z","data":{"id":"em_1","status":"DELIVERED","from":"h@acme.com","to":["a@x.com"],"occurredAt":"2026-11-20T12:00:00Z"}}""";
+
+    private static string Sign(string timestamp, string text = Body, string secret = Secret) =>
+        "v1=" + Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes($"{timestamp}.{text}"))).ToLowerInvariant();
+
+    [Fact]
+    public void ASignedWebhookIsVerifiedAndReadAsATypedEvent()
+    {
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+        var webhooks = new MeengClient("k").Webhooks(Secret);
+        var headers = new Dictionary<string, string> { ["X-Meeng-Signature"] = Sign(timestamp), ["X-Meeng-Timestamp"] = timestamp };
+        Assert.True(webhooks.Verify(Body, headers));
+        var delivered = Assert.IsType<EmailWebhookEvent>(webhooks.ConstructEvent(Body, headers));
+        Assert.Equal("email.delivered", delivered.Type);
+        Assert.Equal(["a@x.com"], delivered.Data.To);
+        Assert.Equal(EmailBasePayload.StatusDelivered, delivered.Data.Status);
+    }
+
+    [Fact]
+    public void TheUseSendHeadersAreAcceptedAsWellInAnyCase()
+    {
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+        var headers = new Dictionary<string, string> { ["x-usesend-signature"] = Sign(timestamp), ["X-UseSend-Timestamp"] = timestamp };
+        Assert.True(new MeengClient("k").Webhooks(Secret).Verify(Body, headers));
+    }
+
+    [Fact]
+    public void AWebhookIsRefusedWithTheCodeThatSaysWhy()
+    {
+        var now = DateTimeOffset.FromUnixTimeMilliseconds(1_800_000_000_000);
+        var timestamp = now.ToUnixTimeMilliseconds().ToString();
+        var old = (now.ToUnixTimeMilliseconds() - 6 * 60 * 1000).ToString();
+        var webhooks = new MeengClient("k").Webhooks(Secret);
+        var good = new Dictionary<string, string> { ["X-Meeng-Signature"] = Sign(timestamp), ["X-Meeng-Timestamp"] = timestamp };
+        var stale = new Dictionary<string, string> { ["X-Meeng-Signature"] = Sign(old), ["X-Meeng-Timestamp"] = old };
+
+        string Refused(Dictionary<string, string> headers, string body = Body, WebhookOptions? options = null)
+        {
+            try
+            {
+                webhooks.ConstructEvent(body, headers, (options ?? new WebhookOptions()) with { Now = now });
+                return "ACCEPTED";
+            }
+            catch (WebhookVerificationException e)
+            {
+                return e.Code;
+            }
+        }
+
+        Assert.Equal("ACCEPTED", Refused(good));
+        Assert.Equal("MISSING_SIGNATURE", Refused(new() { ["X-Meeng-Timestamp"] = timestamp }));
+        Assert.Equal("MISSING_TIMESTAMP", Refused(new() { ["X-Meeng-Signature"] = Sign(timestamp) }));
+        Assert.Equal("INVALID_SIGNATURE_FORMAT", Refused(new() { ["X-Meeng-Signature"] = Sign(timestamp)[3..], ["X-Meeng-Timestamp"] = timestamp }));
+        Assert.Equal("INVALID_TIMESTAMP", Refused(new() { ["X-Meeng-Signature"] = Sign(timestamp), ["X-Meeng-Timestamp"] = "yesterday" }));
+        Assert.Equal("TIMESTAMP_OUT_OF_RANGE", Refused(stale));
+        Assert.Equal("ACCEPTED", Refused(stale, options: new WebhookOptions { Tolerance = TimeSpan.FromMilliseconds(-1) }));
+        Assert.Equal("ACCEPTED", Refused(stale, options: new WebhookOptions { Tolerance = TimeSpan.FromMinutes(10) }));
+        Assert.Equal("SIGNATURE_MISMATCH", Refused(good, options: new WebhookOptions { Secret = "another" }));
+        Assert.Equal("SIGNATURE_MISMATCH", Refused(good, Body.Replace("em_1", "em_2")));
+        Assert.Equal("INVALID_JSON", Refused(new() { ["X-Meeng-Signature"] = Sign(timestamp, "not json"), ["X-Meeng-Timestamp"] = timestamp }, "not json"));
     }
 }

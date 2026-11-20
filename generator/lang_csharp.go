@@ -45,13 +45,26 @@ func init() {
 			}
 			return name
 		},
-		"csType":      csType,
-		"csRequired":  func(f *Field, input bool) bool { return f.Required && (input || !f.Nullable) },
-		"csConst":     func(field, value string) string { return idiomPascal(field) + csConstPart(value) },
+		"csType":     csType,
+		"csRequired": func(f *Field, input bool) bool { return f.Required && (input || !f.Nullable) },
+		"csConst":    func(field, value string) string { return idiomPascal(field) + enumPascal(value) },
+		// csQuery is the C# type of a query filter.
+		"csQuery": func(p *Param) string {
+			switch p.Kind {
+			case "integer":
+				return "int?"
+			case "stringlist":
+				return "IReadOnlyList<string>?"
+			}
+			return "string?"
+		},
+		// csAnswers are the types the services read, once each.
+		"csAnswers": csAnswers,
+		// csBodyLists are the lists of bodies the services send, once each.
+		"csBodyLists": csBodyLists,
 		"csDoc":       csDoc,
 		"csText":      csText,
 		"csRemarks":   csRemarks,
-		"csEnvelopes": csEnvelopes,
 		"csWrite":     csWrite,
 		"csRef":       csRef,
 		// csTypeInfo is the JsonTypeInfo property the JSON context names a
@@ -152,32 +165,44 @@ func csDoc(indent, text string) string {
 	return indent + "/// <summary>" + strings.ReplaceAll(text, "\n", "\n"+indent+"/// ") + "</summary>\n"
 }
 
-// Envelope is one type the API answers in its data envelope, for the
-// source-generated JSON context.
-type Envelope struct {
-	// Type is the C# type in the envelope: Product, Page<Product>.
+// Answer is one type a service reads, for the source-generated JSON context.
+type Answer struct {
+	// Type is the C# type: Domain, List<Domain>.
 	Type string
 	// Name is its JsonTypeInfo's name on the context.
 	Name string
 }
 
-// csEnvelopes are the types the services read, once each.
-func csEnvelopes(services []*Service) []Envelope {
-	seen := map[string]Envelope{}
+// csAnswers are the types the services read, once each.
+func csAnswers(services []*Service) []Answer {
+	seen := map[string]Answer{}
 	for _, service := range services {
 		for _, method := range service.Methods {
-			if method.Paginated {
-				seen[method.Item+"Page"] = Envelope{Type: "Page<" + method.Item + ">", Name: method.Item + "PageEnvelope"}
-			} else if !method.NoContent {
-				seen[method.Response] = Envelope{Type: method.Response, Name: method.Response + "Envelope"}
+			if method.ResponseList {
+				seen[method.Response+"List"] = Answer{Type: "List<" + method.Response + ">", Name: method.Response + "List"}
+			} else {
+				seen[method.Response] = Answer{Type: method.Response, Name: method.Response}
 			}
 		}
 	}
-	out := make([]Envelope, 0, len(seen))
-	for _, envelope := range seen {
-		out = append(out, envelope)
+	out := make([]Answer, 0, len(seen))
+	for _, answer := range seen {
+		out = append(out, answer)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// csBodyLists are the lists of bodies the services send, once each.
+func csBodyLists(services []*Service) []Answer {
+	var out []Answer
+	for _, service := range services {
+		for _, method := range service.Methods {
+			if method.BodyList {
+				out = append(out, Answer{Type: "List<" + method.Body.Name + ">", Name: method.Body.Name + "List"})
+			}
+		}
+	}
 	return out
 }
 

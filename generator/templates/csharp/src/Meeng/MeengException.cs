@@ -1,120 +1,66 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 
 namespace Meeng;
 
 /// <summary>
-/// A request the API refused. <see cref="Code"/> is the API's:
-/// invalid_credential, forbidden, not_found, invalid_request, conflict,
-/// idempotency_conflict, unsupported_media_type, body_too_large, rate_limited or unavailable. <see cref="Fields"/> says, for
-/// invalid_request, what is wrong with each field. <see cref="Record"/> is, for
-/// the usage ingestion, the position (from 1) in the batch of the event the API
-/// refused, and 0 for any other error. <see cref="RetryAfter"/> is how many
-/// seconds to wait on a 429.
+/// A request the API refused. <see cref="Code"/> is the API's, such as
+/// <c>NOT_UNIQUE</c>, <c>FORBIDDEN</c> or <c>NOT_FOUND</c>; it is
+/// <c>INTERNAL_SERVER_ERROR</c> when the answer carried none.
+/// <see cref="RetryAfter"/> is how many seconds to wait on a 429.
 /// </summary>
 public sealed class MeengException : Exception
 {
-    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> NoFields = new Dictionary<string, IReadOnlyList<string>>();
-
-    private static string Describe(int status, string code, string apiMessage, IReadOnlyDictionary<string, IReadOnlyList<string>>? fields)
-    {
-        var detail = apiMessage;
-        if (detail.Length == 0 && fields is not null)
-        {
-            var keys = new List<string>(fields.Keys);
-            keys.Sort(StringComparer.Ordinal);
-            var parts = new List<string>();
-            foreach (var key in keys)
-            {
-                if (fields[key].Count > 0)
-                {
-                    parts.Add($"{key}: {fields[key][0]}");
-                }
-            }
-            detail = string.Join("; ", parts);
-        }
-        return detail.Length > 0 ? $"meeng: {status} {code}: {detail}" : $"meeng: {status} {code}";
-    }
-
     /// <summary>A refusal.</summary>
     /// <param name="status">The HTTP status.</param>
-    /// <param name="code">The API's error code, empty when it sent none.</param>
-    /// <param name="apiMessage">The API's message, empty when it sent none.</param>
-    /// <param name="fields">What is wrong with each field.</param>
+    /// <param name="code">The API's error code.</param>
+    /// <param name="apiMessage">The API's message.</param>
     /// <param name="retryAfter">Seconds to wait before trying again, or null.</param>
-    /// <param name="record">The event of a batch the API refused, from 1, or 0.</param>
-    public MeengException(int status, string code, string apiMessage, IReadOnlyDictionary<string, IReadOnlyList<string>>? fields = null, int? retryAfter = null, int record = 0)
-        : base(Describe(status, code, apiMessage, fields))
+    public MeengException(int status, string code, string apiMessage, int? retryAfter = null)
+        : base(apiMessage.Length > 0 ? $"meeng: {status} {code}: {apiMessage}" : $"meeng: {status} {code}")
     {
         Status = status;
         Code = code;
         ApiMessage = apiMessage;
-        Fields = fields ?? NoFields;
         RetryAfter = retryAfter;
-        Record = record;
     }
 
     /// <summary>The HTTP status.</summary>
     public int Status { get; }
 
-    /// <summary>The API's error code: invalid_request, not_found…</summary>
+    /// <summary>The API's error code: NOT_UNIQUE, FORBIDDEN…</summary>
     public string Code { get; }
 
-    /// <summary>The API's message, empty when it sent none.</summary>
+    /// <summary>The API's message.</summary>
     public string ApiMessage { get; }
-
-    /// <summary>For invalid_request, what is wrong with each field.</summary>
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> Fields { get; }
 
     /// <summary>On a 429, how many seconds to wait; null otherwise.</summary>
     public int? RetryAfter { get; }
 
-    /// <summary>For the usage ingestion, the position (from 1) of the event the API refused; 0 otherwise.</summary>
-    public int Record { get; }
-
-    /// <summary>The refusal a response carries; a body that is not the API's JSON is still a refusal.</summary>
+    /// <summary>
+    /// The refusal a response carries: the answer's <c>{"error": {"code",
+    /// "message"}}</c>, <c>{"error": "text"}</c> or the error itself. A body that
+    /// is not the API's JSON is still a refusal.
+    /// </summary>
     internal static MeengException FromResponse(int status, string? retryAfter, byte[] body)
     {
         string code = "", message = "";
-        var record = 0;
-        var fields = new Dictionary<string, IReadOnlyList<string>>();
         try
         {
             using var document = JsonDocument.Parse(body);
             var root = document.RootElement;
-            // Every error is the problem itself (error, message, fields). Servers from before
-            // that document wrapped the usage ingestion's errors in data: still read.
-            if (root.ValueKind == JsonValueKind.Object && !root.TryGetProperty("error", out _) && root.TryGetProperty("data", out var wrapped) && wrapped.ValueKind == JsonValueKind.Object)
-            {
-                root = wrapped;
-            }
             if (root.ValueKind == JsonValueKind.Object)
             {
-                code = Text(root, "error");
-                if (root.TryGetProperty("record", out var position) && position.ValueKind == JsonValueKind.Number && position.TryGetInt32(out var number) && number > 0)
+                var found = root.TryGetProperty("error", out var wrapped) ? wrapped : root;
+                if (found.ValueKind == JsonValueKind.String)
                 {
-                    record = number;
+                    message = found.GetString()!;
                 }
-                message = Text(root, "message");
-                if (root.TryGetProperty("fields", out var problems) && problems.ValueKind == JsonValueKind.Object)
+                else if (found.ValueKind == JsonValueKind.Object)
                 {
-                    foreach (var field in problems.EnumerateObject())
-                    {
-                        var list = new List<string>();
-                        if (field.Value.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var problem in field.Value.EnumerateArray())
-                            {
-                                if (problem.ValueKind == JsonValueKind.String)
-                                {
-                                    list.Add(problem.GetString()!);
-                                }
-                            }
-                        }
-                        fields[field.Name] = list;
-                    }
+                    code = Text(found, "code");
+                    message = Text(found, "message");
                 }
             }
         }
@@ -122,10 +68,33 @@ public sealed class MeengException : Exception
         {
             // A refusal without a JSON body is still a refusal.
         }
+        if (code.Length == 0)
+        {
+            code = "INTERNAL_SERVER_ERROR";
+        }
+        if (message.Length == 0)
+        {
+            message = Reason(status);
+        }
         int? seconds = int.TryParse(retryAfter, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
-        return new MeengException(status, code, message, fields, seconds, record);
+        return new MeengException(status, code, message, seconds);
     }
 
     private static string Text(JsonElement root, string name) =>
         root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : "";
+
+    private static string Reason(int status) => status switch
+    {
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        403 => "Forbidden",
+        404 => "Not Found",
+        409 => "Conflict",
+        422 => "Unprocessable Entity",
+        429 => "Too Many Requests",
+        500 => "Internal Server Error",
+        502 => "Bad Gateway",
+        503 => "Service Unavailable",
+        _ => "Error",
+    };
 }

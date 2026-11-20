@@ -1,70 +1,36 @@
 package dev.meeng;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
- * A request the API refused. {@link #getCode()} is the API's:
- * invalid_credential, forbidden, not_found, invalid_request, conflict,
- * idempotency_conflict, unsupported_media_type, body_too_large, rate_limited or unavailable. {@link #getFields()} says, for
- * invalid_request, what is wrong with each field. {@link #getRecord()} is, for
- * the usage ingestion, the position (from 1) in the batch of the event the API
- * refused, and 0 for any other error. {@link #getRetryAfter()} is how many
- * seconds to wait on a 429.
+ * A request the API refused. {@link #getCode()} is the API's, such as
+ * NOT_UNIQUE, FORBIDDEN or NOT_FOUND; it is INTERNAL_SERVER_ERROR when the
+ * answer carried none. {@link #getRetryAfter()} is how many seconds to wait on
+ * a 429.
  */
 public class MeengException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
-    /** The HTTP status. */
     private final int status;
-    /** The API's error code. */
     private final String code;
-    /** The API's message. */
     private final String apiMessage;
-    /** What is wrong with each field. */
-    private final Map<String, List<String>> fields;
-    /** Seconds to wait before trying again, or null. */
     private final Integer retryAfter;
-    /** The event of a batch the API refused, from 1, or 0. */
-    private final int record;
 
     /**
      * A refusal.
      *
      * @param status the HTTP status
-     * @param code the API's error code, empty when it sent none
-     * @param apiMessage the API's message, empty when it sent none
-     * @param fields what is wrong with each field
+     * @param code the API's error code
+     * @param apiMessage the API's message
      * @param retryAfter seconds to wait before trying again, or null
-     * @param record the event of a batch the API refused, from 1, or 0
      */
-    private static String describe(int status, String code, String apiMessage, Map<String, List<String>> fields) {
-        String detail = apiMessage;
-        if (detail.isEmpty()) {
-            List<String> parts = new ArrayList<>();
-            fields.keySet().stream().sorted().forEach(key -> {
-                List<String> messages = fields.get(key);
-                if (messages != null && !messages.isEmpty()) {
-                    parts.add(key + ": " + messages.get(0));
-                }
-            });
-            detail = String.join("; ", parts);
-        }
-        return detail.isEmpty() ? "meeng: " + status + " " + code : "meeng: " + status + " " + code + ": " + detail;
-    }
-
-    public MeengException(int status, String code, String apiMessage, Map<String, List<String>> fields, Integer retryAfter, int record) {
-        super(describe(status, code, apiMessage, fields));
+    public MeengException(int status, String code, String apiMessage, Integer retryAfter) {
+        super(apiMessage.isEmpty() ? "meeng: " + status + " " + code : "meeng: " + status + " " + code + ": " + apiMessage);
         this.status = status;
         this.code = code;
         this.apiMessage = apiMessage;
-        this.fields = Collections.unmodifiableMap(new LinkedHashMap<>(fields));
         this.retryAfter = retryAfter;
-        this.record = record;
     }
 
     /** @return the HTTP status */
@@ -72,19 +38,14 @@ public class MeengException extends RuntimeException {
         return status;
     }
 
-    /** @return the API's error code: invalid_request, not_found… */
+    /** @return the API's error code: NOT_UNIQUE, FORBIDDEN… */
     public String getCode() {
         return code;
     }
 
-    /** @return the API's message, empty when it sent none */
+    /** @return the API's message */
     public String getApiMessage() {
         return apiMessage;
-    }
-
-    /** @return for invalid_request, what is wrong with each field */
-    public Map<String, List<String>> getFields() {
-        return fields;
     }
 
     /** @return on a 429, how many seconds to wait; null otherwise */
@@ -92,51 +53,72 @@ public class MeengException extends RuntimeException {
         return retryAfter;
     }
 
-    /** @return for the usage ingestion, the position (from 1) of the event the API refused; 0 otherwise */
-    public int getRecord() {
-        return record;
-    }
-
-    /** The refusal a response carries; a body that is not the API's JSON is still a refusal. */
+    /**
+     * The refusal a response carries: the answer's {"error": {"code",
+     * "message"}}, {"error": "text"} or the error itself. A body that is not
+     * the API's JSON is still a refusal.
+     */
     static MeengException of(Transport.Response response) {
-        Map<String, Object> data = Collections.emptyMap();
+        String code = "";
+        String message = "";
         try {
             Object parsed = Json.parse(new String(response.getBody(), StandardCharsets.UTF_8));
             if (parsed instanceof Map) {
-                data = Json.asObject(parsed);
-                // Every error is the problem itself (error, message, fields). Servers from
-                // before that document wrapped the usage ingestion's errors in data: still read.
-                if (!data.containsKey("error") && data.get("data") instanceof Map) {
-                    data = Json.asObject(data.get("data"));
+                Map<String, Object> data = Json.asObject(parsed);
+                Object found = data.containsKey("error") ? data.get("error") : data;
+                if (found instanceof String) {
+                    message = (String) found;
+                } else if (found instanceof Map) {
+                    Map<String, Object> error = Json.asObject(found);
+                    code = text(error.get("code"));
+                    message = text(error.get("message"));
                 }
             }
         } catch (IllegalStateException e) {
             // A refusal without a JSON body is still a refusal.
         }
-        Map<String, List<String>> fields = new LinkedHashMap<>();
-        if (data.get("fields") instanceof Map) {
-            for (Map.Entry<String, Object> field : Json.asObject(data.get("fields")).entrySet()) {
-                List<String> problems = new ArrayList<>();
-                if (field.getValue() instanceof List) {
-                    for (Object problem : (List<?>) field.getValue()) {
-                        if (problem instanceof String) {
-                            problems.add((String) problem);
-                        }
-                    }
-                }
-                fields.put(field.getKey(), Collections.unmodifiableList(problems));
-            }
+        if (code.isEmpty()) {
+            code = "INTERNAL_SERVER_ERROR";
+        }
+        if (message.isEmpty()) {
+            message = reason(response.getStatus());
         }
         String retryAfter = response.getHeaders().getOrDefault("retry-after", "").trim();
         Integer seconds = null;
         if (!retryAfter.isEmpty() && retryAfter.length() < 10 && retryAfter.chars().allMatch(Character::isDigit)) {
             seconds = Integer.parseInt(retryAfter);
         }
-        int record = data.get("record") instanceof Long && (Long) data.get("record") > 0 && (Long) data.get("record") < Integer.MAX_VALUE ? ((Long) data.get("record")).intValue() : 0;
-        return new MeengException(response.getStatus(), text(data.get("error")), text(data.get("message")), fields, seconds, record);
+        return new MeengException(response.getStatus(), code, message, seconds);
     }
 
     private static String text(Object value) {
         return value instanceof String ? (String) value : "";
+    }
+
+    private static String reason(int status) {
+        switch (status) {
+            case 400:
+                return "Bad Request";
+            case 401:
+                return "Unauthorized";
+            case 403:
+                return "Forbidden";
+            case 404:
+                return "Not Found";
+            case 409:
+                return "Conflict";
+            case 422:
+                return "Unprocessable Entity";
+            case 429:
+                return "Too Many Requests";
+            case 500:
+                return "Internal Server Error";
+            case 502:
+                return "Bad Gateway";
+            case 503:
+                return "Service Unavailable";
+            default:
+                return "Error";
+        }
     }
 }

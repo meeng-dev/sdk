@@ -12,20 +12,19 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
- * meeng's API with one organization's API key. The key says the
- * organization and the environment: prk_test_… is the test environment,
- * prk_live_… the live one.
+ * meeng's API with one team's API key. Without a key it is read from
+ * MEENG_API_KEY, and the address of the app from MEENG_BASE_URL.
  *
  * <pre>{@code
- * Meeng meeng = new Meeng(System.getenv("MEENG_API_KEY"));
- * Product product = meeng.products().create(ProductsService.CreateParams.builder().name("Curso").build());
- * for (Product each : meeng.products().listIter()) { … }
+ * Meeng meeng = new Meeng("mg_123");
+ * EmailsSendResponse sent = meeng.emails().send(EmailsService.SendParams.builder()
+ *         .from("hello@acme.com").to(List.of("customer@example.com")).subject("Hello").html("<p>Hello</p>").build());
  * }</pre>
  *
  * <p>A refusal throws {@link MeengException}; a request that could not be
@@ -39,8 +38,15 @@ public final class Meeng {
     /** The contract this SDK was generated from. */
     public static final String API_VERSION = {{quote .APIVersion}};
 
-    /** meeng's API. The environment, test or live, is the API key's: prk_test_… or prk_live_…. */
+    /**
+     * Where meeng's API lives. The client appends {{.APIPrefix}}/v1 to it, so
+     * MEENG_BASE_URL, like {@link Builder#baseUrl(String)}, is the address of
+     * the app and nothing more.
+     */
     public static final String DEFAULT_BASE_URL = {{quote .BaseURL}};
+
+    /** What every path starts with, after the base URL. */
+    public static final String API_PREFIX = {{quote .APIPrefix}};
 
     private final String apiKey;
     private final String baseUrl;
@@ -50,18 +56,31 @@ public final class Meeng {
     private final {{pascal .Name}}Service {{javaName .Name}};
 {{- end}}
 
+    /** A client for the key in MEENG_API_KEY. */
+    public Meeng() {
+        this(builder(null));
+    }
+
     /**
-     * A client for the organization apiKey belongs to.
+     * A client for the team apiKey belongs to.
      *
-     * @param apiKey the organization's API key
+     * @param apiKey the team's API key
      */
     public Meeng(String apiKey) {
         this(builder(apiKey));
     }
 
     private Meeng(Builder builder) {
-        this.apiKey = Objects.requireNonNull(builder.apiKey, "apiKey");
-        this.baseUrl = builder.baseUrl.replaceAll("/+$", "");
+        String key = builder.apiKey != null && !builder.apiKey.isEmpty() ? builder.apiKey : System.getenv("MEENG_API_KEY");
+        if (key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("Missing API key. Pass it to the constructor `new Meeng(\"mg_123\")` or set MEENG_API_KEY");
+        }
+        this.apiKey = key;
+        String base = builder.baseUrl != null ? builder.baseUrl : System.getenv("MEENG_BASE_URL");
+        if (base == null || base.isEmpty()) {
+            base = DEFAULT_BASE_URL;
+        }
+        this.baseUrl = base.replaceAll("/+$", "");
         checkBaseUrl(this.baseUrl);
         this.timeout = builder.timeout;
         this.transport = builder.transport == null ? new HttpTransport() : builder.transport;
@@ -73,7 +92,7 @@ public final class Meeng {
     /**
      * A builder of a client with another base URL, timeout or transport.
      *
-     * @param apiKey the organization's API key
+     * @param apiKey the team's API key, or null for MEENG_API_KEY
      * @return the builder
      */
     public static Builder builder(String apiKey) {
@@ -86,34 +105,46 @@ public final class Meeng {
     }
 {{end}}
     /**
-     * Calls the API and answers what it wrapped in "data"; a refusal throws
-     * MeengException.
+     * Checks and reads the webhooks a team's endpoint receives.
+     *
+     * @param secret the endpoint's signing secret
+     * @return the handler
      */
-    Object request(String method, String path, Map<String, String> query, Map<String, Object> body, String idempotencyKey, RequestOptions options) {
-        StringBuilder url = new StringBuilder(baseUrl).append(path);
+    public Webhooks webhooks(String secret) {
+        return new Webhooks(secret);
+    }
+
+    /** @return the address every call goes to, with the API prefix */
+    public String getUrl() {
+        return baseUrl + API_PREFIX;
+    }
+
+    /**
+     * Calls the API and answers its JSON, parsed: a Map, a List, or a scalar. A
+     * refusal throws MeengException.
+     *
+     * @param query the filters as name and value pairs; a list is a name for each value
+     */
+    Object request(String method, String path, List<String[]> query, Object body, String idempotencyKey) {
+        StringBuilder url = new StringBuilder(baseUrl).append(API_PREFIX).append(path);
         if (query != null) {
             char separator = '?';
-            for (Map.Entry<String, String> param : query.entrySet()) {
-                if (param.getValue() == null || param.getValue().isEmpty()) {
+            for (String[] param : query) {
+                if (param[1] == null || param[1].isEmpty()) {
                     continue;
                 }
-                url.append(separator).append(encode(param.getKey())).append('=').append(encode(param.getValue()));
+                url.append(separator).append(encode(param[0])).append('=').append(encode(param[1]));
                 separator = '&';
             }
         }
-        String key = options != null && options.getApiKey() != null && !options.getApiKey().isEmpty() ? options.getApiKey() : apiKey;
         Map<String, String> headers = new LinkedHashMap<>();
-        headers.put("Authorization", "Bearer " + key);
+        headers.put("Authorization", "Bearer " + apiKey);
         headers.put("Accept", "application/json");
         headers.put("User-Agent", "meeng-java/" + VERSION);
         byte[] payload = null;
         if (body != null) {
             payload = Json.write(body).getBytes(StandardCharsets.UTF_8);
             headers.put("Content-Type", "application/json");
-        }
-        if ((idempotencyKey == null || idempotencyKey.isEmpty()) && method.equals("POST")) {
-            // A POST is sent with a key of its own, one a call, unless the caller gave one.
-            idempotencyKey = UUID.randomUUID().toString();
         }
         if (idempotencyKey != null && !idempotencyKey.isEmpty()) {
             headers.put("Idempotency-Key", idempotencyKey);
@@ -130,10 +161,7 @@ public final class Meeng {
         if (response.getStatus() >= 300) {
             throw MeengException.of(response);
         }
-        if (response.getStatus() == 204) {
-            return null;
-        }
-        return Json.required(Json.asObject(Json.parse(new String(response.getBody(), StandardCharsets.UTF_8))), "data", Json::any);
+        return Json.parse(new String(response.getBody(), StandardCharsets.UTF_8));
     }
 
     /** Throws unless the base URL is https, or http to localhost, 127.0.0.0/8 or ::1. */
@@ -167,7 +195,7 @@ public final class Meeng {
     /** Builds a {@link Meeng} client. */
     public static final class Builder {
         private final String apiKey;
-        private String baseUrl = DEFAULT_BASE_URL;
+        private String baseUrl;
         private Duration timeout = Duration.ofSeconds(30);
         private Transport transport;
 
@@ -176,7 +204,7 @@ public final class Meeng {
         }
 
         /**
-         * Points the client at another address, such as a local server. It
+         * Points the client at another app, such as a self-hosted one. It
          * must be https; http is accepted only for localhost, 127.0.0.0/8 and
          * ::1, and any other makes {@link #build()} throw
          * IllegalArgumentException.

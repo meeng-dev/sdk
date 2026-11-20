@@ -19,6 +19,9 @@ namespace Meeng;
 {{end}}
     /// <summary>{{if .Description}}{{csText .Description}}{{else}}The API's <c>{{.Wire}}</c>.{{end}}{{if or .Nullable (not .Required)}} Null when the API sends none.{{end}}</summary>
     [JsonPropertyName({{quote .Wire}})]
+{{- if .Type.OrScalar}}
+    [JsonConverter(typeof(StringListConverter))]
+{{- end}}
     public {{if csRequired . false}}required {{end}}{{csType . false}} {{csProp $model .Wire}} { get; init; }
 {{- end}}
 }

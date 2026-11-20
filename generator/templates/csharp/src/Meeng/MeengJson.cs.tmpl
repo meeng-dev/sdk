@@ -11,24 +11,19 @@ namespace Meeng;
 /// reflection, so the package trims and compiles ahead of time.
 /// </summary>
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
-{{- range csEnvelopes .Services}}
-[JsonSerializable(typeof(Envelope<{{.Type}}>), TypeInfoPropertyName = "{{.Name}}")]
+{{- range csAnswers .Services}}
+[JsonSerializable(typeof({{.Type}}), TypeInfoPropertyName = "{{.Name}}")]
 {{- end}}
 {{- range inputs .Models}}
 [JsonSerializable(typeof({{.Name}}))]
 {{- end}}
+{{- range csBodyLists .Services}}
+[JsonSerializable(typeof({{.Type}}), TypeInfoPropertyName = "{{.Name}}")]
+{{- end}}
 {{- range webhookModels .Webhooks}}
 [JsonSerializable(typeof({{.}}))]
 {{- end}}
-[JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(JsonElement))]
 internal sealed partial class MeengJson : JsonSerializerContext
 {
-}
-
-/// <summary>The API's answer: what it answers, wrapped in <c>data</c>.</summary>
-internal sealed class Envelope<T>
-{
-    [JsonPropertyName("data")]
-    public T? Data { get; set; }
 }

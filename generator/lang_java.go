@@ -31,7 +31,17 @@ func init() {
 			}
 			return name
 		},
-		"javaType":  javaType,
+		"javaType": javaType,
+		// javaQuery is the Java type of a query filter.
+		"javaQuery": func(p *Param) string {
+			switch p.Kind {
+			case "integer":
+				return "Integer"
+			case "stringlist":
+				return "List<String>"
+			}
+			return "String"
+		},
 		"javaBoxed": func(t *TypeRef) string { return javaRef(t, true) },
 		"javaRead":  javaRead,
 		"javaWrite": javaWrite,
@@ -119,6 +129,9 @@ func javaRef(t *TypeRef, boxed bool) string {
 	case "model":
 		return t.Model
 	case "array":
+		if t.OrScalar {
+			return "List<String>"
+		}
 		return "List<" + javaRef(t.Items, true) + ">"
 	case "map":
 		return "Map<String, " + javaRef(t.Items, true) + ">"
@@ -145,6 +158,9 @@ func javaConvert(t *TypeRef) string {
 	case "model":
 		return "Json.model(" + t.Model + "::fromJson)"
 	case "array":
+		if t.OrScalar {
+			return "Json::asStringList"
+		}
 		return "Json.list(" + javaConvert(t.Items) + ")"
 	case "map":
 		return "Json.map(" + javaConvert(t.Items) + ")"

@@ -3,24 +3,26 @@ package dev.meeng;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
 
 class MeengTest {
@@ -41,522 +43,240 @@ class MeengTest {
     }
 
     private static Meeng client(Recorder recorder) {
-        return Meeng.builder("prk_test_key").baseUrl("https://meeng.test/").transport(recorder).build();
+        return Meeng.builder("mg_test_key").baseUrl("https://meeng.test/").transport(recorder).build();
     }
 
-    private static Transport.Response json(int status, Map<String, String> headers, Object payload) {
-        byte[] body = payload == null ? new byte[0] : Json.write(payload).getBytes(StandardCharsets.UTF_8);
-        return new Transport.Response(status, headers, body);
+    private static Transport.Response json(int status, Object payload) {
+        byte[] body = (payload instanceof String ? (String) payload : Json.write(payload)).getBytes(StandardCharsets.UTF_8);
+        return new Transport.Response(status, Map.of("retry-after", "7"), body);
     }
 
-    private static Map<String, Object> product(String id) {
-        Map<String, Object> product = new LinkedHashMap<>();
-        product.put("id", id);
-        product.put("name", "Curso");
-        product.put("description", "");
-        product.put("status", "active");
-        product.put("showcase_id", "shw_1");
-        product.put("created_at", "2026-10-17T00:00:00Z");
-        return product;
-    }
-
-    private static Map<String, Object> data(Object value) {
-        return Map.of("data", value);
-    }
-
-    private static Map<String, String> query(String url) {
-        Map<String, String> query = new HashMap<>();
-        String raw = URI.create(url).getRawQuery();
-        if (raw != null) {
-            for (String pair : raw.split("&")) {
-                String[] parts = pair.split("=", 2);
-                query.put(parts[0], parts.length > 1 ? parts[1] : "");
-            }
+    private static Map<String, Object> map(Object... pairs) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            out.put((String) pairs[i], pairs[i + 1]);
         }
-        return query;
+        return out;
+    }
+
+    private static Map<String, Object> body(Transport.Request request) {
+        return Json.asObject(Json.parse(new String(request.getBody(), StandardCharsets.UTF_8)));
     }
 
     @Test
-    void aCallCarriesTheKeyAndUnwrapsTheData() {
-        Recorder recorder = new Recorder(request -> json(200, Map.of(), data(product("prod_1"))));
-        Product got = client(recorder).products().get("prod_1");
-        assertEquals("prod_1", got.getId());
-        assertEquals(Product.STATUS_ACTIVE, got.getStatus());
-        Transport.Request seen = recorder.seen.get(0);
-        assertEquals("GET", seen.getMethod());
-        assertEquals("/api/v1/products/prod_1", URI.create(seen.getUrl()).getPath());
-        assertEquals("Bearer prk_test_key", seen.getHeaders().get("Authorization"));
-        assertEquals("meeng-java/" + Meeng.VERSION, seen.getHeaders().get("User-Agent"));
+    void sendingAnEmailCarriesTheKeyTheBodyAndTheIdempotencyKey() {
+        Recorder recorder = new Recorder(r -> json(200, map("emailId", "em_1")));
+        EmailsSendResponse sent = client(recorder).emails().send(
+                EmailsService.SendParams.builder().from("hello@acme.com").to(List.of("a@x.com", "b@x.com")).subject("Hi").html("<p>Hi</p>").build(),
+                RequestOptions.builder().idempotencyKey("order-1").build());
+        assertEquals("em_1", sent.getEmailId());
+        Transport.Request request = recorder.seen.get(0);
+        assertEquals("POST", request.getMethod());
+        assertEquals("https://meeng.test/api/v1/emails", request.getUrl());
+        assertEquals("Bearer mg_test_key", request.getHeaders().get("Authorization"));
+        assertEquals("order-1", request.getHeaders().get("Idempotency-Key"));
+        assertEquals("application/json", request.getHeaders().get("Content-Type"));
+        assertEquals("meeng-java/" + Meeng.VERSION, request.getHeaders().get("User-Agent"));
+        assertEquals(map("from", "hello@acme.com", "to", List.of("a@x.com", "b@x.com"), "subject", "Hi", "html", "<p>Hi</p>"), body(request));
     }
 
     @Test
-    void aWriteSendsItsBodyAndIdempotencyKey() {
-        Recorder recorder = new Recorder(request -> json(201, Map.of(), data(product("prod_1"))));
-        client(recorder).products().create(
-                ProductsService.CreateParams.builder().name("Curso").build(),
-                RequestOptions.builder().idempotencyKey("create-1").build());
-        Transport.Request seen = recorder.seen.get(0);
-        assertEquals("POST", seen.getMethod());
-        assertEquals("create-1", seen.getHeaders().get("Idempotency-Key"));
-        assertEquals("application/json", seen.getHeaders().get("Content-Type"));
-        assertEquals(Map.of("name", "Curso"), Json.parse(new String(seen.getBody(), StandardCharsets.UTF_8)));
-    }
-
-    private static Map<String, Object> session(String clientSecret) {
-        Map<String, Object> session = new LinkedHashMap<>();
-        session.put("id", "pcl_1");
-        session.put("url", "https://meeng.dev/pagamento/pcl_1");
-        session.put("product_id", "prod_1");
-        session.put("price_id", "price_1");
-        session.put("status", "active");
-        session.put("label", "");
-        session.put("quantity", 1);
-        session.put("success_url", "https://loja.example/obrigado");
-        session.put("cancel_url", "");
-        session.put("expires_at", null);
-        session.put("created_at", "2026-11-16T12:00:00Z");
-        session.put("session_id", "cs_1");
-        session.put("client_secret", clientSecret);
-        session.put("client_secret_expires_at", "2026-11-16T12:30:00Z");
-        session.put("status_key", "sk_1");
-        session.put("amount_cents", null);
-        session.put("items", java.util.List.of());
-        session.put("metadata", java.util.Map.of());
-        session.put("client_reference_id", "");
-        session.put("discount_id", "");
-        session.put("showcase_id", "shw_1");
-        session.put("subscription_start_at", null);
-        return session;
+    void aWriteWithNoBodyOfItsOwnSendsAnEmptyObject() {
+        Recorder recorder = new Recorder(r -> json(200, map("emailId", "em_1")));
+        client(recorder).emails().cancel("em_1");
+        Transport.Request request = recorder.seen.get(0);
+        assertEquals("POST", request.getMethod());
+        assertEquals("https://meeng.test/api/v1/emails/em_1/cancel", request.getUrl());
+        assertEquals("{}", new String(request.getBody(), StandardCharsets.UTF_8));
     }
 
     @Test
-    void aCheckoutSessionHandsBackTheClientSecretForTheBrowser() {
-        int[] calls = {0};
-        Recorder recorder = new Recorder(request -> calls[0]++ == 0
-                ? json(201, Map.of(), data(session("cs_secret_1")))
-                : json(201, Map.of("Idempotent-Replayed", "true"), data(session(""))));
-        Meeng meeng = client(recorder);
-        CheckoutsService.CreateParams params = CheckoutsService.CreateParams.builder()
-                .productId("prod_1").priceId("price_1").successUrl("https://loja.example/obrigado").build();
-        RequestOptions options = RequestOptions.builder().idempotencyKey("pedido-1").build();
-        CheckoutCreated checkout = meeng.checkouts().create(params, options);
-        assertEquals("cs_secret_1", checkout.getClientSecret());
-        assertEquals("cs_1", checkout.getSessionId());
-        assertEquals("sk_1", checkout.getStatusKey());
-        assertEquals("2026-11-16T12:30:00Z", checkout.getClientSecretExpiresAt());
-        assertEquals("https://meeng.dev/pagamento/pcl_1", checkout.getUrl());
-        assertNull(checkout.getExpiresAt());
-        Transport.Request seen = recorder.seen.get(0);
-        assertEquals("POST", seen.getMethod());
-        assertEquals("/api/v1/checkouts", URI.create(seen.getUrl()).getPath());
-        assertEquals("pedido-1", seen.getHeaders().get("Idempotency-Key"));
-        assertEquals(
-                Map.of("product_id", "prod_1", "price_id", "price_1", "success_url", "https://loja.example/obrigado"),
-                Json.parse(new String(seen.getBody(), StandardCharsets.UTF_8)));
-        CheckoutCreated again = meeng.checkouts().create(params, options);
-        assertEquals("", again.getClientSecret());
-        assertEquals("cs_1", again.getSessionId());
+    void aSendWithoutAnIdempotencyKeySendsNone() {
+        Recorder recorder = new Recorder(r -> json(200, map("emailId", "em_1")));
+        client(recorder).emails().send(EmailsService.SendParams.builder().from("hello@acme.com").to(List.of("a@x.com")).text("Hi").build());
+        assertFalse(recorder.seen.get(0).getHeaders().containsKey("Idempotency-Key"));
     }
 
     @Test
-    void aModelThatMayBeNullDecodesBothWays() {
-        Map<String, Object> pix = new LinkedHashMap<>();
-        pix.put("copia_e_cola", "000201");
-        pix.put("qr_code_svg", "<svg/>");
-        pix.put("expires_at", null);
-        Map<String, Object> payment = new LinkedHashMap<>();
-        payment.put("id", "pay_1");
-        payment.put("method", "pix");
-        payment.put("state", "pending");
-        payment.put("unresolved", false);
-        payment.put("card_brand", "");
-        payment.put("card_kind", "");
-        payment.put("installments", 1L);
-        payment.put("pix", pix);
-        payment.put("boleto", null);
-        CheckoutClientPayment got = CheckoutClientPayment.fromJson(payment);
-        assertNull(got.getBoleto());
-        assertEquals("000201", got.getPix().getCopiaECola());
-        assertNull(got.getPix().getExpiresAt());
+    void aBatchAnswersTheListOfIds() {
+        Recorder recorder = new Recorder(r -> json(200, map("data", List.of(map("emailId", "em_1"), map("emailId", "em_2")))));
+        EmailsBatchResponse got = client(recorder).emails().batch(List.of(
+                EmailsService.BatchParams.builder().from("hello@acme.com").to(List.of("a@x.com")).subject("One").text("1").build(),
+                EmailsService.BatchParams.builder().from("hello@acme.com").to(List.of("b@x.com")).subject("Two").text("2").build()));
+        assertEquals("em_2", got.getData().get(1).getEmailId());
+        assertEquals("https://meeng.test/api/v1/emails/batch", recorder.seen.get(0).getUrl());
+        assertEquals(2, ((List<?>) Json.parse(new String(recorder.seen.get(0).getBody(), StandardCharsets.UTF_8))).size());
     }
 
     @Test
-    void aBaseUrlMustBeHttpsUnlessItIsLoopback() {
-        for (String base : List.of("https://meeng.dev", "http://localhost:8080", "http://LOCALHOST", "http://127.0.0.1:1", "http://127.255.0.3", "http://[::1]:8080")) {
-            Meeng.builder("k").baseUrl(base).build();
-        }
-        for (String base : List.of("http://meeng.dev", "http://localhost.evil.test", "http://127.0.0.1.evil.test", "http://10.0.0.1", "ftp://localhost", "meeng.dev", "", "http://[::2]", "http://127.0.0.300")) {
-            IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> Meeng.builder("k").baseUrl(base).build(), base);
-            assertTrue(refused.getMessage().contains("must be https"));
-        }
+    void listingEmailsSendsTheFiltersAListOnceForEachValue() {
+        Recorder recorder = new Recorder(r -> json(200, map("data", List.of(), "count", 0)));
+        EmailsListResponse got = client(recorder).emails().list(
+                EmailsService.ListParams.builder().page(2).limit(10).startDate("2026-11-01T00:00:00Z").domainId(List.of("1", "2")).build());
+        assertEquals(0L, got.getCount());
+        Transport.Request request = recorder.seen.get(0);
+        assertEquals("GET", request.getMethod());
+        assertEquals("https://meeng.test/api/v1/emails?page=2&limit=10&startDate=2026-11-01T00%3A00%3A00Z&domainId=1&domainId=2", request.getUrl());
     }
 
     @Test
-    void aDiscountGoesThroughCreateGetListAndDelete() {
-        String template = "{\"id\":\"__ID__\",\"name\":\"Black\",\"code\":null,\"type\":\"percentage\",\"basis_points\":1000,\"amount_cents\":0,\"currency\":\"BRL\",\"duration\":\"once\",\"duration_in_months\":0,\"max_redemptions\":null,\"max_redemptions_per_customer\":null,\"redemptions_count\":0,\"starts_at\":\"2026-10-17T00:00:00Z\",\"ends_at\":null,\"status\":\"active\",\"product_ids\":[\"prod_1\"],\"created_at\":\"2026-10-17T00:00:00Z\",\"modified_at\":\"2026-10-17T00:00:00Z\"}";
-        Recorder recorder = new Recorder(request -> {
-            if (request.getMethod().equals("POST")) {
-                return json(201, Map.of(), data(Json.parse(template.replace("__ID__", "disc_1"))));
-            }
-            if (request.getMethod().equals("DELETE")) {
-                return json(204, Map.of(), null);
-            }
-            if (URI.create(request.getUrl()).getPath().equals("/api/v1/discounts")) {
-                String page = query(request.getUrl()).get("page");
-                return json(200, Map.of(), data(Map.of(
-                        "items", List.of(Json.parse(template.replace("__ID__", "disc_" + page))),
-                        "pagination", Map.of("total_count", 2, "max_page", 2))));
-            }
-            return json(200, Map.of(), data(Json.parse(template.replace("__ID__", "disc_1"))));
-        });
-        Meeng meeng = client(recorder);
-        Discount created = meeng.discounts().create(DiscountsService.CreateParams.builder().name("Black").type("percentage").duration("once").basisPoints(1000L).build());
-        assertEquals("disc_1", created.getId());
-        assertNull(created.getCode());
-        assertEquals(List.of("prod_1"), created.getProductIds());
-        assertEquals("Black", meeng.discounts().get("disc_1").getName());
-        List<String> ids = new ArrayList<>();
-        for (Discount each : meeng.discounts().listIter(DiscountsService.ListParams.builder().limit(1).build())) {
-            ids.add(each.getId());
-        }
-        assertEquals(List.of("disc_1", "disc_2"), ids);
-        meeng.discounts().delete("disc_1");
-        List<String> requests = new ArrayList<>();
-        for (Transport.Request each : recorder.seen) {
-            requests.add(each.getMethod() + " " + URI.create(each.getUrl()).getPath());
-        }
-        assertEquals(List.of("POST /api/v1/discounts", "GET /api/v1/discounts/disc_1", "GET /api/v1/discounts", "GET /api/v1/discounts", "DELETE /api/v1/discounts/disc_1"), requests);
-        assertEquals(Map.of("name", "Black", "type", "percentage", "duration", "once", "basis_points", 1000L), Json.parse(new String(recorder.seen.get(0).getBody(), StandardCharsets.UTF_8)));
+    void aPathParameterIsEscaped() {
+        Recorder recorder = new Recorder(r -> json(200, map("id", "a/b c", "teamId", 1, "to", "a@x.com", "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
+                "createdAt", "x", "updatedAt", "x", "emailEvents", List.of(map("emailId", "a/b c", "status", "SENT", "createdAt", "x", "data", map("ip", "1.2.3.4"))))));
+        Email email = client(recorder).emails().get("a/b c");
+        assertEquals("https://meeng.test/api/v1/emails/a%2Fb%20c", recorder.seen.get(0).getUrl());
+        assertEquals(List.of("a@x.com"), email.getTo());
+        assertEquals(EmailEvent.STATUS_SENT, email.getEmailEvents().get(0).getStatus());
     }
 
     @Test
-    void aFreeFormValueDecodesNested() {
-        String state = "{\"id\":\"cus_1\",\"showcase_id\":\"shw_1\",\"name\":\"Ana\",\"email\":\"ana@example.com\",\"external_id\":\"\",\"status\":\"active\",\"created_at\":\"2026-10-17T00:00:00Z\",\"active_subscriptions\":[],\"granted_benefits\":[{\"id\":\"gr_1\",\"granted_at\":\"2026-10-17T00:00:00Z\",\"benefit_id\":\"ben_1\",\"benefit_type\":\"feature_flag\",\"benefit_metadata\":{\"flags\":{\"beta\":true,\"limits\":{\"seats\":5,\"tiers\":[\"a\",2,null,1.5]}}},\"properties\":{\"links\":[{\"url\":\"https://example.com\",\"expires\":null}]}}]}";
-        Recorder recorder = new Recorder(request -> json(200, Map.of(), data(Json.parse(state))));
-        CustomerStateBenefitGrant grant = client(recorder).customers().getState("cus_1").getGrantedBenefits().get(0);
-        Map<?, ?> flags = (Map<?, ?>) grant.getBenefitMetadata().get("flags");
-        Map<?, ?> limits = (Map<?, ?>) flags.get("limits");
-        assertEquals(true, flags.get("beta"));
-        assertEquals(5L, limits.get("seats"));
-        assertEquals(java.util.Arrays.asList("a", 2L, null, 1.5), limits.get("tiers"));
-        Map<?, ?> link = (Map<?, ?>) ((List<?>) grant.getProperties().get("links")).get(0);
-        assertEquals("https://example.com", link.get("url"));
-        assertTrue(link.containsKey("expires") && link.get("expires") == null);
+    void aListTheApiAnswersWithoutAnObjectAroundItIsAList() {
+        Recorder recorder = new Recorder(r -> json(200, List.of(map("id", "cb_1", "name", "News", "teamId", 1, "properties", map("plan", "string"),
+                "variables", List.of("plan"), "emoji", "x", "createdAt", "x", "updatedAt", "x", "_count", map("contacts", 4)))));
+        List<ContactBook> books = client(recorder).contactBooks().list();
+        assertEquals("News", books.get(0).getName());
+        assertEquals(4L, books.get(0).getCount().getContacts());
     }
 
     @Test
-    void aPostWithoutAKeyIsSentWithItsOwnAGetWithNone() {
-        Recorder recorder = new Recorder(request -> json(201, Map.of(), data(product("prod_1"))));
-        Meeng meeng = client(recorder);
-        ProductsService.CreateParams params = ProductsService.CreateParams.builder().name("Curso").build();
-        meeng.products().create(params);
-        meeng.products().create(params);
-        meeng.products().create(params, RequestOptions.builder().idempotencyKey("mine").build());
-        meeng.products().get("prod_1");
-        String uuid = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-        String first = recorder.seen.get(0).getHeaders().get("Idempotency-Key");
-        String second = recorder.seen.get(1).getHeaders().get("Idempotency-Key");
-        assertTrue(first.matches(uuid) && second.matches(uuid), first + " " + second);
-        assertNotEquals(first, second);
-        assertEquals("mine", recorder.seen.get(2).getHeaders().get("Idempotency-Key"));
-        assertNull(recorder.seen.get(3).getHeaders().get("Idempotency-Key"));
+    void aDeleteCanCarryABody() {
+        Recorder recorder = new Recorder(r -> json(200, map("success", true, "count", 2)));
+        ContactsBulkDeleteResponse got = client(recorder).contacts().bulkDelete("cb_1", ContactsService.BulkDeleteParams.builder().contactIds(List.of("c1", "c2")).build());
+        assertEquals(2L, got.getCount());
+        Transport.Request request = recorder.seen.get(0);
+        assertEquals("DELETE", request.getMethod());
+        assertEquals("https://meeng.test/api/v1/contactBooks/cb_1/contacts/bulk", request.getUrl());
+        assertEquals("{\"contactIds\":[\"c1\",\"c2\"]}", new String(request.getBody(), StandardCharsets.UTF_8));
     }
 
     @Test
-    void iteratingWalksEveryPage() {
-        Recorder recorder = new Recorder(request -> {
-            String page = query(request.getUrl()).get("page");
-            return json(200, Map.of(), data(Map.of(
-                    "items", List.of(product("prod_" + page)),
-                    "pagination", Map.of("total_count", 3, "max_page", 3))));
-        });
-        List<String> ids = new ArrayList<>();
-        for (Product product : client(recorder).products().listIter(ProductsService.ListParams.builder().limit(1).build())) {
-            ids.add(product.getId());
-        }
-        assertEquals(List.of("prod_1", "prod_2", "prod_3"), ids);
-        assertEquals("1", query(recorder.seen.get(0).getUrl()).get("limit"));
+    void upsertTakesTheContactsIdInThePath() {
+        Recorder recorder = new Recorder(r -> json(200, map("contactId", "c_1")));
+        ContactsUpsertResponse got = client(recorder).contacts().upsert("cb_1", "c_1", ContactsService.UpsertParams.builder().email("a@x.com").firstName("Ana").build());
+        assertEquals("c_1", got.getContactId());
+        assertEquals("PUT", recorder.seen.get(0).getMethod());
+        assertEquals("https://meeng.test/api/v1/contactBooks/cb_1/contacts/c_1", recorder.seen.get(0).getUrl());
     }
 
     @Test
-    void aMetadataFilterIsSentAsOnePairAKeyTheKeysSortedAndEscaped() {
-        Recorder recorder = new Recorder(request -> json(200, Map.of(), data(Map.of(
-                "items", List.of(),
-                "pagination", Map.of("total_count", 0, "max_page", 1)))));
-        Map<String, String> metadata = Map.of("pedido", "123", "camera id", "a/b");
-        client(recorder).orders().list(OrdersService.ListParams.builder().clientReferenceId("pedido-1").metadata(metadata).build());
-        assertEquals(
-                "client_reference_id=pedido-1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123",
-                URI.create(recorder.seen.get(0).getUrl()).getRawQuery());
-        for (Checkout ignored : client(recorder).checkouts().listIter(CheckoutsService.ListParams.builder().limit(1).metadata(metadata).build())) {
-            throw new AssertionError("an empty page has no items");
-        }
-        assertEquals(
-                "page=1&limit=1&metadata%5Bcamera%20id%5D=a%2Fb&metadata%5Bpedido%5D=123",
-                URI.create(recorder.seen.get(1).getUrl()).getRawQuery());
-    }
-
-    @Test
-    void customersAreListedByEmail() {
-        Recorder recorder = new Recorder(request -> json(200, Map.of(), data(Map.of(
-                "items", List.of(),
-                "pagination", Map.of("total_count", 0, "max_page", 1)))));
-        client(recorder).customers().list(CustomersService.ListParams.builder().email("ana@example.com").build());
-        URI url = URI.create(recorder.seen.get(0).getUrl());
-        assertEquals("/api/v1/customers", url.getPath());
-        assertEquals("email=ana%40example.com", url.getRawQuery());
-    }
-
-    // A graduated price goes out with its tiers and without the fixed amount, and
-    // a subscription reads back the quantity it bills and the order reference it
-    // came from; amount_cents is the cycle's total for that quantity.
-    @Test
-    void aGraduatedPriceCarriesItsTiersAndASubscriptionItsQuantity() {
-        String price = "{\"id\":\"price_1\",\"product_id\":\"prod_1\",\"type\":\"recurring\",\"interval\":\"month\",\"interval_count\":1,\"currency\":\"BRL\",\"status\":\"active\",\"amount_cents\":0,\"pricing_model\":\"graduated\",\"unit_amount_cents\":null,\"unit_label\":\"câmera\",\"unit_label_plural\":\"câmeras\",\"tiers\":[{\"up_to\":1,\"unit_amount_cents\":25000},{\"up_to\":null,\"unit_amount_cents\":15000}]}";
-        String subscription = "{\"id\":\"sub_1\",\"amount_cents\":55000,\"cancel_at_period_end\":false,\"client_reference_id\":\"pedido-9\",\"currency\":\"BRL\",\"current_period_end\":\"2026-12-20T00:00:00Z\",\"current_period_start\":\"2026-11-20T00:00:00Z\",\"customer_id\":\"cus_1\",\"interval\":\"month\",\"metadata\":{\"camera\":\"c1\"},\"price_id\":\"price_1\",\"product_id\":\"prod_1\",\"quantity\":3,\"showcase_id\":\"shw_1\",\"status\":\"active\",\"suspended_at\":null,\"suspension_reason\":null,\"trial_end\":null,\"trial_start\":null}";
-        Recorder recorder = new Recorder(request -> "POST".equals(request.getMethod())
-                ? json(201, Map.of(), data(Json.parse(price)))
-                : json(200, Map.of(), data(Json.parse(subscription))));
-        Meeng meeng = client(recorder);
-        Price created = meeng.prices().create(PricesService.CreateParams.builder()
-                .productId("prod_1").type("recurring").interval("month").pricingModel("graduated")
-                .tiers(List.of(
-                        PricesService.PricesCreateTier.builder().upTo(1L).unitAmountCents(25000L).build(),
-                        PricesService.PricesCreateTier.builder().unitAmountCents(15000L).build()))
-                .unitLabel("câmera").unitLabelPlural("câmeras")
-                .build());
-        assertEquals("/api/v1/prices", URI.create(recorder.seen.get(0).getUrl()).getPath());
-        Map<String, Object> sent = Json.asObject(Json.parse(new String(recorder.seen.get(0).getBody(), StandardCharsets.UTF_8)));
-        assertEquals("graduated", sent.get("pricing_model"));
-        assertEquals(List.of(Map.of("up_to", 1L, "unit_amount_cents", 25000L), Map.of("unit_amount_cents", 15000L)), sent.get("tiers"));
-        assertFalse(sent.containsKey("amount_cents"));
-        assertEquals("graduated", created.getPricingModel());
-        assertEquals(0L, created.getAmountCents());
-        assertNull(created.getUnitAmountCents());
-        assertEquals(2, created.getTiers().size());
-        assertEquals(Long.valueOf(1), created.getTiers().get(0).getUpTo());
-        assertNull(created.getTiers().get(1).getUpTo());
-        assertEquals(15000L, created.getTiers().get(1).getUnitAmountCents());
-        Subscription got = meeng.subscriptions().get("sub_1");
-        assertEquals("/api/v1/subscriptions/sub_1", URI.create(recorder.seen.get(1).getUrl()).getPath());
-        assertEquals(3L, got.getQuantity());
-        assertEquals(55000L, got.getAmountCents());
-        assertEquals("pedido-9", got.getClientReferenceId());
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void usageIngestionCarriesTheSourceCredentialAndItsEvents() {
-        Recorder recorder = new Recorder(request -> json(200, Map.of(), data(Map.of("created", 1L, "replayed", 0L))));
-        Meeng usage = Meeng.builder("pus_live_source").baseUrl("https://meeng.test/").transport(recorder).build();
-        UsageIngestReceipt receipt = usage.usage().ingest(UsageService.IngestParams.builder().events(List.of(UsageService.UsageIngestEvent.builder()
-                .customerId("cus_1").externalEventId("req-1").inputTokens("1200").outputTokens("300").cachedTokens("0")
-                .occurredAt("2026-11-13T12:00:00Z")
-                .cost(UsageService.UsageIngestEventCost.builder().amount("1.250000").currency("brl").build())
-                .build())).build());
-        assertEquals(1L, receipt.getCreated());
-        assertEquals(0L, receipt.getReplayed());
-        Transport.Request seen = recorder.seen.get(0);
-        assertEquals("POST", seen.getMethod());
-        assertEquals("/api/v1/usage/token-events", URI.create(seen.getUrl()).getPath());
-        assertEquals("Bearer pus_live_source", seen.getHeaders().get("Authorization"));
-        Map<String, Object> sent = Json.asObject(Json.parse(new String(seen.getBody(), StandardCharsets.UTF_8)));
-        List<Object> events = (List<Object>) sent.get("events");
-        assertEquals(1, events.size());
-        Map<String, Object> event = Json.asObject(events.get(0));
-        assertEquals("cus_1", event.get("customer_id"));
-        assertEquals(Map.of("amount", "1.250000", "currency", "brl"), event.get("_cost"));
-        assertEquals(false, event.containsKey("_llm"));
-        assertEquals(false, event.containsKey("parent_id"));
-    }
-
-    @Test
-    void usageIngestionErrorsAreTheFlatErrorDocument() {
-        UsageService.IngestParams params = UsageService.IngestParams.builder().events(List.of(UsageService.UsageIngestEvent.builder()
-                .customerId("cus_1").externalEventId("req-1").inputTokens("1").outputTokens("0").cachedTokens("0").occurredAt("2026-11-13T12:00:00Z").build())).build();
+    void aRefusalThrowsInEveryShapeTheApiWritesIt() {
         Object[][] cases = {
-            {401, Map.of("error", "invalid_credential"), "invalid_credential", 0, ""},
-            {409, Map.of("error", "conflict", "record", 2L, "message", "conflict"), "conflict", 2, "conflict"},
-            {422, Map.of("error", "invalid_request", "record", 3L, "message", "validation failed: customer_id", "fields", Map.of("customer_id", List.of("unknown"))), "invalid_request", 3, "validation failed: customer_id"},
-            {400, Map.of("error", "invalid_request", "message", "malformed JSON"), "invalid_request", 0, "malformed JSON"},
-            {415, Map.of("error", "unsupported_media_type"), "unsupported_media_type", 0, ""},
-            {500, Map.of("error", "unavailable"), "unavailable", 0, ""},
+            {409, map("error", map("code", "NOT_UNIQUE", "message", "Idempotency-Key already used")), "NOT_UNIQUE", "Idempotency-Key already used"},
+            {403, map("error", "Forbidden"), "INTERNAL_SERVER_ERROR", "Forbidden"},
+            {400, map("code", "BAD_REQUEST", "message", "bad"), "BAD_REQUEST", "bad"},
+            {502, "<html>", "INTERNAL_SERVER_ERROR", "Bad Gateway"},
         };
         for (Object[] each : cases) {
-            Recorder recorder = new Recorder(request -> json((Integer) each[0], Map.of(), each[1]));
-            MeengException refused = assertThrows(MeengException.class, () -> client(recorder).usage().ingest(params));
-            assertEquals(each[0], refused.getStatus());
-            assertEquals(each[2], refused.getCode());
-            assertEquals(each[3], refused.getRecord());
-            assertEquals(each[4], refused.getApiMessage());
-            if ((Integer) each[0] == 422) {
-                assertEquals(List.of("unknown"), refused.getFields().get("customer_id"));
-            }
+            Recorder recorder = new Recorder(r -> json((Integer) each[0], each[1]));
+            MeengException refusal = assertThrows(MeengException.class, () -> client(recorder).emails().cancel("em_1"));
+            assertEquals((Integer) each[0], refusal.getStatus());
+            assertEquals(each[2], refusal.getCode());
+            assertEquals(7, refusal.getRetryAfter());
+            assertEquals("meeng: " + each[0] + " " + each[2] + ": " + each[3], refusal.getMessage());
         }
     }
 
     @Test
-    void anErrorWrappedInDataByAnOlderServerIsStillRead() {
-        UsageService.IngestParams params = UsageService.IngestParams.builder().events(List.of(UsageService.UsageIngestEvent.builder()
-                .customerId("cus_1").externalEventId("req-1").inputTokens("1").outputTokens("0").cachedTokens("0").occurredAt("2026-11-13T12:00:00Z").build())).build();
-        Recorder recorder = new Recorder(request -> json(409, Map.of(), data(Map.of("error", "event_conflict", "record", 2L, "message", "conflict"))));
-        MeengException refused = assertThrows(MeengException.class, () -> client(recorder).usage().ingest(params));
-        assertEquals(409, refused.getStatus());
-        assertEquals("event_conflict", refused.getCode());
-        assertEquals(2, refused.getRecord());
+    void anEmailsRecipientsMayComeAsOneStringOrAList() {
+        Recorder recorder = new Recorder(r -> json(200, map("id", "em_1", "teamId", 1, "to", "a@x.com", "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
+                "createdAt", "x", "updatedAt", "x", "emailEvents", List.of())));
+        assertEquals(List.of("a@x.com"), client(recorder).emails().get("em_1").getTo());
     }
 
     @Test
-    void aRefusalIsATypedError() {
-        Recorder recorder = new Recorder(request -> URI.create(request.getUrl()).getPath().equals("/api/v1/customers")
-                ? json(422, Map.of(), Map.of("error", "invalid_request", "fields", Map.of("email", List.of("send an e-mail"))))
-                : json(429, Map.of("Retry-After", "7"), null));
-        Meeng meeng = client(recorder);
-        MeengException refused = assertThrows(MeengException.class,
-                () -> meeng.customers().create(CustomersService.CreateParams.builder().name("x").email("x").build()));
-        assertEquals(422, refused.getStatus());
-        assertEquals("invalid_request", refused.getCode());
-        assertEquals(List.of("send an e-mail"), refused.getFields().get("email"));
-        MeengException limited = assertThrows(MeengException.class, () -> meeng.products().list());
-        assertEquals(429, limited.getStatus());
-        assertEquals(Integer.valueOf(7), limited.getRetryAfter());
-    }
-
-    // The webhook vectors every SDK checks: Standard Webhooks' own example, and
-    // meeng events signed under two secrets, as while one is rotated.
-    private static final String REFERENCE_SECRET = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw";
-    private static final String OLD_SECRET = "whsec_cGVyYXRhLXNkay1vbGQta2V5LTAxMjM0NTY3ODlhYmM=";
-    private static final String NEW_SECRET = "whsec_cGVyYXRhLXNkay1uZXcta2V5LTAxMjM0NTY3ODlhYmM=";
-    private static final String ORDER_PAID = "{\"id\":\"msg_2\",\"type\":\"order.paid\",\"timestamp\":\"2026-10-22T12:00:00Z\",\"data\":{\"id\":\"ord_1\",\"customer_id\":\"cus_1\",\"product_id\":\"prod_1\",\"price_id\":\"price_1\",\"amount_cents\":12000,\"currency\":\"BRL\",\"status\":\"succeeded\",\"paid_at\":\"2026-10-22T12:00:00Z\",\"order_status\":\"paid\",\"refunded_amount_cents\":0,\"refund_id\":null,\"refund_amount_cents\":null,\"installments\":3,\"installment_interest_cents\":360,\"items\":[],\"metadata\":{},\"client_reference_id\":\"\",\"showcase_id\":\"shw_1\"}}";
-    private static final String USAGE_RECORDED = "{\"id\":\"msg_3\",\"type\":\"usage_event.recorded\",\"timestamp\":\"2026-10-22T12:00:00Z\",\"data\":{\"event_id\":\"ue_1\",\"aggregate\":\"usage_event\",\"aggregate_id\":\"ue_1\",\"merchant_id\":\"mer_1\",\"environment\":\"test\"}}";
-    private static final String ORDER_PAID_LIVE = "{\"id\":\"msg_5\",\"type\":\"order.paid\",\"timestamp\":\"2026-10-22T12:00:00Z\",\"environment\":\"live\",\"showcase_id\":\"shw_1\",\"data\":{\"id\":\"ord_1\",\"customer_id\":\"cus_1\",\"product_id\":\"prod_1\",\"price_id\":\"price_1\",\"amount_cents\":12000,\"currency\":\"BRL\",\"status\":\"succeeded\",\"paid_at\":\"2026-10-22T12:00:00Z\",\"order_status\":\"paid\",\"refunded_amount_cents\":0,\"refund_id\":null,\"refund_amount_cents\":null,\"installments\":3,\"installment_interest_cents\":360,\"items\":[],\"metadata\":{},\"client_reference_id\":\"\",\"showcase_id\":\"shw_1\"}}";
-    private static final String PAYOUT_SENT_TEST = "{\"id\":\"msg_6\",\"type\":\"payout.sent\",\"timestamp\":\"2026-10-22T12:00:00Z\",\"environment\":\"test\",\"data\":{\"payout_id\":\"po_1\",\"amount_cents\":5000}}";
-    private static final String PAYOUT_SENT = "{\"id\":\"msg_4\",\"type\":\"payout.sent\",\"timestamp\":\"2026-10-22T12:00:00Z\",\"data\":{\"payout_id\":\"po_1\",\"amount_cents\":5000}}";
-    private static final long SIGNED_AT = 1792670400L;
-
-    private static Map<String, String> webhookHeaders(String id, long at, String signature) {
-        Map<String, String> headers = new HashMap<>();
-        headers.put("Webhook-Id", id);
-        headers.put("webhook-timestamp", Long.toString(at));
-        headers.put("webhook-signature", signature);
-        return headers;
-    }
-
-    @Test
-    void theStandardWebhooksVectorVerifies() {
-        byte[] body = "{\"test\": 2432232314}".getBytes(StandardCharsets.UTF_8);
-        Map<String, String> headers = webhookHeaders("msg_p5jXN8AQM9LWM0D4loKWxJek", 1614265330L, "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=");
-        Instant at = Instant.ofEpochSecond(1614265330L);
-        Webhook.verifySignature(REFERENCE_SECRET, headers, body, at);
-        byte[] changed = "{\"test\": 2432232314} ".getBytes(StandardCharsets.UTF_8);
-        assertThrows(WebhookVerificationException.class, () -> Webhook.verifySignature(REFERENCE_SECRET, headers, changed, at));
-        assertThrows(WebhookVerificationException.class, () -> Webhook.verifySignature(REFERENCE_SECRET, headers, body, at.plusSeconds(301)));
-        assertThrows(WebhookVerificationException.class, () -> Webhook.verifySignature(NEW_SECRET, headers, body, at));
-    }
-
-    @Test
-    void aTimestampThatIsNotPlainDigitsIsRefused() {
-        byte[] body = "{\"test\": 2432232314}".getBytes(StandardCharsets.UTF_8);
-        String[][] cases = {{"+1614265330", "JQsSpSSK1m9NI2FueDRZN3FL/jU9336idQcq6VmF+c8="}, {"\u00b2", "PEggIsKE32VQ8J4ZIk9apRhPy7w+a20bxGpjk1K4/HY="}, {"", "x"}, {"1_6", "x"}};
-        for (String[] each : cases) {
-            Map<String, String> headers = webhookHeaders("msg_p5jXN8AQM9LWM0D4loKWxJek", 0L, "v1," + each[1]);
-            headers.put("webhook-timestamp", each[0]);
-            assertThrows(WebhookVerificationException.class, () -> Webhook.verifySignature(REFERENCE_SECRET, headers, body, Instant.ofEpochSecond(1614265330L)), each[0]);
+    void theAddressMustBeHttpsExceptToLocalhost() {
+        for (String base : new String[] {"http://app.meeng.test", "ftp://app.meeng.test", "app.meeng.test", "http://localhost.evil.test"}) {
+            assertThrows(IllegalArgumentException.class, () -> Meeng.builder("k").baseUrl(base).build(), base);
         }
-    }
-
-    @Test
-    void aWebhookCarriesTheEnvironmentItHappenedIn() {
-        Instant now = Instant.ofEpochSecond(SIGNED_AT + 120);
-        String[][] older = {
-            {"msg_2", "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=", ORDER_PAID},
-            {"msg_3", "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU=", USAGE_RECORDED},
-            {"msg_4", "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY=", PAYOUT_SENT},
-        };
-        for (String[] each : older) {
-            WebhookEvent event = Webhook.verify(NEW_SECRET, webhookHeaders(each[0], SIGNED_AT, each[1]), each[2].getBytes(StandardCharsets.UTF_8), now);
-            assertEquals("", event.getEnvironment(), each[0]);
-            assertEquals("", event.getShowcaseId(), each[0]);
+        for (String base : new String[] {"https://app.meeng.test", "http://localhost:3000", "http://127.0.0.1:3000", "http://[::1]:3000"}) {
+            Meeng.builder("k").baseUrl(base).build();
         }
-        WebhookEvent order = Webhook.verify(NEW_SECRET, webhookHeaders("msg_5", SIGNED_AT, "v1,9CgfDokxQ7tBEd7vvv32TI4QUdqkaHrxgUo2UUNQpOY="), ORDER_PAID_LIVE.getBytes(StandardCharsets.UTF_8), now);
-        assertInstanceOf(OrderWebhookEvent.class, order);
-        assertEquals("live", order.getEnvironment());
-        assertEquals("shw_1", order.getShowcaseId());
-        assertEquals("shw_1", ((OrderWebhookEvent) order).getData().getShowcaseId());
-        WebhookEvent unknown = Webhook.verify(NEW_SECRET, webhookHeaders("msg_6", SIGNED_AT, "v1,6He63m1rUlB789sgtRAHqex4wyKkzAwdHt6uRsp8YQM="), PAYOUT_SENT_TEST.getBytes(StandardCharsets.UTF_8), now);
-        assertInstanceOf(UnknownWebhookEvent.class, unknown);
-        assertEquals("test", unknown.getEnvironment());
-        assertEquals("", unknown.getShowcaseId());
+        assertEquals("https://app.meeng.test/api", Meeng.builder("k").baseUrl("https://app.meeng.test/").build().getUrl());
     }
 
     @Test
-    void aWebhookAnswersItsTypedEvent() {
-        Instant now = Instant.ofEpochSecond(SIGNED_AT + 120);
-        Map<String, String> headers = webhookHeaders("msg_2", SIGNED_AT, "v1,fvRLETNjaSQOVbSs/eVRV/C17ysRHoubzX3idpGAifI= v1,ZsKtmVTp/mXCeW5qAiaLJY1TjyXwUyS7RxRVa3RIQQo=");
-        byte[] orderPaid = ORDER_PAID.getBytes(StandardCharsets.UTF_8);
-        for (String secret : List.of(NEW_SECRET, OLD_SECRET)) {
-            WebhookEvent event = Webhook.verify(secret, headers, orderPaid, now);
-            OrderWebhookEvent order = assertInstanceOf(OrderWebhookEvent.class, event);
-            assertEquals("order.paid", order.getType());
-            assertEquals("ord_1", order.getData().getId());
-            assertEquals(3L, order.getData().getInstallments());
-            assertEquals(360L, order.getData().getInstallmentInterestCents());
-        }
-        assertThrows(WebhookVerificationException.class, () -> Webhook.verify(REFERENCE_SECRET, headers, orderPaid, now));
-        WebhookEvent usage = Webhook.verify(NEW_SECRET, webhookHeaders("msg_3", SIGNED_AT, "v1,Z3E2vTbczigiySfkzakxuZotPn9FlBY1KAET6hPEZoU="),
-                USAGE_RECORDED.getBytes(StandardCharsets.UTF_8), now);
-        assertEquals("mer_1", assertInstanceOf(IdentifiersWebhookEvent.class, usage).getData().get("merchant_id"));
-        assertEquals("msg_3", usage.getId());
-        WebhookEvent unknown = Webhook.verify(NEW_SECRET, webhookHeaders("msg_4", SIGNED_AT, "v1,Sa/yofA3h/58pFR+rIiWdIc8qXfcuqvyJSjxn4oJ1ZY="),
-                PAYOUT_SENT.getBytes(StandardCharsets.UTF_8), now);
-        assertEquals("payout.sent", unknown.getType());
-        assertEquals("po_1", assertInstanceOf(UnknownWebhookEvent.class, unknown).getData().get("payout_id"));
-    }
-
-    @Test
-    void theRealHttpSendsAndReadsThroughTheJdkClient() throws IOException {
+    void theJdkTransportNeverFollowsARedirect() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            byte[] answer;
-            if (!"Bearer prk_test_key".equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
-                exchange.getResponseHeaders().set("Retry-After", "3");
-                answer = Json.write(Map.of("error", "invalid_credential")).getBytes(StandardCharsets.UTF_8);
-                exchange.sendResponseHeaders(401, answer.length);
-            } else {
-                Map<String, Object> sent = Json.asObject(Json.parse(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
-                String idempotencyKey = exchange.getRequestHeaders().getFirst("Idempotency-Key");
-                Map<String, Object> product = product("prod_1");
-                product.put("name", sent.get("name"));
-                product.put("description", idempotencyKey == null ? "" : idempotencyKey);
-                product.put("showcase_id", "shw_1");
-                product.put("created_at", exchange.getRequestMethod() + " " + exchange.getRequestURI());
-                answer = Json.write(data(product)).getBytes(StandardCharsets.UTF_8);
-                exchange.sendResponseHeaders(201, answer.length);
-            }
-            try (OutputStream out = exchange.getResponseBody()) {
-                out.write(answer);
-            }
+            exchange.getResponseHeaders().add("Location", "https://elsewhere.test/");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
         });
         server.start();
         try {
-            String base = "http://127.0.0.1:" + server.getAddress().getPort();
-            Product product = Meeng.builder("prk_test_key").baseUrl(base).build().products().create(
-                    ProductsService.CreateParams.builder().name("Curso").build(),
-                    RequestOptions.builder().idempotencyKey("create-1").build());
-            assertEquals("Curso", product.getName());
-            assertEquals("create-1", product.getDescription());
-            assertEquals("POST /api/v1/products", product.getCreatedAt());
-
-            MeengException refused = assertThrows(MeengException.class,
-                    () -> Meeng.builder("prk_test_other").baseUrl(base).build().products().get("prod_1"));
-            assertEquals(401, refused.getStatus());
-            assertEquals("invalid_credential", refused.getCode());
-            assertEquals(Integer.valueOf(3), refused.getRetryAfter());
-            assertFalse(refused.getMessage().isEmpty());
-            assertTrue(refused.getFields().isEmpty());
+            Meeng meeng = Meeng.builder("k").baseUrl("http://127.0.0.1:" + server.getAddress().getPort()).build();
+            MeengException refusal = assertThrows(MeengException.class, () -> meeng.emails().cancel("em_1"));
+            assertEquals(302, refusal.getStatus());
         } finally {
             server.stop(0);
         }
+    }
+
+    private static final String SECRET = "whsec_test";
+    private static final String BODY = "{\"id\":\"evt_1\",\"type\":\"email.delivered\",\"createdAt\":\"2026-11-20T12:00:00Z\",\"data\":{\"id\":\"em_1\",\"status\":\"DELIVERED\",\"from\":\"h@acme.com\",\"to\":[\"a@x.com\"],\"occurredAt\":\"2026-11-20T12:00:00Z\"}}";
+
+    private static String sign(String timestamp, String text, String secret) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            StringBuilder out = new StringBuilder("v1=");
+            for (byte each : mac.doFinal((timestamp + "." + text).getBytes(StandardCharsets.UTF_8))) {
+                out.append(String.format("%02x", each));
+            }
+            return out.toString();
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    void aSignedWebhookIsVerifiedAndReadAsATypedEvent() {
+        String timestamp = Long.toString(System.currentTimeMillis());
+        Webhooks webhooks = new Meeng("k").webhooks(SECRET);
+        Map<String, String> headers = Map.of("X-Meeng-Signature", sign(timestamp, BODY, SECRET), "X-Meeng-Timestamp", timestamp);
+        assertTrue(webhooks.verify(BODY, headers));
+        WebhookEvent event = webhooks.constructEvent(BODY, headers);
+        EmailWebhookEvent delivered = assertInstanceOf(EmailWebhookEvent.class, event);
+        assertEquals("email.delivered", delivered.getType());
+        assertEquals(List.of("a@x.com"), delivered.getData().getTo());
+    }
+
+    @Test
+    void theUseSendHeadersAreAcceptedAsWellInAnyCase() {
+        String timestamp = Long.toString(System.currentTimeMillis());
+        Map<String, String> headers = Map.of("x-usesend-signature", sign(timestamp, BODY, SECRET), "X-UseSend-Timestamp", timestamp);
+        assertTrue(new Meeng("k").webhooks(SECRET).verify(BODY, headers));
+    }
+
+    private static String refused(Webhooks webhooks, Map<String, String> headers, String text, Webhooks.Options options) {
+        try {
+            webhooks.constructEvent(text, headers, options);
+            return "ACCEPTED";
+        } catch (WebhookVerificationException e) {
+            return e.getCode();
+        }
+    }
+
+    @Test
+    void aWebhookIsRefusedWithTheCodeThatSaysWhy() {
+        Instant now = Instant.ofEpochMilli(1_800_000_000_000L);
+        String timestamp = Long.toString(now.toEpochMilli());
+        String old = Long.toString(now.toEpochMilli() - 6 * 60 * 1000);
+        Webhooks webhooks = new Meeng("k").webhooks(SECRET);
+        Webhooks.Options at = Webhooks.Options.defaults().now(now);
+        Map<String, String> good = Map.of("X-Meeng-Signature", sign(timestamp, BODY, SECRET), "X-Meeng-Timestamp", timestamp);
+        Map<String, String> stale = Map.of("X-Meeng-Signature", sign(old, BODY, SECRET), "X-Meeng-Timestamp", old);
+        assertEquals("ACCEPTED", refused(webhooks, good, BODY, at));
+        assertEquals("MISSING_SIGNATURE", refused(webhooks, Map.of("X-Meeng-Timestamp", timestamp), BODY, at));
+        assertEquals("MISSING_TIMESTAMP", refused(webhooks, Map.of("X-Meeng-Signature", sign(timestamp, BODY, SECRET)), BODY, at));
+        assertEquals("INVALID_SIGNATURE_FORMAT", refused(webhooks, Map.of("X-Meeng-Signature", sign(timestamp, BODY, SECRET).substring(3), "X-Meeng-Timestamp", timestamp), BODY, at));
+        assertEquals("INVALID_TIMESTAMP", refused(webhooks, Map.of("X-Meeng-Signature", sign(timestamp, BODY, SECRET), "X-Meeng-Timestamp", "yesterday"), BODY, at));
+        assertEquals("TIMESTAMP_OUT_OF_RANGE", refused(webhooks, stale, BODY, at));
+        assertEquals("ACCEPTED", refused(webhooks, stale, BODY, Webhooks.Options.defaults().now(now).tolerance(Duration.ofMillis(-1))));
+        assertEquals("ACCEPTED", refused(webhooks, stale, BODY, Webhooks.Options.defaults().now(now).tolerance(Duration.ofMinutes(10))));
+        assertEquals("SIGNATURE_MISMATCH", refused(webhooks, good, BODY, Webhooks.Options.defaults().now(now).secret("another")));
+        assertEquals("SIGNATURE_MISMATCH", refused(webhooks, good, BODY.replace("em_1", "em_2"), at));
+        assertEquals("INVALID_JSON", refused(webhooks, Map.of("X-Meeng-Signature", sign(timestamp, "not json", SECRET), "X-Meeng-Timestamp", timestamp), "not json", at));
+        assertNull(URI.create("https://meeng.test").getQuery());
     }
 }

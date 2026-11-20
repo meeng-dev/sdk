@@ -401,6 +401,14 @@ final class Json {
         throw mismatch("a boolean", value);
     }
 
+    /** A list of strings that the API may write as one string. */
+    static List<String> asStringList(Object value) {
+        if (value instanceof String) {
+            return List.of((String) value);
+        }
+        return list(Json::asString).apply(value);
+    }
+
     static Object any(Object value) {
         return value;
     }

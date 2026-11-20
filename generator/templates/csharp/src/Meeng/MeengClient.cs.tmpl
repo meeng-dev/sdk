@@ -13,16 +13,14 @@ using System.Threading.Tasks;
 namespace Meeng;
 
 /// <summary>
-/// meeng's API with one organization's API key. The key says the
-/// organization and the environment: <c>prk_test_…</c> is the test
-/// environment, <c>prk_live_…</c> the live one. The client is safe to share
-/// between threads.
+/// meeng's API with one team's API key. Without a key it is read from
+/// <c>MEENG_API_KEY</c>, and the address of the app from <c>MEENG_BASE_URL</c>.
+/// The client is safe to share between threads.
 /// </summary>
 /// <example>
 /// <code>
-/// var meeng = new MeengClient(Environment.GetEnvironmentVariable("MEENG_API_KEY")!);
-/// var product = await meeng.Products.CreateAsync(new ProductsCreateParams { Name = "Curso" });
-/// await foreach (var each in meeng.Products.ListIterAsync()) { … }
+/// var meeng = new MeengClient("mg_123");
+/// var sent = await meeng.Emails.SendAsync(new EmailsSendParams { From = "hello@acme.com", To = ["customer@example.com"], Subject = "Hello", Html = "&lt;p&gt;Hello&lt;/p&gt;" });
 /// </code>
 /// </example>
 public sealed class MeengClient
@@ -33,8 +31,14 @@ public sealed class MeengClient
     /// <summary>The contract this SDK was generated from.</summary>
     public const string ApiVersion = {{quote .APIVersion}};
 
-    /// <summary>meeng's API. The environment, test or live, is the API key's: <c>prk_test_…</c> or <c>prk_live_…</c>.</summary>
+    /// <summary>
+    /// Where meeng's API lives. The client appends <c>{{.APIPrefix}}/v1</c> to it, so
+    /// <c>MEENG_BASE_URL</c>, like <see cref="MeengClientOptions.BaseUrl"/>, is the address of the app and nothing more.
+    /// </summary>
     public const string DefaultBaseUrl = {{quote .BaseURL}};
+
+    /// <summary>What every path starts with, after the base URL.</summary>
+    public const string ApiPrefix = {{quote .APIPrefix}};
 
     // One connection pool for every client that brings no HttpClient of its
     // own, renewed every few minutes so DNS changes are seen.
@@ -48,15 +52,21 @@ public sealed class MeengClient
     private readonly TimeSpan timeout;
     private readonly HttpClient http;
 
-    /// <summary>A client for the organization <paramref name="apiKey"/> belongs to.</summary>
-    /// <param name="apiKey">The organization's API key.</param>
+    /// <summary>A client for the team <paramref name="apiKey"/> belongs to.</summary>
+    /// <param name="apiKey">The team's API key; <c>MEENG_API_KEY</c> when null.</param>
     /// <param name="options">Another base URL, timeout or HTTP stack; null for the defaults.</param>
-    public MeengClient(string apiKey, MeengClientOptions? options = null)
+    /// <exception cref="ArgumentException">There is no key, or the base URL is not https (or loopback http).</exception>
+    public MeengClient(string? apiKey = null, MeengClientOptions? options = null)
     {
-        ArgumentException.ThrowIfNullOrEmpty(apiKey);
+        apiKey = string.IsNullOrEmpty(apiKey) ? Environment.GetEnvironmentVariable("MEENG_API_KEY") : apiKey;
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            throw new ArgumentException("Missing API key. Pass it to the constructor `new MeengClient(\"mg_123\")` or set MEENG_API_KEY", nameof(apiKey));
+        }
         options ??= new MeengClientOptions();
         this.apiKey = apiKey;
-        baseUrl = (options.BaseUrl ?? DefaultBaseUrl).TrimEnd('/');
+        var configured = options.BaseUrl ?? Environment.GetEnvironmentVariable("MEENG_BASE_URL");
+        baseUrl = (string.IsNullOrEmpty(configured) ? DefaultBaseUrl : configured).TrimEnd('/');
         CheckBaseUrl(baseUrl);
         timeout = options.Timeout ?? TimeSpan.FromSeconds(30);
         http = options.HttpClient
@@ -69,39 +79,32 @@ public sealed class MeengClient
     /// <summary>The API's {{.Name}}.</summary>
     public {{pascal .Name}}Service {{pascal .Name}} { get; }
 {{end}}
-    /// <summary>
-    /// Calls the API and answers what it wrapped in <c>data</c>; a refusal
-    /// throws <see cref="MeengException"/>.
-    /// </summary>
+    /// <summary>Checks and reads the webhooks a team's endpoint receives.</summary>
+    /// <param name="secret">The endpoint's signing secret.</param>
+    /// <returns>The handler.</returns>
+    public Webhooks Webhooks(string secret) => new(secret);
+
+    /// <summary>The address every call goes to, with the API prefix.</summary>
+    public string Url => baseUrl + ApiPrefix;
+
+    /// <summary>Calls the API and reads its answer; a refusal throws <see cref="MeengException"/>.</summary>
     internal async Task<T> RequestAsync<T>(
         HttpMethod method,
         string path,
         IEnumerable<KeyValuePair<string, string?>>? query,
         byte[]? body,
-        JsonTypeInfo<Envelope<T>> answer,
+        JsonTypeInfo<T> answer,
         string? idempotencyKey,
-        RequestOptions? options,
         CancellationToken cancellationToken)
     {
-        var raw = await SendAsync(method, path, query, body, idempotencyKey, options, cancellationToken).ConfigureAwait(false);
-        var envelope = JsonSerializer.Deserialize(raw, answer);
-        if (envelope is null || envelope.Data is null)
+        var raw = await SendAsync(method, path, query, body, idempotencyKey, cancellationToken).ConfigureAwait(false);
+        var value = JsonSerializer.Deserialize(raw, answer);
+        if (value is null)
         {
-            throw new JsonException("meeng: the API answered no data");
+            throw new JsonException("meeng: the API answered no JSON");
         }
-        return envelope.Data;
+        return value;
     }
-
-    /// <summary>Calls the API for an answer that is a 204 with no body; a refusal throws <see cref="MeengException"/>.</summary>
-    internal async Task RequestNoContentAsync(
-        HttpMethod method,
-        string path,
-        IEnumerable<KeyValuePair<string, string?>>? query,
-        byte[]? body,
-        string? idempotencyKey,
-        RequestOptions? options,
-        CancellationToken cancellationToken) =>
-        await SendAsync(method, path, query, body, idempotencyKey, options, cancellationToken).ConfigureAwait(false);
 
     private async Task<byte[]> SendAsync(
         HttpMethod method,
@@ -109,10 +112,9 @@ public sealed class MeengClient
         IEnumerable<KeyValuePair<string, string?>>? query,
         byte[]? body,
         string? idempotencyKey,
-        RequestOptions? options,
         CancellationToken cancellationToken)
     {
-        var url = new StringBuilder(baseUrl).Append(path);
+        var url = new StringBuilder(baseUrl).Append(ApiPrefix).Append(path);
         if (query is not null)
         {
             var separator = '?';
@@ -126,24 +128,14 @@ public sealed class MeengClient
                 separator = '&';
             }
         }
-        var key = options?.ApiKey;
-        if (string.IsNullOrEmpty(key))
-        {
-            key = apiKey;
-        }
         using var request = new HttpRequestMessage(method, url.ToString());
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.TryAddWithoutValidation("User-Agent", "meeng-csharp/" + Version);
         if (body is not null)
         {
             request.Content = new ByteArrayContent(body);
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        }
-        if (string.IsNullOrEmpty(idempotencyKey) && method == HttpMethod.Post)
-        {
-            // A POST is sent with a key of its own, one a call, unless the caller gave one.
-            idempotencyKey = Guid.NewGuid().ToString();
         }
         if (!string.IsNullOrEmpty(idempotencyKey))
         {
@@ -194,4 +186,7 @@ public sealed class MeengClient
         ArgumentNullException.ThrowIfNull(value);
         return Uri.EscapeDataString(value);
     }
+
+    /// <summary>The body of a call with none of its own, as useSend's SDKs send it.</summary>
+    internal static readonly byte[] EmptyObject = "{}"u8.ToArray();
 }
