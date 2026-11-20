@@ -297,7 +297,7 @@ func (r *Runner) checkPHP(blocks []Block) Result {
 		res.Problems = append(res.Problems, err.Error())
 		return res
 	}
-	args := []string{"analyse", "--no-progress", "--error-format=raw", "-c", "phpstan.neon"}
+	args := []string{"analyse", "--no-progress", "--memory-limit=1G", "--error-format=raw", "-c", "phpstan.neon"}
 	command := path
 	if strings.HasSuffix(path, ".phar") {
 		command, args = php, append([]string{path}, args...)
