@@ -38,7 +38,7 @@ defmodule Meeng do
   nothing more.
   """
   @spec default_base_url() :: String.t()
-  def default_base_url, do: "https://app.meeng.dev"
+  def default_base_url, do: "https://meeng.dev"
 
   @doc "What every path starts with, after the base URL."
   @spec api_prefix() :: String.t()

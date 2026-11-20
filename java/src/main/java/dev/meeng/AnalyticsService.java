@@ -51,12 +51,12 @@ public final class AnalyticsService {
             return new Builder();
         }
 
-        /** @return How many days to count: 7 or 30. (null when not filtered) */
+        /** @return How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today. (null when not filtered) */
         public String getDays() {
             return days;
         }
 
-        /** @return Only emails of these domains; a list sends one domainId for each value. (null when not filtered) */
+        /** @return Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. (null when not filtered) */
         public String getDomainId() {
             return domainId;
         }
@@ -77,7 +77,7 @@ public final class AnalyticsService {
             }
 
             /**
-             * @param days How many days to count: 7 or 30.
+             * @param days How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
              * @return this builder
              */
             public Builder days(String days) {
@@ -86,7 +86,7 @@ public final class AnalyticsService {
             }
 
             /**
-             * @param domainId Only emails of these domains; a list sends one domainId for each value.
+             * @param domainId Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
              * @return this builder
              */
             public Builder domainId(String domainId) {
@@ -134,7 +134,7 @@ public final class AnalyticsService {
             return new Builder();
         }
 
-        /** @return Only emails of these domains; a list sends one domainId for each value. (null when not filtered) */
+        /** @return Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. (null when not filtered) */
         public String getDomainId() {
             return domainId;
         }
@@ -153,7 +153,7 @@ public final class AnalyticsService {
             }
 
             /**
-             * @param domainId Only emails of these domains; a list sends one domainId for each value.
+             * @param domainId Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
              * @return this builder
              */
             public Builder domainId(String domainId) {

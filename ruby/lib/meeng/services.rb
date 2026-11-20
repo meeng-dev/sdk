@@ -173,10 +173,10 @@ module Meeng
     # Lists the contacts of a contact book, optionally by email or id.
     #
     # @param contactBookId [String, Integer]
-    # @param emails [String, nil] Only the contacts with these emails, separated by commas.
+    # @param emails [String, nil] Comma separated e-mail addresses; an exact match.
     # @param page [Integer, nil] The page, from 1.
-    # @param limit [Integer, nil] The items a page: 1 to 100, 50 by default.
-    # @param ids [String, nil] Only the contacts with these ids, separated by commas.
+    # @param limit [Integer, nil] Contacts to a page; 5000 when it is not given.
+    # @param ids [String, nil] Comma separated contact ids.
     # @return [Array<Hash>]
     def list(contactBookId, emails: nil, page: nil, limit: nil, ids: nil)
       query = {
@@ -352,9 +352,9 @@ module Meeng
 
     # Lists campaigns, optionally by status or a search text.
     #
-    # @param page [Integer, nil] The page, from 1.
-    # @param status [String, nil] Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.
-    # @param search [String, nil] Only campaigns whose name matches this text.
+    # @param page [Integer, nil] The page, from 1; 30 campaigns to a page.
+    # @param status [String, nil] Only campaigns in this status.
+    # @param search [String, nil] Part of the name or of the subject.
     # @return [Hash]
     def list(page: nil, status: nil, search: nil)
       query = {
@@ -418,8 +418,8 @@ module Meeng
 
     # Counts emails by day over the last 7 or 30 days.
     #
-    # @param days [String, nil] How many days to count: 7 or 30.
-    # @param domain_id [String, nil] Only emails of these domains; a list sends one domainId for each value.
+    # @param days [String, nil] How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
+    # @param domain_id [String, nil] Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     # @return [Hash]
     def email_time_series(days: nil, domain_id: nil)
       query = {
@@ -431,7 +431,7 @@ module Meeng
 
     # Reads the bounce and complaint rates of the sending reputation.
     #
-    # @param domain_id [String, nil] Only emails of these domains; a list sends one domainId for each value.
+    # @param domain_id [String, nil] Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     # @return [Hash]
     def reputation_metrics(domain_id: nil)
       query = {

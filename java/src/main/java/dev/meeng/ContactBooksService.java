@@ -42,7 +42,7 @@ public final class ContactBooksService {
 
         private final String name;
         private final String emoji;
-        private final Map<String, String> properties;
+        private final Map<String, Object> properties;
         private final Boolean doubleOptInEnabled;
         private final String doubleOptInFrom;
         private final String doubleOptInSubject;
@@ -76,7 +76,7 @@ public final class ContactBooksService {
         }
 
         /** @return the {@code properties} sent (null when left out) */
-        public Map<String, String> getProperties() {
+        public Map<String, Object> getProperties() {
             return properties;
         }
 
@@ -136,7 +136,7 @@ public final class ContactBooksService {
         public static final class Builder {
             private String name;
             private String emoji;
-            private Map<String, String> properties;
+            private Map<String, Object> properties;
             private Boolean doubleOptInEnabled;
             private String doubleOptInFrom;
             private String doubleOptInSubject;
@@ -168,7 +168,7 @@ public final class ContactBooksService {
              * @param properties the {@code properties} to send
              * @return this builder
              */
-            public Builder properties(Map<String, String> properties) {
+            public Builder properties(Map<String, Object> properties) {
                 this.properties = properties;
                 return this;
             }
@@ -260,7 +260,7 @@ public final class ContactBooksService {
 
         private final String name;
         private final String emoji;
-        private final Map<String, String> properties;
+        private final Map<String, Object> properties;
         private final Boolean doubleOptInEnabled;
         private final String doubleOptInFrom;
         private final String doubleOptInSubject;
@@ -294,7 +294,7 @@ public final class ContactBooksService {
         }
 
         /** @return the {@code properties} sent (null when left out) */
-        public Map<String, String> getProperties() {
+        public Map<String, Object> getProperties() {
             return properties;
         }
 
@@ -356,7 +356,7 @@ public final class ContactBooksService {
         public static final class Builder {
             private String name;
             private String emoji;
-            private Map<String, String> properties;
+            private Map<String, Object> properties;
             private Boolean doubleOptInEnabled;
             private String doubleOptInFrom;
             private String doubleOptInSubject;
@@ -388,7 +388,7 @@ public final class ContactBooksService {
              * @param properties the {@code properties} to send
              * @return this builder
              */
-            public Builder properties(Map<String, String> properties) {
+            public Builder properties(Map<String, Object> properties) {
                 this.properties = properties;
                 return this;
             }

@@ -336,6 +336,177 @@ final class CampaignActionResponse {
   Map<String, Object?> toJson() => {'success': success};
 }
 
+/// CampaignRow is a resource of meeng's API.
+final class CampaignRow {
+  const CampaignRow({
+    required this.id,
+    required this.name,
+    required this.from,
+    required this.subject,
+    this.previewText,
+    this.contactBookId,
+    this.html,
+    this.content,
+    required this.status,
+    this.scheduledAt,
+    required this.batchSize,
+    required this.batchWindowMinutes,
+    required this.total,
+    required this.sent,
+    required this.delivered,
+    required this.opened,
+    required this.clicked,
+    required this.unsubscribed,
+    required this.bounced,
+    required this.hardBounced,
+    required this.complained,
+    required this.replyTo,
+    required this.cc,
+    required this.bcc,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.teamId,
+    required this.domainId,
+    required this.isApi,
+    this.lastCursor,
+    this.lastSentAt,
+  });
+
+  /// A CampaignRow out of the API's JSON.
+  factory CampaignRow.fromJson(Map<String, Object?> json) {
+    return CampaignRow(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      from: json['from'] as String,
+      subject: json['subject'] as String,
+      previewText: json['previewText'] as String?,
+      contactBookId: json['contactBookId'] as String?,
+      html: json['html'] as String?,
+      content: json['content'] as String?,
+      status: json['status'] as String,
+      scheduledAt: json['scheduledAt'] as String?,
+      batchSize: json['batchSize'] as int,
+      batchWindowMinutes: json['batchWindowMinutes'] as int,
+      total: json['total'] as int,
+      sent: json['sent'] as int,
+      delivered: json['delivered'] as int,
+      opened: json['opened'] as int,
+      clicked: json['clicked'] as int,
+      unsubscribed: json['unsubscribed'] as int,
+      bounced: json['bounced'] as int,
+      hardBounced: json['hardBounced'] as int,
+      complained: json['complained'] as int,
+      replyTo: readList(json['replyTo'], readString),
+      cc: readList(json['cc'], readString),
+      bcc: readList(json['bcc'], readString),
+      createdAt: json['createdAt'] as String,
+      updatedAt: json['updatedAt'] as String,
+      teamId: json['teamId'] as int,
+      domainId: json['domainId'] as int,
+      isApi: json['isApi'] as bool,
+      lastCursor: json['lastCursor'] as String?,
+      lastSentAt: json['lastSentAt'] as String?,
+    );
+  }
+
+  final String id;
+
+  final String name;
+
+  final String from;
+
+  final String subject;
+
+  final String? previewText;
+
+  final String? contactBookId;
+
+  final String? html;
+
+  final String? content;
+
+  final String status;
+
+  final String? scheduledAt;
+
+  final int batchSize;
+
+  final int batchWindowMinutes;
+
+  final int total;
+
+  final int sent;
+
+  final int delivered;
+
+  final int opened;
+
+  final int clicked;
+
+  final int unsubscribed;
+
+  final int bounced;
+
+  final int hardBounced;
+
+  final int complained;
+
+  final List<String> replyTo;
+
+  final List<String> cc;
+
+  final List<String> bcc;
+
+  final String createdAt;
+
+  final String updatedAt;
+
+  final int teamId;
+
+  final int domainId;
+
+  final bool isApi;
+
+  final String? lastCursor;
+
+  final String? lastSentAt;
+
+  /// The JSON the API answers.
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'from': from,
+    'subject': subject,
+    'previewText': previewText,
+    'contactBookId': contactBookId,
+    'html': html,
+    'content': content,
+    'status': status,
+    'scheduledAt': scheduledAt,
+    'batchSize': batchSize,
+    'batchWindowMinutes': batchWindowMinutes,
+    'total': total,
+    'sent': sent,
+    'delivered': delivered,
+    'opened': opened,
+    'clicked': clicked,
+    'unsubscribed': unsubscribed,
+    'bounced': bounced,
+    'hardBounced': hardBounced,
+    'complained': complained,
+    'replyTo': replyTo,
+    'cc': cc,
+    'bcc': bcc,
+    'createdAt': createdAt,
+    'updatedAt': updatedAt,
+    'teamId': teamId,
+    'domainId': domainId,
+    'isApi': isApi,
+    'lastCursor': lastCursor,
+    'lastSentAt': lastSentAt,
+  };
+}
+
 /// The body of campaigns.create.
 final class CampaignsCreateParams {
   const CampaignsCreateParams({
@@ -376,8 +547,6 @@ final class CampaignsCreateParams {
 
   final bool? sendNow;
 
-  /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am',
-  /// 'next monday 10:30')
   final String? scheduledAt;
 
   final int? batchSize;
@@ -509,8 +678,6 @@ final class CampaignsListResponse {
 final class CampaignsScheduleParams {
   const CampaignsScheduleParams({this.scheduledAt, this.batchSize});
 
-  /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am',
-  /// 'next monday 10:30')
   final String? scheduledAt;
 
   final int? batchSize;
@@ -544,7 +711,8 @@ final class Contact {
     this.firstName,
     this.lastName,
     required this.email,
-    this.subscribed,
+    required this.subscribed,
+    this.unsubscribeReason,
     required this.properties,
     required this.contactBookId,
     required this.createdAt,
@@ -558,7 +726,8 @@ final class Contact {
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
       email: json['email'] as String,
-      subscribed: json['subscribed'] as bool?,
+      subscribed: json['subscribed'] as bool,
+      unsubscribeReason: json['unsubscribeReason'] as String?,
       properties: readMap(json['properties'], readString),
       contactBookId: json['contactBookId'] as String,
       createdAt: json['createdAt'] as String,
@@ -574,7 +743,9 @@ final class Contact {
 
   final String email;
 
-  final bool? subscribed;
+  final bool subscribed;
+
+  final String? unsubscribeReason;
 
   final Map<String, String> properties;
 
@@ -587,10 +758,11 @@ final class Contact {
   /// The JSON the API answers.
   Map<String, Object?> toJson() => {
     'id': id,
-    'firstName': ?firstName,
-    'lastName': ?lastName,
+    'firstName': firstName,
+    'lastName': lastName,
     'email': email,
-    'subscribed': ?subscribed,
+    'subscribed': subscribed,
+    'unsubscribeReason': unsubscribeReason,
     'properties': properties,
     'contactBookId': contactBookId,
     'createdAt': createdAt,
@@ -607,7 +779,7 @@ final class ContactBook {
     required this.properties,
     required this.variables,
     required this.emoji,
-    this.doubleOptInEnabled,
+    required this.doubleOptInEnabled,
     this.doubleOptInFrom,
     this.doubleOptInSubject,
     this.doubleOptInContent,
@@ -625,7 +797,7 @@ final class ContactBook {
       properties: readMap(json['properties'], readString),
       variables: readList(json['variables'], readString),
       emoji: json['emoji'] as String,
-      doubleOptInEnabled: json['doubleOptInEnabled'] as bool?,
+      doubleOptInEnabled: json['doubleOptInEnabled'] as bool,
       doubleOptInFrom: json['doubleOptInFrom'] as String?,
       doubleOptInSubject: json['doubleOptInSubject'] as String?,
       doubleOptInContent: json['doubleOptInContent'] as String?,
@@ -638,40 +810,28 @@ final class ContactBook {
     );
   }
 
-  /// The ID of the contact book
   final String id;
 
-  /// The name of the contact book
   final String name;
 
-  /// The ID of the team
   final int teamId;
 
-  /// Custom properties for the contact book
   final Map<String, String> properties;
 
-  /// Allowed personalization variables for contacts in this book
   final List<String> variables;
 
-  /// The emoji associated with the contact book
   final String emoji;
 
-  /// Whether double opt-in is enabled for new contacts
-  final bool? doubleOptInEnabled;
+  final bool doubleOptInEnabled;
 
-  /// From address used for double opt-in emails (must use a verified domain)
   final String? doubleOptInFrom;
 
-  /// Subject line used for double opt-in confirmation email
   final String? doubleOptInSubject;
 
-  /// Email editor JSON content used for double opt-in confirmation
   final String? doubleOptInContent;
 
-  /// The creation timestamp
   final String createdAt;
 
-  /// The last update timestamp
   final String updatedAt;
 
   final ContactBookCount? count;
@@ -684,10 +844,10 @@ final class ContactBook {
     'properties': properties,
     'variables': variables,
     'emoji': emoji,
-    'doubleOptInEnabled': ?doubleOptInEnabled,
-    'doubleOptInFrom': ?doubleOptInFrom,
-    'doubleOptInSubject': ?doubleOptInSubject,
-    'doubleOptInContent': ?doubleOptInContent,
+    'doubleOptInEnabled': doubleOptInEnabled,
+    'doubleOptInFrom': doubleOptInFrom,
+    'doubleOptInSubject': doubleOptInSubject,
+    'doubleOptInContent': doubleOptInContent,
     'createdAt': createdAt,
     'updatedAt': updatedAt,
     '_count': ?count?.toJson(),
@@ -703,7 +863,6 @@ final class ContactBookCount {
     return ContactBookCount(contacts: json['contacts'] as int);
   }
 
-  /// The number of contacts in the contact book
   final int contacts;
 
   /// The JSON the API answers.
@@ -727,7 +886,7 @@ final class ContactBooksCreateParams {
 
   final String? emoji;
 
-  final Map<String, String>? properties;
+  final Map<String, Object?>? properties;
 
   final bool? doubleOptInEnabled;
 
@@ -800,7 +959,7 @@ final class ContactBooksUpdateParams {
 
   final String? emoji;
 
-  final Map<String, String>? properties;
+  final Map<String, Object?>? properties;
 
   final bool? doubleOptInEnabled;
 
@@ -902,7 +1061,7 @@ final class ContactsBulkCreateParams {
 
   final String? lastName;
 
-  final Map<String, String>? properties;
+  final Map<String, Object?>? properties;
 
   final bool? subscribed;
 
@@ -988,7 +1147,7 @@ final class ContactsCreateParams {
 
   final String? lastName;
 
-  final Map<String, String>? properties;
+  final Map<String, Object?>? properties;
 
   final bool? subscribed;
 
@@ -1004,17 +1163,17 @@ final class ContactsCreateParams {
 
 /// ContactsCreateResponse is a resource of meeng's API.
 final class ContactsCreateResponse {
-  const ContactsCreateResponse({this.contactId});
+  const ContactsCreateResponse({required this.contactId});
 
   /// A ContactsCreateResponse out of the API's JSON.
   factory ContactsCreateResponse.fromJson(Map<String, Object?> json) {
-    return ContactsCreateResponse(contactId: json['contactId'] as String?);
+    return ContactsCreateResponse(contactId: json['contactId'] as String);
   }
 
-  final String? contactId;
+  final String contactId;
 
   /// The JSON the API answers.
-  Map<String, Object?> toJson() => {'contactId': ?contactId};
+  Map<String, Object?> toJson() => {'contactId': contactId};
 }
 
 /// ContactsDeleteResponse is a resource of meeng's API.
@@ -1045,7 +1204,7 @@ final class ContactsUpdateParams {
 
   final String? lastName;
 
-  final Map<String, String>? properties;
+  final Map<String, Object?>? properties;
 
   final bool? subscribed;
 
@@ -1060,17 +1219,17 @@ final class ContactsUpdateParams {
 
 /// ContactsUpdateResponse is a resource of meeng's API.
 final class ContactsUpdateResponse {
-  const ContactsUpdateResponse({this.contactId});
+  const ContactsUpdateResponse({required this.contactId});
 
   /// A ContactsUpdateResponse out of the API's JSON.
   factory ContactsUpdateResponse.fromJson(Map<String, Object?> json) {
-    return ContactsUpdateResponse(contactId: json['contactId'] as String?);
+    return ContactsUpdateResponse(contactId: json['contactId'] as String);
   }
 
-  final String? contactId;
+  final String contactId;
 
   /// The JSON the API answers.
-  Map<String, Object?> toJson() => {'contactId': ?contactId};
+  Map<String, Object?> toJson() => {'contactId': contactId};
 }
 
 /// The body of contacts.upsert.
@@ -1089,7 +1248,7 @@ final class ContactsUpsertParams {
 
   final String? lastName;
 
-  final Map<String, String>? properties;
+  final Map<String, Object?>? properties;
 
   final bool? subscribed;
 
@@ -1125,20 +1284,21 @@ final class Domain {
     required this.name,
     required this.teamId,
     required this.status,
-    this.region,
-    this.clickTracking,
-    this.openTracking,
+    required this.region,
+    required this.clickTracking,
+    required this.openTracking,
     required this.publicKey,
-    this.dkimStatus,
-    this.spfDetails,
-    required this.createdAt,
-    required this.updatedAt,
-    this.dmarcAdded,
-    this.isVerifying,
+    required this.dkimSelector,
+    required this.dkimStatus,
+    required this.spfDetails,
+    required this.dmarcAdded,
+    required this.isVerifying,
     this.errorMessage,
     this.subdomain,
     this.verificationError,
     this.lastCheckedTime,
+    required this.createdAt,
+    required this.updatedAt,
     required this.dnsRecords,
   });
 
@@ -1149,20 +1309,21 @@ final class Domain {
       name: json['name'] as String,
       teamId: json['teamId'] as int,
       status: json['status'] as String,
-      region: json['region'] as String?,
-      clickTracking: json['clickTracking'] as bool?,
-      openTracking: json['openTracking'] as bool?,
+      region: json['region'] as String,
+      clickTracking: json['clickTracking'] as bool,
+      openTracking: json['openTracking'] as bool,
       publicKey: json['publicKey'] as String,
-      dkimStatus: json['dkimStatus'] as String?,
-      spfDetails: json['spfDetails'] as String?,
-      createdAt: json['createdAt'] as String,
-      updatedAt: json['updatedAt'] as String,
-      dmarcAdded: json['dmarcAdded'] as bool?,
-      isVerifying: json['isVerifying'] as bool?,
+      dkimSelector: json['dkimSelector'] as String,
+      dkimStatus: json['dkimStatus'] as String,
+      spfDetails: json['spfDetails'] as String,
+      dmarcAdded: json['dmarcAdded'] as bool,
+      isVerifying: json['isVerifying'] as bool,
       errorMessage: json['errorMessage'] as String?,
       subdomain: json['subdomain'] as String?,
       verificationError: json['verificationError'] as String?,
       lastCheckedTime: json['lastCheckedTime'] as String?,
+      createdAt: json['createdAt'] as String,
+      updatedAt: json['updatedAt'] as String,
       dnsRecords: readList(
         json['dnsRecords'],
         (value) => DomainDnsRecord.fromJson(readObject(value)),
@@ -1170,37 +1331,31 @@ final class Domain {
     );
   }
 
-  /// The ID of the domain
   final int id;
 
-  /// The name of the domain
   final String name;
 
-  /// The ID of the team
   final int teamId;
 
-  /// One of `NOT_STARTED`, `PENDING`, `SUCCESS`, `FAILED`, `TEMPORARY_FAILURE`.
   final String status;
 
-  final String? region;
+  final String region;
 
-  final bool? clickTracking;
+  final bool clickTracking;
 
-  final bool? openTracking;
+  final bool openTracking;
 
   final String publicKey;
 
-  final String? dkimStatus;
+  final String dkimSelector;
 
-  final String? spfDetails;
+  final String dkimStatus;
 
-  final String createdAt;
+  final String spfDetails;
 
-  final String updatedAt;
+  final bool dmarcAdded;
 
-  final bool? dmarcAdded;
-
-  final bool? isVerifying;
+  final bool isVerifying;
 
   final String? errorMessage;
 
@@ -1210,6 +1365,10 @@ final class Domain {
 
   final String? lastCheckedTime;
 
+  final String createdAt;
+
+  final String updatedAt;
+
   final List<DomainDnsRecord> dnsRecords;
 
   /// The JSON the API answers.
@@ -1218,20 +1377,21 @@ final class Domain {
     'name': name,
     'teamId': teamId,
     'status': status,
-    'region': ?region,
-    'clickTracking': ?clickTracking,
-    'openTracking': ?openTracking,
+    'region': region,
+    'clickTracking': clickTracking,
+    'openTracking': openTracking,
     'publicKey': publicKey,
-    'dkimStatus': ?dkimStatus,
-    'spfDetails': ?spfDetails,
+    'dkimSelector': dkimSelector,
+    'dkimStatus': dkimStatus,
+    'spfDetails': spfDetails,
+    'dmarcAdded': dmarcAdded,
+    'isVerifying': isVerifying,
+    'errorMessage': errorMessage,
+    'subdomain': subdomain,
+    'verificationError': verificationError,
+    'lastCheckedTime': lastCheckedTime,
     'createdAt': createdAt,
     'updatedAt': updatedAt,
-    'dmarcAdded': ?dmarcAdded,
-    'isVerifying': ?isVerifying,
-    'errorMessage': ?errorMessage,
-    'subdomain': ?subdomain,
-    'verificationError': ?verificationError,
-    'lastCheckedTime': ?lastCheckedTime,
     'dnsRecords': dnsRecords.map((item) => item.toJson()).toList(),
   };
 }
@@ -1261,27 +1421,18 @@ final class DomainDnsRecord {
     );
   }
 
-  /// DNS record type
-  ///
-  /// One of `MX`, `TXT`.
   final String type;
 
-  /// DNS record name
   final String name;
 
-  /// DNS record value
   final String value;
 
-  /// DNS record TTL
   final String ttl;
 
-  /// DNS record priority
   final String? priority;
 
-  /// One of `NOT_STARTED`, `PENDING`, `SUCCESS`, `FAILED`, `TEMPORARY_FAILURE`.
   final String status;
 
-  /// Whether the record is recommended
   final bool? recommended;
 
   /// The JSON the API answers.
@@ -1441,9 +1592,6 @@ final class Email {
     required this.id,
     required this.teamId,
     required this.to,
-    this.replyTo,
-    this.cc,
-    this.bcc,
     required this.from,
     required this.subject,
     this.html,
@@ -1458,10 +1606,7 @@ final class Email {
     return Email(
       id: json['id'] as String,
       teamId: json['teamId'] as int,
-      to: readStringList(json['to']),
-      replyTo: readOptional(json['replyTo'], readStringList),
-      cc: readOptional(json['cc'], readStringList),
-      bcc: readOptional(json['bcc'], readStringList),
+      to: readList(json['to'], readString),
       from: json['from'] as String,
       subject: json['subject'] as String,
       html: json['html'] as String?,
@@ -1480,12 +1625,6 @@ final class Email {
   final int teamId;
 
   final List<String> to;
-
-  final List<String>? replyTo;
-
-  final List<String>? cc;
-
-  final List<String>? bcc;
 
   final String from;
 
@@ -1506,9 +1645,6 @@ final class Email {
     'id': id,
     'teamId': teamId,
     'to': to,
-    'replyTo': ?replyTo,
-    'cc': ?cc,
-    'bcc': ?bcc,
     'from': from,
     'subject': subject,
     'html': html,
@@ -1850,20 +1986,17 @@ final class EmailEvent {
       emailId: json['emailId'] as String,
       status: json['status'] as String,
       createdAt: json['createdAt'] as String,
-      data: json['data'],
+      data: readOptional(json['data'], (value) => readMap(value, readAny)),
     );
   }
 
   final String emailId;
 
-  /// One of `SCHEDULED`, `QUEUED`, `SENT`, `DELIVERY_DELAYED`, `BOUNCED`,
-  /// `REJECTED`, `RENDERING_FAILURE`, `DELIVERED`, `OPENED`, `CLICKED`,
-  /// `COMPLAINED`, `FAILED`, `CANCELLED`, `SUPPRESSED`.
   final String status;
 
   final String createdAt;
 
-  final Object? data;
+  final Map<String, Object?>? data;
 
   /// The JSON the API answers.
   Map<String, Object?> toJson() => {
@@ -2211,6 +2344,7 @@ final class EmailsBatchAttachment {
 
   final String filename;
 
+  /// The file, in base64.
   final String content;
 
   /// The JSON the API takes; a field left null is left out.
@@ -2255,13 +2389,14 @@ final class EmailsBatchParams {
 
   final String from;
 
-  /// Optional when templateId is provided
+  /// Optional when templateId is provided.
   final String? subject;
 
-  /// ID of a template from the dashboard
+  /// ID of a template from the dashboard.
   final String? templateId;
 
-  final Map<String, String>? variables;
+  /// The values of the template's variables, as text.
+  final Map<String, Object?>? variables;
 
   final List<String>? replyTo;
 
@@ -2273,8 +2408,8 @@ final class EmailsBatchParams {
 
   final String? html;
 
-  /// Custom headers to included with the emails
-  final Map<String, String>? headers;
+  /// Custom headers to include with the e-mail, name to value.
+  final Map<String, Object?>? headers;
 
   final List<EmailsBatchAttachment>? attachments;
 
@@ -2325,17 +2460,17 @@ final class EmailsBatchResponse {
 
 /// EmailsCancelResponse is a resource of meeng's API.
 final class EmailsCancelResponse {
-  const EmailsCancelResponse({this.emailId});
+  const EmailsCancelResponse({required this.emailId});
 
   /// A EmailsCancelResponse out of the API's JSON.
   factory EmailsCancelResponse.fromJson(Map<String, Object?> json) {
-    return EmailsCancelResponse(emailId: json['emailId'] as String?);
+    return EmailsCancelResponse(emailId: json['emailId'] as String);
   }
 
-  final String? emailId;
+  final String emailId;
 
   /// The JSON the API answers.
-  Map<String, Object?> toJson() => {'emailId': ?emailId};
+  Map<String, Object?> toJson() => {'emailId': emailId};
 }
 
 /// One item of data in EmailsListResponse.
@@ -2343,9 +2478,9 @@ final class EmailsListItem {
   const EmailsListItem({
     required this.id,
     required this.to,
-    this.replyTo,
-    this.cc,
-    this.bcc,
+    required this.replyTo,
+    required this.cc,
+    required this.bcc,
     required this.from,
     required this.subject,
     this.html,
@@ -2361,10 +2496,10 @@ final class EmailsListItem {
   factory EmailsListItem.fromJson(Map<String, Object?> json) {
     return EmailsListItem(
       id: json['id'] as String,
-      to: readStringList(json['to']),
-      replyTo: readOptional(json['replyTo'], readStringList),
-      cc: readOptional(json['cc'], readStringList),
-      bcc: readOptional(json['bcc'], readStringList),
+      to: readList(json['to'], readString),
+      replyTo: readList(json['replyTo'], readString),
+      cc: readList(json['cc'], readString),
+      bcc: readList(json['bcc'], readString),
       from: json['from'] as String,
       subject: json['subject'] as String,
       html: json['html'] as String?,
@@ -2381,11 +2516,11 @@ final class EmailsListItem {
 
   final List<String> to;
 
-  final List<String>? replyTo;
+  final List<String> replyTo;
 
-  final List<String>? cc;
+  final List<String> cc;
 
-  final List<String>? bcc;
+  final List<String> bcc;
 
   final String from;
 
@@ -2399,9 +2534,6 @@ final class EmailsListItem {
 
   final String updatedAt;
 
-  /// One of `SCHEDULED`, `QUEUED`, `SENT`, `DELIVERY_DELAYED`, `BOUNCED`,
-  /// `REJECTED`, `RENDERING_FAILURE`, `DELIVERED`, `OPENED`, `CLICKED`,
-  /// `COMPLAINED`, `FAILED`, `CANCELLED`, `SUPPRESSED`.
   final String? latestStatus;
 
   final String? scheduledAt;
@@ -2412,9 +2544,9 @@ final class EmailsListItem {
   Map<String, Object?> toJson() => {
     'id': id,
     'to': to,
-    'replyTo': ?replyTo,
-    'cc': ?cc,
-    'bcc': ?bcc,
+    'replyTo': replyTo,
+    'cc': cc,
+    'bcc': bcc,
     'from': from,
     'subject': subject,
     'html': html,
@@ -2459,6 +2591,7 @@ final class EmailsSendAttachment {
 
   final String filename;
 
+  /// The file, in base64.
   final String content;
 
   /// The JSON the API takes; a field left null is left out.
@@ -2488,13 +2621,14 @@ final class EmailsSendParams {
 
   final String from;
 
-  /// Optional when templateId is provided
+  /// Optional when templateId is provided.
   final String? subject;
 
-  /// ID of a template from the dashboard
+  /// ID of a template from the dashboard.
   final String? templateId;
 
-  final Map<String, String>? variables;
+  /// The values of the template's variables, as text.
+  final Map<String, Object?>? variables;
 
   final List<String>? replyTo;
 
@@ -2506,8 +2640,8 @@ final class EmailsSendParams {
 
   final String? html;
 
-  /// Custom headers to included with the emails
-  final Map<String, String>? headers;
+  /// Custom headers to include with the e-mail, name to value.
+  final Map<String, Object?>? headers;
 
   final List<EmailsSendAttachment>? attachments;
 
@@ -2536,17 +2670,17 @@ final class EmailsSendParams {
 
 /// EmailsSendResponse is a resource of meeng's API.
 final class EmailsSendResponse {
-  const EmailsSendResponse({this.emailId});
+  const EmailsSendResponse({required this.emailId});
 
   /// A EmailsSendResponse out of the API's JSON.
   factory EmailsSendResponse.fromJson(Map<String, Object?> json) {
-    return EmailsSendResponse(emailId: json['emailId'] as String?);
+    return EmailsSendResponse(emailId: json['emailId'] as String);
   }
 
-  final String? emailId;
+  final String emailId;
 
   /// The JSON the API answers.
-  Map<String, Object?> toJson() => {'emailId': ?emailId};
+  Map<String, Object?> toJson() => {'emailId': emailId};
 }
 
 /// The body of emails.update.
@@ -2561,17 +2695,17 @@ final class EmailsUpdateParams {
 
 /// EmailsUpdateResponse is a resource of meeng's API.
 final class EmailsUpdateResponse {
-  const EmailsUpdateResponse({this.emailId});
+  const EmailsUpdateResponse({required this.emailId});
 
   /// A EmailsUpdateResponse out of the API's JSON.
   factory EmailsUpdateResponse.fromJson(Map<String, Object?> json) {
-    return EmailsUpdateResponse(emailId: json['emailId'] as String?);
+    return EmailsUpdateResponse(emailId: json['emailId'] as String);
   }
 
-  final String? emailId;
+  final String emailId;
 
   /// The JSON the API answers.
-  Map<String, Object?> toJson() => {'emailId': ?emailId};
+  Map<String, Object?> toJson() => {'emailId': emailId};
 }
 
 /// The data of webhook.test, which the dashboard sends to try an endpoint.

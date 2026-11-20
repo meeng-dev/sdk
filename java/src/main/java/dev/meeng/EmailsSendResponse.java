@@ -16,10 +16,10 @@ public final class EmailsSendResponse {
 
     static EmailsSendResponse fromJson(Map<String, Object> data) {
         return new EmailsSendResponse(
-                Json.optional(data, "emailId", Json::asString));
+                Json.required(data, "emailId", Json::asString));
     }
 
-    /** @return the API's {@code emailId} (null when the API sends none) */
+    /** @return the API's {@code emailId} */
     public String getEmailId() {
         return emailId;
     }

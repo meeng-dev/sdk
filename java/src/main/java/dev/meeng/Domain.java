@@ -7,38 +7,29 @@ import java.util.Map;
 
 /** Domain is a resource of meeng's API. */
 public final class Domain {
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_NOT_STARTED = "NOT_STARTED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_PENDING = "PENDING";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_SUCCESS = "SUCCESS";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_FAILED = "FAILED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_TEMPORARY_FAILURE = "TEMPORARY_FAILURE";
 
     private final long id;
     private final String name;
     private final long teamId;
     private final String status;
     private final String region;
-    private final Boolean clickTracking;
-    private final Boolean openTracking;
+    private final boolean clickTracking;
+    private final boolean openTracking;
     private final String publicKey;
+    private final String dkimSelector;
     private final String dkimStatus;
     private final String spfDetails;
-    private final String createdAt;
-    private final String updatedAt;
-    private final Boolean dmarcAdded;
-    private final Boolean isVerifying;
+    private final boolean dmarcAdded;
+    private final boolean isVerifying;
     private final String errorMessage;
     private final String subdomain;
     private final String verificationError;
     private final String lastCheckedTime;
+    private final String createdAt;
+    private final String updatedAt;
     private final List<DomainDnsRecord> dnsRecords;
 
-    Domain(long id, String name, long teamId, String status, String region, Boolean clickTracking, Boolean openTracking, String publicKey, String dkimStatus, String spfDetails, String createdAt, String updatedAt, Boolean dmarcAdded, Boolean isVerifying, String errorMessage, String subdomain, String verificationError, String lastCheckedTime, List<DomainDnsRecord> dnsRecords) {
+    Domain(long id, String name, long teamId, String status, String region, boolean clickTracking, boolean openTracking, String publicKey, String dkimSelector, String dkimStatus, String spfDetails, boolean dmarcAdded, boolean isVerifying, String errorMessage, String subdomain, String verificationError, String lastCheckedTime, String createdAt, String updatedAt, List<DomainDnsRecord> dnsRecords) {
         this.id = id;
         this.name = name;
         this.teamId = teamId;
@@ -47,16 +38,17 @@ public final class Domain {
         this.clickTracking = clickTracking;
         this.openTracking = openTracking;
         this.publicKey = publicKey;
+        this.dkimSelector = dkimSelector;
         this.dkimStatus = dkimStatus;
         this.spfDetails = spfDetails;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
         this.dmarcAdded = dmarcAdded;
         this.isVerifying = isVerifying;
         this.errorMessage = errorMessage;
         this.subdomain = subdomain;
         this.verificationError = verificationError;
         this.lastCheckedTime = lastCheckedTime;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
         this.dnsRecords = dnsRecords;
     }
 
@@ -66,34 +58,35 @@ public final class Domain {
                 Json.required(data, "name", Json::asString),
                 Json.required(data, "teamId", Json::asLong),
                 Json.required(data, "status", Json::asString),
-                Json.optional(data, "region", Json::asString),
-                Json.optional(data, "clickTracking", Json::asBoolean),
-                Json.optional(data, "openTracking", Json::asBoolean),
+                Json.required(data, "region", Json::asString),
+                Json.required(data, "clickTracking", Json::asBoolean),
+                Json.required(data, "openTracking", Json::asBoolean),
                 Json.required(data, "publicKey", Json::asString),
-                Json.optional(data, "dkimStatus", Json::asString),
-                Json.optional(data, "spfDetails", Json::asString),
-                Json.required(data, "createdAt", Json::asString),
-                Json.required(data, "updatedAt", Json::asString),
-                Json.optional(data, "dmarcAdded", Json::asBoolean),
-                Json.optional(data, "isVerifying", Json::asBoolean),
+                Json.required(data, "dkimSelector", Json::asString),
+                Json.required(data, "dkimStatus", Json::asString),
+                Json.required(data, "spfDetails", Json::asString),
+                Json.required(data, "dmarcAdded", Json::asBoolean),
+                Json.required(data, "isVerifying", Json::asBoolean),
                 Json.optional(data, "errorMessage", Json::asString),
                 Json.optional(data, "subdomain", Json::asString),
                 Json.optional(data, "verificationError", Json::asString),
                 Json.optional(data, "lastCheckedTime", Json::asString),
+                Json.required(data, "createdAt", Json::asString),
+                Json.required(data, "updatedAt", Json::asString),
                 Json.required(data, "dnsRecords", Json.list(Json.model(DomainDnsRecord::fromJson))));
     }
 
-    /** @return The ID of the domain */
+    /** @return the API's {@code id} */
     public long getId() {
         return id;
     }
 
-    /** @return The name of the domain */
+    /** @return the API's {@code name} */
     public String getName() {
         return name;
     }
 
-    /** @return The ID of the team */
+    /** @return the API's {@code teamId} */
     public long getTeamId() {
         return teamId;
     }
@@ -103,18 +96,18 @@ public final class Domain {
         return status;
     }
 
-    /** @return the API's {@code region} (null when the API sends none) */
+    /** @return the API's {@code region} */
     public String getRegion() {
         return region;
     }
 
-    /** @return the API's {@code clickTracking} (null when the API sends none) */
-    public Boolean getClickTracking() {
+    /** @return the API's {@code clickTracking} */
+    public boolean getClickTracking() {
         return clickTracking;
     }
 
-    /** @return the API's {@code openTracking} (null when the API sends none) */
-    public Boolean getOpenTracking() {
+    /** @return the API's {@code openTracking} */
+    public boolean getOpenTracking() {
         return openTracking;
     }
 
@@ -123,33 +116,28 @@ public final class Domain {
         return publicKey;
     }
 
-    /** @return the API's {@code dkimStatus} (null when the API sends none) */
+    /** @return the API's {@code dkimSelector} */
+    public String getDkimSelector() {
+        return dkimSelector;
+    }
+
+    /** @return the API's {@code dkimStatus} */
     public String getDkimStatus() {
         return dkimStatus;
     }
 
-    /** @return the API's {@code spfDetails} (null when the API sends none) */
+    /** @return the API's {@code spfDetails} */
     public String getSpfDetails() {
         return spfDetails;
     }
 
-    /** @return the API's {@code createdAt} */
-    public String getCreatedAt() {
-        return createdAt;
-    }
-
-    /** @return the API's {@code updatedAt} */
-    public String getUpdatedAt() {
-        return updatedAt;
-    }
-
-    /** @return the API's {@code dmarcAdded} (null when the API sends none) */
-    public Boolean getDmarcAdded() {
+    /** @return the API's {@code dmarcAdded} */
+    public boolean getDmarcAdded() {
         return dmarcAdded;
     }
 
-    /** @return the API's {@code isVerifying} (null when the API sends none) */
-    public Boolean getIsVerifying() {
+    /** @return the API's {@code isVerifying} */
+    public boolean getIsVerifying() {
         return isVerifying;
     }
 
@@ -173,6 +161,16 @@ public final class Domain {
         return lastCheckedTime;
     }
 
+    /** @return the API's {@code createdAt} */
+    public String getCreatedAt() {
+        return createdAt;
+    }
+
+    /** @return the API's {@code updatedAt} */
+    public String getUpdatedAt() {
+        return updatedAt;
+    }
+
     /** @return the API's {@code dnsRecords} */
     public List<DomainDnsRecord> getDnsRecords() {
         return dnsRecords;
@@ -180,6 +178,6 @@ public final class Domain {
 
     @Override
     public String toString() {
-        return "Domain{" + "id=" + id + ", name=" + name + ", teamId=" + teamId + ", status=" + status + ", region=" + region + ", clickTracking=" + clickTracking + ", openTracking=" + openTracking + ", publicKey=" + publicKey + ", dkimStatus=" + dkimStatus + ", spfDetails=" + spfDetails + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + ", dmarcAdded=" + dmarcAdded + ", isVerifying=" + isVerifying + ", errorMessage=" + errorMessage + ", subdomain=" + subdomain + ", verificationError=" + verificationError + ", lastCheckedTime=" + lastCheckedTime + ", dnsRecords=" + dnsRecords + "}";
+        return "Domain{" + "id=" + id + ", name=" + name + ", teamId=" + teamId + ", status=" + status + ", region=" + region + ", clickTracking=" + clickTracking + ", openTracking=" + openTracking + ", publicKey=" + publicKey + ", dkimSelector=" + dkimSelector + ", dkimStatus=" + dkimStatus + ", spfDetails=" + spfDetails + ", dmarcAdded=" + dmarcAdded + ", isVerifying=" + isVerifying + ", errorMessage=" + errorMessage + ", subdomain=" + subdomain + ", verificationError=" + verificationError + ", lastCheckedTime=" + lastCheckedTime + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + ", dnsRecords=" + dnsRecords + "}";
     }
 }

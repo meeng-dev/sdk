@@ -161,7 +161,7 @@ type spec struct {
 	} `json:"servers"`
 	Paths      map[string]map[string]*operation `json:"paths"`
 	Components struct {
-		Schemas map[string]json.RawMessage `json:"schemas"`
+		Schemas map[string]*schema `json:"schemas"`
 	} `json:"components"`
 }
 
@@ -233,6 +233,24 @@ type schema struct {
 	AnyOf                []*schema       `json:"anyOf"`
 }
 
+// isNull says the schema is the JSON null: {"type": "null"}.
+func (s *schema) isNull() bool {
+	text, _ := s.Type.(string)
+	return text == "null"
+}
+
+// hasNull says the schema's type lists null beside another type, as OpenAPI
+// 3.1 writes a nullable value: {"type": ["string", "null"]}.
+func (s *schema) hasNull() bool {
+	list, _ := s.Type.([]any)
+	for _, each := range list {
+		if text, _ := each.(string); text == "null" {
+			return true
+		}
+	}
+	return false
+}
+
 // free says the schema constrains nothing: no type, no shape, no values. Its
 // value is any JSON.
 func (s *schema) free() bool {
@@ -288,13 +306,13 @@ type loader struct {
 	extra []*Model
 	// inline are those models by name.
 	inline map[string]*Model
+	// components are the schemas the contract names, by name. A schema that
+	// refers to one is read as that schema.
+	components map[string]*schema
 }
 
 func build(doc *spec, version string) (*IR, error) {
 	ir := &IR{Version: version, APIVersion: doc.Info.Version}
-	if len(doc.Components.Schemas) > 0 {
-		return nil, fmt.Errorf("generator: the contract names schemas, which this generator does not read: it expects every shape inline")
-	}
 	if len(doc.Servers) == 0 {
 		return nil, fmt.Errorf("generator: the contract has no server")
 	}
@@ -308,27 +326,34 @@ func build(doc *spec, version string) (*IR, error) {
 		return nil, err
 	}
 	origin, prefix := splitServer(doc.Servers[0].URL)
-	ir.BaseURL, ir.APIPrefix = origin, prefix
-	l := &loader{models: map[string]*Model{}, inline: map[string]*Model{}}
-	services := map[string]*Service{}
 	paths := make([]string, 0, len(doc.Paths))
 	for path := range doc.Paths {
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
+	// The contract writes the whole path, /api/v1/emails; the SDKs keep the
+	// API prefix apart, so that a client can be pointed at the app alone.
+	pathPrefix, err := versionPrefix(paths)
+	if err != nil {
+		return nil, err
+	}
+	ir.BaseURL, ir.APIPrefix = origin, prefix+pathPrefix
+	l := &loader{models: map[string]*Model{}, inline: map[string]*Model{}, components: doc.Components.Schemas}
+	services := map[string]*Service{}
 	seen := map[string]bool{}
-	for _, path := range paths {
+	for _, full := range paths {
+		path := strings.TrimPrefix(full, pathPrefix)
 		if err := checkPath(path); err != nil {
 			return nil, err
 		}
-		verbs := make([]string, 0, len(doc.Paths[path]))
-		for verb := range doc.Paths[path] {
+		verbs := make([]string, 0, len(doc.Paths[full]))
+		for verb := range doc.Paths[full] {
 			verbs = append(verbs, verb)
 		}
 		// Sorted, so that what two routes share is described the same way every run.
 		sort.Strings(verbs)
 		for _, httpMethod := range verbs {
-			op := doc.Paths[path][httpMethod]
+			op := doc.Paths[full][httpMethod]
 			if !httpMethods[httpMethod] {
 				return nil, fmt.Errorf("generator: %s is not an HTTP method the SDKs send (%s)", httpMethod, path)
 			}
@@ -390,6 +415,25 @@ func build(doc *spec, version string) (*IR, error) {
 	sort.Slice(all, func(i, j int) bool { return all[i].Name < all[j].Name })
 	ir.Models = all
 	return ir, nil
+}
+
+// versionPrefix is what every path of the contract has before /v1: /api. The
+// contract's operations all live under one prefix, or the SDKs would have to
+// guess which one a client adds.
+func versionPrefix(paths []string) (string, error) {
+	prefix := ""
+	for i, path := range paths {
+		at := strings.Index(path, "/v1/")
+		if at < 0 {
+			return "", fmt.Errorf("generator: path %s has no /v1/ in it", path)
+		}
+		if i == 0 {
+			prefix = path[:at]
+		} else if path[:at] != prefix {
+			return "", fmt.Errorf("generator: paths do not share one prefix before /v1: %q and %q", prefix, path[:at])
+		}
+	}
+	return prefix, nil
 }
 
 // splitServer writes https://app.meeng.dev/api as its origin and its prefix.
@@ -468,6 +512,13 @@ func (l *loader) methodOf(op *operation, httpMethod, path string, def operationD
 			if err := checkIdentifier("query parameter", param.Name); err != nil {
 				return nil, err
 			}
+			if param.Schema != nil {
+				resolved, err := l.deref(param.Schema, map[string]bool{})
+				if err != nil {
+					return nil, fmt.Errorf("generator: %s: query parameter %s: %w", id, param.Name, err)
+				}
+				param.Schema = resolved
+			}
 			kind, err := queryKind(param)
 			if err != nil {
 				return nil, fmt.Errorf("generator: %s: %w", id, err)
@@ -495,6 +546,10 @@ func (l *loader) methodOf(op *operation, httpMethod, path string, def operationD
 	if answer == nil {
 		return nil, fmt.Errorf("generator: %s answers no JSON body", id)
 	}
+	answer, err := l.answerOf(answer, def)
+	if err != nil {
+		return nil, fmt.Errorf("generator: %s: %w", id, err)
+	}
 	before := len(l.extra)
 	response, list, err := l.rootModel(def.responseName(), answer, false)
 	if err != nil {
@@ -511,6 +566,10 @@ func (l *loader) methodOf(op *operation, httpMethod, path string, def operationD
 		body := op.RequestBody.Content["application/json"].Schema
 		if body == nil {
 			return nil, fmt.Errorf("generator: %s takes a body that is not JSON", id)
+		}
+		body, err := l.deref(body, map[string]bool{})
+		if err != nil {
+			return nil, fmt.Errorf("generator: %s: %w", id, err)
 		}
 		before := len(l.extra)
 		model, list, err := l.rootModel(Pascal(def.Service)+Pascal(def.Name)+"Params", body, true)
@@ -531,6 +590,110 @@ func (l *loader) methodOf(op *operation, httpMethod, path string, def operationD
 		}
 	}
 	return method, nil
+}
+
+// componentPrefix starts the reference to a schema the contract names.
+const componentPrefix = "#/components/schemas/"
+
+// answerOf is the schema an operation answers, with every reference to a named
+// schema read as that schema.
+//
+// The contract writes a list as a named schema that refers to itself:
+// DomainList is {"$ref": "#/components/schemas/DomainList"}, which names no
+// shape at all. A list is read as the list of its item, which surface.go names
+// in Response (Domain for DomainList), and the contract must have that item as a
+// schema of its own. Any other reference to itself stops generation.
+func (l *loader) answerOf(answer *schema, def operationDef) (*schema, error) {
+	if strings.HasPrefix(answer.Ref, componentPrefix) {
+		name := strings.TrimPrefix(answer.Ref, componentPrefix)
+		if target := l.components[name]; target != nil && target.Ref == answer.Ref {
+			if def.Response == "" || name != def.Response+"List" || l.components[def.Response] == nil {
+				return nil, fmt.Errorf("the contract answers %s, a schema that refers to itself: surface.go must name the item of the list in Response", name)
+			}
+			answer = &schema{Type: "array", Items: &schema{Ref: componentPrefix + def.Response}}
+		}
+	}
+	return l.deref(answer, map[string]bool{})
+}
+
+// deref reads every reference to a named schema inside s as the schema it
+// names, and writes the OpenAPI 3.1 forms of a nullable value the way the
+// generator reads one: {"type": ["string", "null"]} and
+// {"anyOf": [schema, {"type": "null"}]}. trail holds the schemas being read, so a
+// schema that contains itself stops generation instead of running forever.
+func (l *loader) deref(s *schema, trail map[string]bool) (*schema, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if strings.HasPrefix(s.Ref, componentPrefix) {
+		name := strings.TrimPrefix(s.Ref, componentPrefix)
+		target := l.components[name]
+		if target == nil {
+			return nil, fmt.Errorf("the contract refers to the schema %s, which it does not define", name)
+		}
+		if trail[name] {
+			return nil, fmt.Errorf("the schema %s contains itself", name)
+		}
+		trail[name] = true
+		defer delete(trail, name)
+		resolved, err := l.deref(target, trail)
+		if err != nil {
+			return nil, err
+		}
+		out := *resolved
+		if s.Description != "" {
+			out.Description = s.Description
+		}
+		if s.Nullable {
+			out.Nullable = true
+		}
+		return &out, nil
+	}
+	out := *s
+	if len(s.Properties.Keys) > 0 {
+		out.Properties = properties{Keys: s.Properties.Keys, Map: map[string]*schema{}}
+		for _, key := range s.Properties.Keys {
+			property, err := l.deref(s.Properties.Map[key], trail)
+			if err != nil {
+				return nil, err
+			}
+			out.Properties.Map[key] = property
+		}
+	}
+	if s.Items != nil {
+		items, err := l.deref(s.Items, trail)
+		if err != nil {
+			return nil, err
+		}
+		out.Items = items
+	}
+	if len(s.AnyOf) > 0 {
+		out.AnyOf = make([]*schema, len(s.AnyOf))
+		for i, each := range s.AnyOf {
+			member, err := l.deref(each, trail)
+			if err != nil {
+				return nil, err
+			}
+			out.AnyOf[i] = member
+		}
+		// A value that is a schema or null is that schema, nullable.
+		if len(out.AnyOf) == 2 && (out.AnyOf[0].isNull() != out.AnyOf[1].isNull()) {
+			member := out.AnyOf[0]
+			if member.isNull() {
+				member = out.AnyOf[1]
+			}
+			merged := *member
+			merged.Nullable = true
+			if merged.Description == "" {
+				merged.Description = out.Description
+			}
+			return &merged, nil
+		}
+	}
+	if out.hasNull() {
+		out.Nullable = true
+	}
+	return &out, nil
 }
 
 // flush records the models met since before.
@@ -703,7 +866,7 @@ func anyOfType(s *schema) (*TypeRef, bool, error) {
 	var scalar, list bool
 	for _, each := range s.AnyOf {
 		switch {
-		case each.Nullable && each.free():
+		case each.isNull(), each.Nullable && each.free():
 			nullable = true
 		case each.kind() == "string" && len(each.Enum) == 0:
 			scalar = true

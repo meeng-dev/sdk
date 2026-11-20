@@ -106,22 +106,56 @@ type CampaignActionResponse struct {
 	Success bool `json:"success"`
 }
 
+// CampaignRow is a resource of meeng's API.
+type CampaignRow struct {
+	ID                 string   `json:"id"`
+	Name               string   `json:"name"`
+	From               string   `json:"from"`
+	Subject            string   `json:"subject"`
+	PreviewText        *string  `json:"previewText"`
+	ContactBookID      *string  `json:"contactBookId"`
+	HTML               *string  `json:"html"`
+	Content            *string  `json:"content"`
+	Status             string   `json:"status"`
+	ScheduledAt        *string  `json:"scheduledAt"`
+	BatchSize          int64    `json:"batchSize"`
+	BatchWindowMinutes int64    `json:"batchWindowMinutes"`
+	Total              int64    `json:"total"`
+	Sent               int64    `json:"sent"`
+	Delivered          int64    `json:"delivered"`
+	Opened             int64    `json:"opened"`
+	Clicked            int64    `json:"clicked"`
+	Unsubscribed       int64    `json:"unsubscribed"`
+	Bounced            int64    `json:"bounced"`
+	HardBounced        int64    `json:"hardBounced"`
+	Complained         int64    `json:"complained"`
+	ReplyTo            []string `json:"replyTo"`
+	Cc                 []string `json:"cc"`
+	Bcc                []string `json:"bcc"`
+	CreatedAt          string   `json:"createdAt"`
+	UpdatedAt          string   `json:"updatedAt"`
+	TeamID             int64    `json:"teamId"`
+	DomainID           int64    `json:"domainId"`
+	IsAPI              bool     `json:"isApi"`
+	LastCursor         *string  `json:"lastCursor"`
+	LastSentAt         *string  `json:"lastSentAt"`
+}
+
 // The body of campaigns.create.
 type CampaignsCreateParams struct {
-	Name          string     `json:"name"`
-	From          string     `json:"from"`
-	Subject       string     `json:"subject"`
-	PreviewText   *string    `json:"previewText,omitempty"`
-	ContactBookID string     `json:"contactBookId"`
-	Content       *string    `json:"content,omitempty"`
-	HTML          *string    `json:"html,omitempty"`
-	ReplyTo       StringList `json:"replyTo,omitempty"`
-	Cc            StringList `json:"cc,omitempty"`
-	Bcc           StringList `json:"bcc,omitempty"`
-	SendNow       *bool      `json:"sendNow,omitempty"`
-	// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
-	ScheduledAt *string `json:"scheduledAt,omitempty"`
-	BatchSize   *int64  `json:"batchSize,omitempty"`
+	Name          string   `json:"name"`
+	From          string   `json:"from"`
+	Subject       string   `json:"subject"`
+	PreviewText   *string  `json:"previewText,omitempty"`
+	ContactBookID string   `json:"contactBookId"`
+	Content       *string  `json:"content,omitempty"`
+	HTML          *string  `json:"html,omitempty"`
+	ReplyTo       []string `json:"replyTo,omitempty"`
+	Cc            []string `json:"cc,omitempty"`
+	Bcc           []string `json:"bcc,omitempty"`
+	SendNow       *bool    `json:"sendNow,omitempty"`
+	ScheduledAt   *string  `json:"scheduledAt,omitempty"`
+	BatchSize     *int64   `json:"batchSize,omitempty"`
 }
 
 // One item of campaigns in CampaignsListResponse.
@@ -148,7 +182,6 @@ type CampaignsListResponse struct {
 
 // The body of campaigns.schedule.
 type CampaignsScheduleParams struct {
-	// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
 	ScheduledAt *string `json:"scheduledAt,omitempty"`
 	BatchSize   *int64  `json:"batchSize,omitempty"`
 }
@@ -160,62 +193,50 @@ type CampaignsScheduleResponse struct {
 
 // Contact is a resource of meeng's API.
 type Contact struct {
-	ID            string            `json:"id"`
-	FirstName     *string           `json:"firstName,omitempty"`
-	LastName      *string           `json:"lastName,omitempty"`
-	Email         string            `json:"email"`
-	Subscribed    bool              `json:"subscribed,omitempty"`
-	Properties    map[string]string `json:"properties"`
-	ContactBookID string            `json:"contactBookId"`
-	CreatedAt     string            `json:"createdAt"`
-	UpdatedAt     string            `json:"updatedAt"`
+	ID                string            `json:"id"`
+	FirstName         *string           `json:"firstName"`
+	LastName          *string           `json:"lastName"`
+	Email             string            `json:"email"`
+	Subscribed        bool              `json:"subscribed"`
+	UnsubscribeReason *string           `json:"unsubscribeReason"`
+	Properties        map[string]string `json:"properties"`
+	ContactBookID     string            `json:"contactBookId"`
+	CreatedAt         string            `json:"createdAt"`
+	UpdatedAt         string            `json:"updatedAt"`
 }
 
 // ContactBook is a resource of meeng's API.
 type ContactBook struct {
-	// The ID of the contact book
-	ID string `json:"id"`
-	// The name of the contact book
-	Name string `json:"name"`
-	// The ID of the team
-	TeamID int64 `json:"teamId"`
-	// Custom properties for the contact book
-	Properties map[string]string `json:"properties"`
-	// Allowed personalization variables for contacts in this book
-	Variables []string `json:"variables"`
-	// The emoji associated with the contact book
-	Emoji string `json:"emoji"`
-	// Whether double opt-in is enabled for new contacts
-	DoubleOptInEnabled bool `json:"doubleOptInEnabled,omitempty"`
-	// From address used for double opt-in emails (must use a verified domain)
-	DoubleOptInFrom *string `json:"doubleOptInFrom,omitempty"`
-	// Subject line used for double opt-in confirmation email
-	DoubleOptInSubject *string `json:"doubleOptInSubject,omitempty"`
-	// Email editor JSON content used for double opt-in confirmation
-	DoubleOptInContent *string `json:"doubleOptInContent,omitempty"`
-	// The creation timestamp
-	CreatedAt string `json:"createdAt"`
-	// The last update timestamp
-	UpdatedAt string            `json:"updatedAt"`
-	Count     *ContactBookCount `json:"_count,omitempty"`
+	ID                 string            `json:"id"`
+	Name               string            `json:"name"`
+	TeamID             int64             `json:"teamId"`
+	Properties         map[string]string `json:"properties"`
+	Variables          []string          `json:"variables"`
+	Emoji              string            `json:"emoji"`
+	DoubleOptInEnabled bool              `json:"doubleOptInEnabled"`
+	DoubleOptInFrom    *string           `json:"doubleOptInFrom"`
+	DoubleOptInSubject *string           `json:"doubleOptInSubject"`
+	DoubleOptInContent *string           `json:"doubleOptInContent"`
+	CreatedAt          string            `json:"createdAt"`
+	UpdatedAt          string            `json:"updatedAt"`
+	Count              *ContactBookCount `json:"_count,omitempty"`
 }
 
 // The _count of ContactBook.
 type ContactBookCount struct {
-	// The number of contacts in the contact book
 	Contacts int64 `json:"contacts"`
 }
 
 // The body of contactBooks.create.
 type ContactBooksCreateParams struct {
-	Name               string            `json:"name"`
-	Emoji              *string           `json:"emoji,omitempty"`
-	Properties         map[string]string `json:"properties,omitempty"`
-	DoubleOptInEnabled *bool             `json:"doubleOptInEnabled,omitempty"`
-	DoubleOptInFrom    *string           `json:"doubleOptInFrom,omitempty"`
-	DoubleOptInSubject *string           `json:"doubleOptInSubject,omitempty"`
-	DoubleOptInContent *string           `json:"doubleOptInContent,omitempty"`
-	Variables          []string          `json:"variables,omitempty"`
+	Name               string         `json:"name"`
+	Emoji              *string        `json:"emoji,omitempty"`
+	Properties         map[string]any `json:"properties,omitempty"`
+	DoubleOptInEnabled *bool          `json:"doubleOptInEnabled,omitempty"`
+	DoubleOptInFrom    *string        `json:"doubleOptInFrom,omitempty"`
+	DoubleOptInSubject *string        `json:"doubleOptInSubject,omitempty"`
+	DoubleOptInContent *string        `json:"doubleOptInContent,omitempty"`
+	Variables          []string       `json:"variables,omitempty"`
 }
 
 // ContactBooksDeleteResponse is a resource of meeng's API.
@@ -227,14 +248,14 @@ type ContactBooksDeleteResponse struct {
 
 // The body of contactBooks.update.
 type ContactBooksUpdateParams struct {
-	Name               *string           `json:"name,omitempty"`
-	Emoji              *string           `json:"emoji,omitempty"`
-	Properties         map[string]string `json:"properties,omitempty"`
-	DoubleOptInEnabled *bool             `json:"doubleOptInEnabled,omitempty"`
-	DoubleOptInFrom    *string           `json:"doubleOptInFrom,omitempty"`
-	DoubleOptInSubject *string           `json:"doubleOptInSubject,omitempty"`
-	DoubleOptInContent *string           `json:"doubleOptInContent,omitempty"`
-	Variables          []string          `json:"variables,omitempty"`
+	Name               *string        `json:"name,omitempty"`
+	Emoji              *string        `json:"emoji,omitempty"`
+	Properties         map[string]any `json:"properties,omitempty"`
+	DoubleOptInEnabled *bool          `json:"doubleOptInEnabled,omitempty"`
+	DoubleOptInFrom    *string        `json:"doubleOptInFrom,omitempty"`
+	DoubleOptInSubject *string        `json:"doubleOptInSubject,omitempty"`
+	DoubleOptInContent *string        `json:"doubleOptInContent,omitempty"`
+	Variables          []string       `json:"variables,omitempty"`
 }
 
 // The data of the contact events.
@@ -252,11 +273,11 @@ type ContactPayload struct {
 
 // One item of the list contacts.bulkCreate takes.
 type ContactsBulkCreateParams struct {
-	Email      string            `json:"email"`
-	FirstName  *string           `json:"firstName,omitempty"`
-	LastName   *string           `json:"lastName,omitempty"`
-	Properties map[string]string `json:"properties,omitempty"`
-	Subscribed *bool             `json:"subscribed,omitempty"`
+	Email      string         `json:"email"`
+	FirstName  *string        `json:"firstName,omitempty"`
+	LastName   *string        `json:"lastName,omitempty"`
+	Properties map[string]any `json:"properties,omitempty"`
+	Subscribed *bool          `json:"subscribed,omitempty"`
 }
 
 // ContactsBulkCreateResponse is a resource of meeng's API.
@@ -278,16 +299,16 @@ type ContactsBulkDeleteResponse struct {
 
 // The body of contacts.create.
 type ContactsCreateParams struct {
-	Email      string            `json:"email"`
-	FirstName  *string           `json:"firstName,omitempty"`
-	LastName   *string           `json:"lastName,omitempty"`
-	Properties map[string]string `json:"properties,omitempty"`
-	Subscribed *bool             `json:"subscribed,omitempty"`
+	Email      string         `json:"email"`
+	FirstName  *string        `json:"firstName,omitempty"`
+	LastName   *string        `json:"lastName,omitempty"`
+	Properties map[string]any `json:"properties,omitempty"`
+	Subscribed *bool          `json:"subscribed,omitempty"`
 }
 
 // ContactsCreateResponse is a resource of meeng's API.
 type ContactsCreateResponse struct {
-	ContactID string `json:"contactId,omitempty"`
+	ContactID string `json:"contactId"`
 }
 
 // ContactsDeleteResponse is a resource of meeng's API.
@@ -297,24 +318,24 @@ type ContactsDeleteResponse struct {
 
 // The body of contacts.update.
 type ContactsUpdateParams struct {
-	FirstName  *string           `json:"firstName,omitempty"`
-	LastName   *string           `json:"lastName,omitempty"`
-	Properties map[string]string `json:"properties,omitempty"`
-	Subscribed *bool             `json:"subscribed,omitempty"`
+	FirstName  *string        `json:"firstName,omitempty"`
+	LastName   *string        `json:"lastName,omitempty"`
+	Properties map[string]any `json:"properties,omitempty"`
+	Subscribed *bool          `json:"subscribed,omitempty"`
 }
 
 // ContactsUpdateResponse is a resource of meeng's API.
 type ContactsUpdateResponse struct {
-	ContactID string `json:"contactId,omitempty"`
+	ContactID string `json:"contactId"`
 }
 
 // The body of contacts.upsert.
 type ContactsUpsertParams struct {
-	Email      string            `json:"email"`
-	FirstName  *string           `json:"firstName,omitempty"`
-	LastName   *string           `json:"lastName,omitempty"`
-	Properties map[string]string `json:"properties,omitempty"`
-	Subscribed *bool             `json:"subscribed,omitempty"`
+	Email      string         `json:"email"`
+	FirstName  *string        `json:"firstName,omitempty"`
+	LastName   *string        `json:"lastName,omitempty"`
+	Properties map[string]any `json:"properties,omitempty"`
+	Subscribed *bool          `json:"subscribed,omitempty"`
 }
 
 // ContactsUpsertResponse is a resource of meeng's API.
@@ -324,45 +345,37 @@ type ContactsUpsertResponse struct {
 
 // Domain is a resource of meeng's API.
 type Domain struct {
-	// The ID of the domain
-	ID int64 `json:"id"`
-	// The name of the domain
-	Name string `json:"name"`
-	// The ID of the team
+	ID                int64             `json:"id"`
+	Name              string            `json:"name"`
 	TeamID            int64             `json:"teamId"`
 	Status            string            `json:"status"`
-	Region            string            `json:"region,omitempty"`
-	ClickTracking     bool              `json:"clickTracking,omitempty"`
-	OpenTracking      bool              `json:"openTracking,omitempty"`
+	Region            string            `json:"region"`
+	ClickTracking     bool              `json:"clickTracking"`
+	OpenTracking      bool              `json:"openTracking"`
 	PublicKey         string            `json:"publicKey"`
-	DKIMStatus        *string           `json:"dkimStatus,omitempty"`
-	SPFDetails        *string           `json:"spfDetails,omitempty"`
+	DKIMSelector      string            `json:"dkimSelector"`
+	DKIMStatus        string            `json:"dkimStatus"`
+	SPFDetails        string            `json:"spfDetails"`
+	DmarcAdded        bool              `json:"dmarcAdded"`
+	IsVerifying       bool              `json:"isVerifying"`
+	ErrorMessage      *string           `json:"errorMessage"`
+	Subdomain         *string           `json:"subdomain"`
+	VerificationError *string           `json:"verificationError"`
+	LastCheckedTime   *string           `json:"lastCheckedTime"`
 	CreatedAt         string            `json:"createdAt"`
 	UpdatedAt         string            `json:"updatedAt"`
-	DmarcAdded        bool              `json:"dmarcAdded,omitempty"`
-	IsVerifying       bool              `json:"isVerifying,omitempty"`
-	ErrorMessage      *string           `json:"errorMessage,omitempty"`
-	Subdomain         *string           `json:"subdomain,omitempty"`
-	VerificationError *string           `json:"verificationError,omitempty"`
-	LastCheckedTime   *string           `json:"lastCheckedTime,omitempty"`
 	DNSRecords        []DomainDnsRecord `json:"dnsRecords"`
 }
 
 // One item of dnsRecords in Domain.
 type DomainDnsRecord struct {
-	// DNS record type
-	Type string `json:"type"`
-	// DNS record name
-	Name string `json:"name"`
-	// DNS record value
-	Value string `json:"value"`
-	// DNS record TTL
-	TTL string `json:"ttl"`
-	// DNS record priority
-	Priority *string `json:"priority,omitempty"`
-	Status   string  `json:"status"`
-	// Whether the record is recommended
-	Recommended bool `json:"recommended,omitempty"`
+	Type        string  `json:"type"`
+	Name        string  `json:"name"`
+	Value       string  `json:"value"`
+	TTL         string  `json:"ttl"`
+	Priority    *string `json:"priority,omitempty"`
+	Status      string  `json:"status"`
+	Recommended *bool   `json:"recommended,omitempty"`
 }
 
 // The data of the domain events.
@@ -404,10 +417,7 @@ type DomainsVerifyResponse struct {
 type Email struct {
 	ID          string       `json:"id"`
 	TeamID      int64        `json:"teamId"`
-	To          StringList   `json:"to"`
-	ReplyTo     StringList   `json:"replyTo,omitempty"`
-	Cc          StringList   `json:"cc,omitempty"`
-	Bcc         StringList   `json:"bcc,omitempty"`
+	To          []string     `json:"to"`
 	From        string       `json:"from"`
 	Subject     string       `json:"subject"`
 	HTML        *string      `json:"html"`
@@ -482,10 +492,10 @@ type EmailClickedPayload struct {
 
 // One item of emailEvents in Email.
 type EmailEvent struct {
-	EmailID   string `json:"emailId"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"createdAt"`
-	Data      any    `json:"data,omitempty"`
+	EmailID   string         `json:"emailId"`
+	Status    string         `json:"status"`
+	CreatedAt string         `json:"createdAt"`
+	Data      map[string]any `json:"data,omitempty"`
 }
 
 // Why an email failed.
@@ -559,7 +569,8 @@ type EmailSuppressedSuppression struct {
 // One item of attachments in EmailsBatchParams.
 type EmailsBatchAttachment struct {
 	Filename string `json:"filename"`
-	Content  string `json:"content"`
+	// The file, in base64.
+	Content string `json:"content"`
 }
 
 // One item of data in EmailsBatchResponse.
@@ -571,18 +582,19 @@ type EmailsBatchItem struct {
 type EmailsBatchParams struct {
 	To   StringList `json:"to"`
 	From string     `json:"from"`
-	// Optional when templateId is provided
+	// Optional when templateId is provided.
 	Subject *string `json:"subject,omitempty"`
-	// ID of a template from the dashboard
-	TemplateID *string           `json:"templateId,omitempty"`
-	Variables  map[string]string `json:"variables,omitempty"`
-	ReplyTo    StringList        `json:"replyTo,omitempty"`
-	Cc         StringList        `json:"cc,omitempty"`
-	Bcc        StringList        `json:"bcc,omitempty"`
-	Text       *string           `json:"text,omitempty"`
-	HTML       *string           `json:"html,omitempty"`
-	// Custom headers to included with the emails
-	Headers     map[string]string       `json:"headers,omitempty"`
+	// ID of a template from the dashboard.
+	TemplateID *string `json:"templateId,omitempty"`
+	// The values of the template's variables, as text.
+	Variables map[string]any `json:"variables,omitempty"`
+	ReplyTo   StringList     `json:"replyTo,omitempty"`
+	Cc        StringList     `json:"cc,omitempty"`
+	Bcc       StringList     `json:"bcc,omitempty"`
+	Text      *string        `json:"text,omitempty"`
+	HTML      *string        `json:"html,omitempty"`
+	// Custom headers to include with the e-mail, name to value.
+	Headers     map[string]any          `json:"headers,omitempty"`
 	Attachments []EmailsBatchAttachment `json:"attachments,omitempty"`
 	ScheduledAt *string                 `json:"scheduledAt,omitempty"`
 	InReplyToID *string                 `json:"inReplyToId,omitempty"`
@@ -595,25 +607,25 @@ type EmailsBatchResponse struct {
 
 // EmailsCancelResponse is a resource of meeng's API.
 type EmailsCancelResponse struct {
-	EmailID string `json:"emailId,omitempty"`
+	EmailID string `json:"emailId"`
 }
 
 // One item of data in EmailsListResponse.
 type EmailsListItem struct {
-	ID           string     `json:"id"`
-	To           StringList `json:"to"`
-	ReplyTo      StringList `json:"replyTo,omitempty"`
-	Cc           StringList `json:"cc,omitempty"`
-	Bcc          StringList `json:"bcc,omitempty"`
-	From         string     `json:"from"`
-	Subject      string     `json:"subject"`
-	HTML         *string    `json:"html"`
-	Text         *string    `json:"text"`
-	CreatedAt    string     `json:"createdAt"`
-	UpdatedAt    string     `json:"updatedAt"`
-	LatestStatus *string    `json:"latestStatus"`
-	ScheduledAt  *string    `json:"scheduledAt"`
-	DomainID     *int64     `json:"domainId"`
+	ID           string   `json:"id"`
+	To           []string `json:"to"`
+	ReplyTo      []string `json:"replyTo"`
+	Cc           []string `json:"cc"`
+	Bcc          []string `json:"bcc"`
+	From         string   `json:"from"`
+	Subject      string   `json:"subject"`
+	HTML         *string  `json:"html"`
+	Text         *string  `json:"text"`
+	CreatedAt    string   `json:"createdAt"`
+	UpdatedAt    string   `json:"updatedAt"`
+	LatestStatus *string  `json:"latestStatus"`
+	ScheduledAt  *string  `json:"scheduledAt"`
+	DomainID     *int64   `json:"domainId"`
 }
 
 // EmailsListResponse is a resource of meeng's API.
@@ -625,25 +637,27 @@ type EmailsListResponse struct {
 // One item of attachments in EmailsSendParams.
 type EmailsSendAttachment struct {
 	Filename string `json:"filename"`
-	Content  string `json:"content"`
+	// The file, in base64.
+	Content string `json:"content"`
 }
 
 // The body of emails.send.
 type EmailsSendParams struct {
 	To   StringList `json:"to"`
 	From string     `json:"from"`
-	// Optional when templateId is provided
+	// Optional when templateId is provided.
 	Subject *string `json:"subject,omitempty"`
-	// ID of a template from the dashboard
-	TemplateID *string           `json:"templateId,omitempty"`
-	Variables  map[string]string `json:"variables,omitempty"`
-	ReplyTo    StringList        `json:"replyTo,omitempty"`
-	Cc         StringList        `json:"cc,omitempty"`
-	Bcc        StringList        `json:"bcc,omitempty"`
-	Text       *string           `json:"text,omitempty"`
-	HTML       *string           `json:"html,omitempty"`
-	// Custom headers to included with the emails
-	Headers     map[string]string      `json:"headers,omitempty"`
+	// ID of a template from the dashboard.
+	TemplateID *string `json:"templateId,omitempty"`
+	// The values of the template's variables, as text.
+	Variables map[string]any `json:"variables,omitempty"`
+	ReplyTo   StringList     `json:"replyTo,omitempty"`
+	Cc        StringList     `json:"cc,omitempty"`
+	Bcc       StringList     `json:"bcc,omitempty"`
+	Text      *string        `json:"text,omitempty"`
+	HTML      *string        `json:"html,omitempty"`
+	// Custom headers to include with the e-mail, name to value.
+	Headers     map[string]any         `json:"headers,omitempty"`
 	Attachments []EmailsSendAttachment `json:"attachments,omitempty"`
 	ScheduledAt *string                `json:"scheduledAt,omitempty"`
 	InReplyToID *string                `json:"inReplyToId,omitempty"`
@@ -651,7 +665,7 @@ type EmailsSendParams struct {
 
 // EmailsSendResponse is a resource of meeng's API.
 type EmailsSendResponse struct {
-	EmailID string `json:"emailId,omitempty"`
+	EmailID string `json:"emailId"`
 }
 
 // The body of emails.update.
@@ -661,7 +675,7 @@ type EmailsUpdateParams struct {
 
 // EmailsUpdateResponse is a resource of meeng's API.
 type EmailsUpdateResponse struct {
-	EmailID string `json:"emailId,omitempty"`
+	EmailID string `json:"emailId"`
 }
 
 // The data of webhook.test, which the dashboard sends to try an endpoint.
@@ -673,18 +687,6 @@ type WebhookTestPayload struct {
 
 // The values the API answers in an enumerated field.
 const (
-	DomainStatusNotStarted                            = "NOT_STARTED"
-	DomainStatusPending                               = "PENDING"
-	DomainStatusSuccess                               = "SUCCESS"
-	DomainStatusFailed                                = "FAILED"
-	DomainStatusTemporaryFailure                      = "TEMPORARY_FAILURE"
-	DomainDnsRecordStatusNotStarted                   = "NOT_STARTED"
-	DomainDnsRecordStatusPending                      = "PENDING"
-	DomainDnsRecordStatusSuccess                      = "SUCCESS"
-	DomainDnsRecordStatusFailed                       = "FAILED"
-	DomainDnsRecordStatusTemporaryFailure             = "TEMPORARY_FAILURE"
-	DomainDnsRecordTypeMx                             = "MX"
-	DomainDnsRecordTypeTxt                            = "TXT"
 	EmailBasePayloadStatusQueued                      = "QUEUED"
 	EmailBasePayloadStatusSent                        = "SENT"
 	EmailBasePayloadStatusDeliveryDelayed             = "DELIVERY_DELAYED"
@@ -738,20 +740,6 @@ const (
 	EmailClickedPayloadStatusOpened                   = "OPENED"
 	EmailClickedPayloadStatusClicked                  = "CLICKED"
 	EmailClickedPayloadStatusScheduled                = "SCHEDULED"
-	EmailEventStatusScheduled                         = "SCHEDULED"
-	EmailEventStatusQueued                            = "QUEUED"
-	EmailEventStatusSent                              = "SENT"
-	EmailEventStatusDeliveryDelayed                   = "DELIVERY_DELAYED"
-	EmailEventStatusBounced                           = "BOUNCED"
-	EmailEventStatusRejected                          = "REJECTED"
-	EmailEventStatusRenderingFailure                  = "RENDERING_FAILURE"
-	EmailEventStatusDelivered                         = "DELIVERED"
-	EmailEventStatusOpened                            = "OPENED"
-	EmailEventStatusClicked                           = "CLICKED"
-	EmailEventStatusComplained                        = "COMPLAINED"
-	EmailEventStatusFailed                            = "FAILED"
-	EmailEventStatusCancelled                         = "CANCELLED"
-	EmailEventStatusSuppressed                        = "SUPPRESSED"
 	EmailFailedPayloadStatusQueued                    = "QUEUED"
 	EmailFailedPayloadStatusSent                      = "SENT"
 	EmailFailedPayloadStatusDeliveryDelayed           = "DELIVERY_DELAYED"
@@ -797,18 +785,4 @@ const (
 	EmailSuppressedSuppressionTypeBounce              = "Bounce"
 	EmailSuppressedSuppressionTypeComplaint           = "Complaint"
 	EmailSuppressedSuppressionTypeManual              = "Manual"
-	EmailsListItemLatestStatusScheduled               = "SCHEDULED"
-	EmailsListItemLatestStatusQueued                  = "QUEUED"
-	EmailsListItemLatestStatusSent                    = "SENT"
-	EmailsListItemLatestStatusDeliveryDelayed         = "DELIVERY_DELAYED"
-	EmailsListItemLatestStatusBounced                 = "BOUNCED"
-	EmailsListItemLatestStatusRejected                = "REJECTED"
-	EmailsListItemLatestStatusRenderingFailure        = "RENDERING_FAILURE"
-	EmailsListItemLatestStatusDelivered               = "DELIVERED"
-	EmailsListItemLatestStatusOpened                  = "OPENED"
-	EmailsListItemLatestStatusClicked                 = "CLICKED"
-	EmailsListItemLatestStatusComplained              = "COMPLAINED"
-	EmailsListItemLatestStatusFailed                  = "FAILED"
-	EmailsListItemLatestStatusCancelled               = "CANCELLED"
-	EmailsListItemLatestStatusSuppressed              = "SUPPRESSED"
 )

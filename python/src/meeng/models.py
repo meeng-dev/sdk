@@ -72,6 +72,40 @@ CampaignActionResponse = TypedDict("CampaignActionResponse", {
     "success": bool,
 })
 
+CampaignRow = TypedDict("CampaignRow", {
+    "id": str,
+    "name": str,
+    "from": str,
+    "subject": str,
+    "previewText": str | None,
+    "contactBookId": str | None,
+    "html": str | None,
+    "content": str | None,
+    "status": str,
+    "scheduledAt": str | None,
+    "batchSize": int,
+    "batchWindowMinutes": int,
+    "total": int,
+    "sent": int,
+    "delivered": int,
+    "opened": int,
+    "clicked": int,
+    "unsubscribed": int,
+    "bounced": int,
+    "hardBounced": int,
+    "complained": int,
+    "replyTo": list[str],
+    "cc": list[str],
+    "bcc": list[str],
+    "createdAt": str,
+    "updatedAt": str,
+    "teamId": int,
+    "domainId": int,
+    "isApi": bool,
+    "lastCursor": str | None,
+    "lastSentAt": str | None,
+})
+
 # The body of campaigns.create.
 CampaignsCreateParams = TypedDict("CampaignsCreateParams", {
     "name": str,
@@ -81,9 +115,9 @@ CampaignsCreateParams = TypedDict("CampaignsCreateParams", {
     "contactBookId": str,
     "content": NotRequired[str],
     "html": NotRequired[str],
-    "replyTo": NotRequired[str | list[str]],
-    "cc": NotRequired[str | list[str]],
-    "bcc": NotRequired[str | list[str]],
+    "replyTo": NotRequired[list[str]],
+    "cc": NotRequired[list[str]],
+    "bcc": NotRequired[list[str]],
     "sendNow": NotRequired[bool],
     "scheduledAt": NotRequired[str],
     "batchSize": NotRequired[int],
@@ -122,10 +156,11 @@ CampaignsScheduleResponse = TypedDict("CampaignsScheduleResponse", {
 
 Contact = TypedDict("Contact", {
     "id": str,
-    "firstName": NotRequired[str | None],
-    "lastName": NotRequired[str | None],
+    "firstName": str | None,
+    "lastName": str | None,
     "email": str,
-    "subscribed": NotRequired[bool],
+    "subscribed": bool,
+    "unsubscribeReason": str | None,
     "properties": dict[str, str],
     "contactBookId": str,
     "createdAt": str,
@@ -144,20 +179,20 @@ ContactBook = TypedDict("ContactBook", {
     "properties": dict[str, str],
     "variables": list[str],
     "emoji": str,
-    "doubleOptInEnabled": NotRequired[bool],
-    "doubleOptInFrom": NotRequired[str | None],
-    "doubleOptInSubject": NotRequired[str | None],
-    "doubleOptInContent": NotRequired[str | None],
+    "doubleOptInEnabled": bool,
+    "doubleOptInFrom": str | None,
+    "doubleOptInSubject": str | None,
+    "doubleOptInContent": str | None,
     "createdAt": str,
     "updatedAt": str,
-    "_count": NotRequired[ContactBookCount],
+    "_count": NotRequired[ContactBookCount | None],
 })
 
 # The body of contactBooks.create.
 ContactBooksCreateParams = TypedDict("ContactBooksCreateParams", {
     "name": str,
     "emoji": NotRequired[str],
-    "properties": NotRequired[dict[str, str]],
+    "properties": NotRequired[dict[str, Any]],
     "doubleOptInEnabled": NotRequired[bool],
     "doubleOptInFrom": NotRequired[str | None],
     "doubleOptInSubject": NotRequired[str],
@@ -175,7 +210,7 @@ ContactBooksDeleteResponse = TypedDict("ContactBooksDeleteResponse", {
 ContactBooksUpdateParams = TypedDict("ContactBooksUpdateParams", {
     "name": NotRequired[str],
     "emoji": NotRequired[str],
-    "properties": NotRequired[dict[str, str]],
+    "properties": NotRequired[dict[str, Any]],
     "doubleOptInEnabled": NotRequired[bool],
     "doubleOptInFrom": NotRequired[str | None],
     "doubleOptInSubject": NotRequired[str],
@@ -201,7 +236,7 @@ ContactsBulkCreateParams = TypedDict("ContactsBulkCreateParams", {
     "email": str,
     "firstName": NotRequired[str],
     "lastName": NotRequired[str],
-    "properties": NotRequired[dict[str, str]],
+    "properties": NotRequired[dict[str, Any]],
     "subscribed": NotRequired[bool],
 })
 
@@ -225,12 +260,12 @@ ContactsCreateParams = TypedDict("ContactsCreateParams", {
     "email": str,
     "firstName": NotRequired[str],
     "lastName": NotRequired[str],
-    "properties": NotRequired[dict[str, str]],
+    "properties": NotRequired[dict[str, Any]],
     "subscribed": NotRequired[bool],
 })
 
 ContactsCreateResponse = TypedDict("ContactsCreateResponse", {
-    "contactId": NotRequired[str],
+    "contactId": str,
 })
 
 ContactsDeleteResponse = TypedDict("ContactsDeleteResponse", {
@@ -241,12 +276,12 @@ ContactsDeleteResponse = TypedDict("ContactsDeleteResponse", {
 ContactsUpdateParams = TypedDict("ContactsUpdateParams", {
     "firstName": NotRequired[str],
     "lastName": NotRequired[str],
-    "properties": NotRequired[dict[str, str]],
+    "properties": NotRequired[dict[str, Any]],
     "subscribed": NotRequired[bool],
 })
 
 ContactsUpdateResponse = TypedDict("ContactsUpdateResponse", {
-    "contactId": NotRequired[str],
+    "contactId": str,
 })
 
 # The body of contacts.upsert.
@@ -254,7 +289,7 @@ ContactsUpsertParams = TypedDict("ContactsUpsertParams", {
     "email": str,
     "firstName": NotRequired[str],
     "lastName": NotRequired[str],
-    "properties": NotRequired[dict[str, str]],
+    "properties": NotRequired[dict[str, Any]],
     "subscribed": NotRequired[bool],
 })
 
@@ -264,34 +299,35 @@ ContactsUpsertResponse = TypedDict("ContactsUpsertResponse", {
 
 # One item of dnsRecords in Domain.
 DomainDnsRecord = TypedDict("DomainDnsRecord", {
-    "type": Literal["MX", "TXT"],
+    "type": str,
     "name": str,
     "value": str,
     "ttl": str,
     "priority": NotRequired[str | None],
-    "status": Literal["NOT_STARTED", "PENDING", "SUCCESS", "FAILED", "TEMPORARY_FAILURE"],
-    "recommended": NotRequired[bool],
+    "status": str,
+    "recommended": NotRequired[bool | None],
 })
 
 Domain = TypedDict("Domain", {
     "id": int,
     "name": str,
     "teamId": int,
-    "status": Literal["NOT_STARTED", "PENDING", "SUCCESS", "FAILED", "TEMPORARY_FAILURE"],
-    "region": NotRequired[str],
-    "clickTracking": NotRequired[bool],
-    "openTracking": NotRequired[bool],
+    "status": str,
+    "region": str,
+    "clickTracking": bool,
+    "openTracking": bool,
     "publicKey": str,
-    "dkimStatus": NotRequired[str | None],
-    "spfDetails": NotRequired[str | None],
+    "dkimSelector": str,
+    "dkimStatus": str,
+    "spfDetails": str,
+    "dmarcAdded": bool,
+    "isVerifying": bool,
+    "errorMessage": str | None,
+    "subdomain": str | None,
+    "verificationError": str | None,
+    "lastCheckedTime": str | None,
     "createdAt": str,
     "updatedAt": str,
-    "dmarcAdded": NotRequired[bool],
-    "isVerifying": NotRequired[bool],
-    "errorMessage": NotRequired[str | None],
-    "subdomain": NotRequired[str | None],
-    "verificationError": NotRequired[str | None],
-    "lastCheckedTime": NotRequired[str | None],
     "dnsRecords": list[DomainDnsRecord],
 })
 
@@ -331,18 +367,15 @@ DomainsVerifyResponse = TypedDict("DomainsVerifyResponse", {
 # One item of emailEvents in Email.
 EmailEvent = TypedDict("EmailEvent", {
     "emailId": str,
-    "status": Literal["SCHEDULED", "QUEUED", "SENT", "DELIVERY_DELAYED", "BOUNCED", "REJECTED", "RENDERING_FAILURE", "DELIVERED", "OPENED", "CLICKED", "COMPLAINED", "FAILED", "CANCELLED", "SUPPRESSED"],
+    "status": str,
     "createdAt": str,
-    "data": NotRequired[Any | None],
+    "data": NotRequired[dict[str, Any]],
 })
 
 Email = TypedDict("Email", {
     "id": str,
     "teamId": int,
-    "to": str | list[str],
-    "replyTo": NotRequired[str | list[str]],
-    "cc": NotRequired[str | list[str]],
-    "bcc": NotRequired[str | list[str]],
+    "to": list[str],
     "from": str,
     "subject": str,
     "html": str | None,
@@ -500,13 +533,13 @@ EmailsBatchParams = TypedDict("EmailsBatchParams", {
     "from": str,
     "subject": NotRequired[str],
     "templateId": NotRequired[str],
-    "variables": NotRequired[dict[str, str]],
+    "variables": NotRequired[dict[str, Any]],
     "replyTo": NotRequired[str | list[str]],
     "cc": NotRequired[str | list[str]],
     "bcc": NotRequired[str | list[str]],
     "text": NotRequired[str | None],
     "html": NotRequired[str | None],
-    "headers": NotRequired[dict[str, str]],
+    "headers": NotRequired[dict[str, Any]],
     "attachments": NotRequired[list[EmailsBatchAttachment]],
     "scheduledAt": NotRequired[str],
     "inReplyToId": NotRequired[str | None],
@@ -517,23 +550,23 @@ EmailsBatchResponse = TypedDict("EmailsBatchResponse", {
 })
 
 EmailsCancelResponse = TypedDict("EmailsCancelResponse", {
-    "emailId": NotRequired[str],
+    "emailId": str,
 })
 
 # One item of data in EmailsListResponse.
 EmailsListItem = TypedDict("EmailsListItem", {
     "id": str,
-    "to": str | list[str],
-    "replyTo": NotRequired[str | list[str] | None],
-    "cc": NotRequired[str | list[str] | None],
-    "bcc": NotRequired[str | list[str] | None],
+    "to": list[str],
+    "replyTo": list[str],
+    "cc": list[str],
+    "bcc": list[str],
     "from": str,
     "subject": str,
     "html": str | None,
     "text": str | None,
     "createdAt": str,
     "updatedAt": str,
-    "latestStatus": Literal["SCHEDULED", "QUEUED", "SENT", "DELIVERY_DELAYED", "BOUNCED", "REJECTED", "RENDERING_FAILURE", "DELIVERED", "OPENED", "CLICKED", "COMPLAINED", "FAILED", "CANCELLED", "SUPPRESSED"] | None,
+    "latestStatus": str | None,
     "scheduledAt": str | None,
     "domainId": int | None,
 })
@@ -555,20 +588,20 @@ EmailsSendParams = TypedDict("EmailsSendParams", {
     "from": str,
     "subject": NotRequired[str],
     "templateId": NotRequired[str],
-    "variables": NotRequired[dict[str, str]],
+    "variables": NotRequired[dict[str, Any]],
     "replyTo": NotRequired[str | list[str]],
     "cc": NotRequired[str | list[str]],
     "bcc": NotRequired[str | list[str]],
     "text": NotRequired[str | None],
     "html": NotRequired[str | None],
-    "headers": NotRequired[dict[str, str]],
+    "headers": NotRequired[dict[str, Any]],
     "attachments": NotRequired[list[EmailsSendAttachment]],
     "scheduledAt": NotRequired[str],
     "inReplyToId": NotRequired[str | None],
 })
 
 EmailsSendResponse = TypedDict("EmailsSendResponse", {
-    "emailId": NotRequired[str],
+    "emailId": str,
 })
 
 # The body of emails.update.
@@ -577,7 +610,7 @@ EmailsUpdateParams = TypedDict("EmailsUpdateParams", {
 })
 
 EmailsUpdateResponse = TypedDict("EmailsUpdateResponse", {
-    "emailId": NotRequired[str],
+    "emailId": str,
 })
 
 # The data of webhook.test, which the dashboard sends to try an endpoint.

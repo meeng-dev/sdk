@@ -132,7 +132,7 @@ public sealed record ContactsCreateParams
 
     /// <summary>The <c>properties</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("properties")]
-    public IReadOnlyDictionary<string, string>? Properties { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Properties { get; init; }
 
     /// <summary>The <c>subscribed</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("subscribed")]
@@ -143,16 +143,16 @@ public sealed record ContactsCreateParams
 /// <summary>The filters of contacts.list.</summary>
 public sealed record ContactsListQuery
 {
-    /// <summary>Only the contacts with these emails, separated by commas.</summary>
+    /// <summary>Comma separated e-mail addresses; an exact match.</summary>
     public string? Emails { get; init; }
 
     /// <summary>The page, from 1.</summary>
     public int? Page { get; init; }
 
-    /// <summary>The items a page: 1 to 100, 50 by default.</summary>
+    /// <summary>Contacts to a page; 5000 when it is not given.</summary>
     public int? Limit { get; init; }
 
-    /// <summary>Only the contacts with these ids, separated by commas.</summary>
+    /// <summary>Comma separated contact ids.</summary>
     public string? Ids { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()
@@ -177,7 +177,7 @@ public sealed record ContactsUpdateParams
 
     /// <summary>The <c>properties</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("properties")]
-    public IReadOnlyDictionary<string, string>? Properties { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Properties { get; init; }
 
     /// <summary>The <c>subscribed</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("subscribed")]
@@ -202,7 +202,7 @@ public sealed record ContactsUpsertParams
 
     /// <summary>The <c>properties</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("properties")]
-    public IReadOnlyDictionary<string, string>? Properties { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Properties { get; init; }
 
     /// <summary>The <c>subscribed</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("subscribed")]
@@ -227,7 +227,7 @@ public sealed record ContactsBulkCreateParams
 
     /// <summary>The <c>properties</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("properties")]
-    public IReadOnlyDictionary<string, string>? Properties { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Properties { get; init; }
 
     /// <summary>The <c>subscribed</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("subscribed")]

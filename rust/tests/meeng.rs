@@ -51,7 +51,7 @@ fn sending_an_email_carries_the_key_the_body_and_the_idempotency_key() {
         .idempotency_key("order-1")
         .send(&params)
         .unwrap();
-    assert_eq!(sent.email_id.as_deref(), Some("em_1"));
+    assert_eq!(sent.email_id, "em_1");
     let seen = seen.lock().unwrap();
     assert_eq!(seen[0].method, "POST");
     assert_eq!(seen[0].url, "https://meeng.test/api/v1/emails");
@@ -118,7 +118,7 @@ fn listing_emails_sends_the_filters_a_list_once_for_each_value() {
     let (client, seen) = client(|_| {
         json(
             200,
-            serde_json::json!({"data": [{"id": "em_1", "to": "a@x.com", "from": "h@acme.com", "subject": "Hi", "html": null, "text": "Hi", "createdAt": "x", "updatedAt": "x", "latestStatus": "DELIVERED", "scheduledAt": null, "domainId": 3}], "count": 1}),
+            serde_json::json!({"data": [{"id": "em_1", "to": ["a@x.com"], "replyTo": [], "cc": [], "bcc": [], "from": "h@acme.com", "subject": "Hi", "html": null, "text": "Hi", "createdAt": "x", "updatedAt": "x", "latestStatus": "DELIVERED", "scheduledAt": null, "domainId": 3}], "count": 1}),
         )
     });
     let query = EmailsListQuery::new()
@@ -129,10 +129,7 @@ fn listing_emails_sends_the_filters_a_list_once_for_each_value() {
     let got = client.emails().list(&query).unwrap();
     assert_eq!(got.count, 1);
     assert_eq!(got.data[0].to, vec!["a@x.com".to_owned()]);
-    assert_eq!(
-        got.data[0].latest_status.as_ref().map(|s| s.as_str()),
-        Some("DELIVERED")
-    );
+    assert_eq!(got.data[0].latest_status.as_deref(), Some("DELIVERED"));
     assert_eq!(
         seen.lock().unwrap()[0].url,
         "https://meeng.test/api/v1/emails?page=2&limit=10&startDate=2026-11-01T00%3A00%3A00Z&domainId=1&domainId=2"
@@ -160,7 +157,7 @@ fn a_list_the_api_answers_without_an_object_around_it_is_a_list() {
     let (client, _) = client(|_| {
         json(
             200,
-            serde_json::json!([{"id": "cb_1", "name": "News", "teamId": 1, "properties": {"plan": "string"}, "variables": ["plan"], "emoji": "x", "createdAt": "x", "updatedAt": "x", "_count": {"contacts": 4}}]),
+            serde_json::json!([{"id": "cb_1", "name": "News", "teamId": 1, "properties": {"plan": "string"}, "variables": ["plan"], "emoji": "x", "doubleOptInEnabled": false, "doubleOptInFrom": null, "doubleOptInSubject": null, "doubleOptInContent": null, "createdAt": "x", "updatedAt": "x", "_count": {"contacts": 4}}]),
         )
     });
     let books = client.contact_books().list().unwrap();
@@ -237,16 +234,16 @@ fn a_refusal_is_an_error_in_every_shape_the_api_writes_it() {
 }
 
 #[test]
-fn an_emails_recipients_may_come_as_one_string_or_a_list() {
+fn an_emails_recipients_are_a_list() {
     let (client, _) = client(|_| {
         json(
             200,
-            serde_json::json!({"id": "em_1", "teamId": 1, "to": "a@x.com", "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "createdAt": "x", "updatedAt": "x", "emailEvents": []}),
+            serde_json::json!({"id": "em_1", "teamId": 1, "to": ["a@x.com", "b@x.com"], "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "createdAt": "x", "updatedAt": "x", "emailEvents": []}),
         )
     });
     assert_eq!(
         client.emails().get("em_1").unwrap().to,
-        vec!["a@x.com".to_owned()]
+        vec!["a@x.com".to_owned(), "b@x.com".to_owned()]
     );
 }
 

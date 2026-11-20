@@ -11,7 +11,7 @@ export const API_VERSION = "1.0.0";
  * MEENG_BASE_URL, like the `baseUrl` argument, is the address of the app and
  * nothing more.
  */
-export const DEFAULT_BASE_URL = "https://app.meeng.dev";
+export const DEFAULT_BASE_URL = "https://meeng.dev";
 
 /** What every path starts with, after the base URL. */
 export const API_PREFIX = "/api";

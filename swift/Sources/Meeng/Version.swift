@@ -12,7 +12,7 @@ extension MeengClient {
     /// Where meeng's API lives. The client appends `/api/v1` to it, so
     /// `MEENG_BASE_URL`, like the `baseURL` argument, is the address of the app
     /// and nothing more.
-    public static let defaultBaseURL = URL(string: "https://app.meeng.dev")!
+    public static let defaultBaseURL = URL(string: "https://meeng.dev")!
 
     /// What every path starts with, after the base URL.
     static let apiPrefix = "/api"

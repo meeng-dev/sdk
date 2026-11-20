@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -96,11 +97,11 @@ func TestListingEmailsSendsTheFiltersAListOnceForEachValue(t *testing.T) {
 			q.Get("startDate") != "2026-11-01T00:00:00Z" || len(q["domainId"]) != 2 || q["domainId"][1] != "2" || q.Has("endDate") {
 			t.Errorf("request %s %s", r.Method, r.URL.RawQuery)
 		}
-		fmt.Fprint(w, `{"data":[{"id":"em_1","to":"a@x.com","from":"h@acme.com","subject":"Hi","html":null,"text":"Hi","createdAt":"2026-11-20T00:00:00Z","updatedAt":"2026-11-20T00:00:00Z","latestStatus":"DELIVERED","scheduledAt":null,"domainId":3}],"count":1}`)
+		fmt.Fprint(w, `{"data":[{"id":"em_1","to":["a@x.com"],"replyTo":[],"cc":[],"bcc":[],"from":"h@acme.com","subject":"Hi","html":null,"text":"Hi","createdAt":"2026-11-20T00:00:00Z","updatedAt":"2026-11-20T00:00:00Z","latestStatus":"DELIVERED","scheduledAt":null,"domainId":3}],"count":1}`)
 	})
 	list, err := client.Emails.List(context.Background(), &EmailsListQuery{Page: 2, Limit: 10, StartDate: "2026-11-01T00:00:00Z", DomainID: []string{"1", "2"}})
 	if err != nil || list.Count != 1 || len(list.Data) != 1 || list.Data[0].To[0] != "a@x.com" || list.Data[0].HTML != nil ||
-		list.Data[0].LatestStatus == nil || *list.Data[0].LatestStatus != EmailsListItemLatestStatusDelivered || *list.Data[0].DomainID != 3 {
+		list.Data[0].LatestStatus == nil || *list.Data[0].LatestStatus != "DELIVERED" || *list.Data[0].DomainID != 3 {
 		t.Fatalf("list %+v, %v", list, err)
 	}
 }
@@ -113,7 +114,7 @@ func TestAPathParameterIsEscaped(t *testing.T) {
 		fmt.Fprint(w, `{"id":"a/b c","teamId":1,"to":["a@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[{"emailId":"a/b c","status":"SENT","createdAt":"x","data":{"ip":"1.2.3.4"}}]}`)
 	})
 	email, err := client.Emails.Get(context.Background(), "a/b c")
-	if err != nil || email.ID != "a/b c" || len(email.EmailEvents) != 1 || email.EmailEvents[0].Status != EmailEventStatusSent {
+	if err != nil || email.ID != "a/b c" || len(email.EmailEvents) != 1 || email.EmailEvents[0].Status != "SENT" {
 		t.Fatalf("email %+v, %v", email, err)
 	}
 }
@@ -126,7 +127,7 @@ func TestADomainIDIsAnInteger(t *testing.T) {
 		fmt.Fprint(w, `{"id":7,"name":"acme.com","teamId":1,"status":"SUCCESS","publicKey":"k","createdAt":"x","updatedAt":"x","dnsRecords":[{"type":"TXT","name":"a","value":"b","ttl":"Auto","status":"PENDING"}]}`)
 	})
 	domain, err := client.Domains.Get(context.Background(), strconv.Itoa(7))
-	if err != nil || domain.ID != 7 || domain.Status != DomainStatusSuccess || domain.DNSRecords[0].Type != DomainDnsRecordTypeTxt {
+	if err != nil || domain.ID != 7 || domain.Status != "SUCCESS" || domain.DNSRecords[0].Type != "TXT" {
 		t.Fatalf("domain %+v, %v", domain, err)
 	}
 }
@@ -202,13 +203,26 @@ func TestARefusalIsAnErrorInEveryShapeTheAPIWritesIt(t *testing.T) {
 	}
 }
 
-func TestAnEmailsRecipientsMayComeAsOneStringOrAList(t *testing.T) {
+func TestAnEmailsRecipientsMayBeSentAsOneStringOrAList(t *testing.T) {
+	var bodies []string
 	client := server(t, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"id":"em_1","teamId":1,"to":"a@x.com","cc":null,"from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[]}`)
+		raw, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(raw))
+		fmt.Fprint(w, `{"emailId":"em_1"}`)
 	})
-	email, err := client.Emails.Get(context.Background(), "em_1")
-	if err != nil || len(email.To) != 1 || email.To[0] != "a@x.com" || email.Cc != nil {
-		t.Fatalf("email %+v, %v", email, err)
+	one := StringList{"a@x.com"}
+	two := StringList{"a@x.com", "b@x.com"}
+	for _, to := range []StringList{one, two} {
+		if _, err := client.Emails.Send(context.Background(), EmailsSendParams{From: "h@acme.com", To: to}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(bodies) != 2 || !strings.Contains(bodies[0], `"to":["a@x.com"]`) || !strings.Contains(bodies[1], `"to":["a@x.com","b@x.com"]`) {
+		t.Errorf("bodies %v", bodies)
+	}
+	var read StringList
+	if err := json.Unmarshal([]byte(`"a@x.com"`), &read); err != nil || len(read) != 1 || read[0] != "a@x.com" {
+		t.Errorf("a lone string read as %v, %v", read, err)
 	}
 }
 

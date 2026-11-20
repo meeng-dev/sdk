@@ -7,41 +7,13 @@ import java.util.Map;
 
 /** One item of emailEvents in Email. */
 public final class EmailEvent {
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_SCHEDULED = "SCHEDULED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_QUEUED = "QUEUED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_SENT = "SENT";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_DELIVERY_DELAYED = "DELIVERY_DELAYED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_BOUNCED = "BOUNCED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_REJECTED = "REJECTED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_RENDERING_FAILURE = "RENDERING_FAILURE";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_DELIVERED = "DELIVERED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_OPENED = "OPENED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_CLICKED = "CLICKED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_COMPLAINED = "COMPLAINED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_FAILED = "FAILED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_CANCELLED = "CANCELLED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_SUPPRESSED = "SUPPRESSED";
 
     private final String emailId;
     private final String status;
     private final String createdAt;
-    private final Object data;
+    private final Map<String, Object> data;
 
-    EmailEvent(String emailId, String status, String createdAt, Object data) {
+    EmailEvent(String emailId, String status, String createdAt, Map<String, Object> data) {
         this.emailId = emailId;
         this.status = status;
         this.createdAt = createdAt;
@@ -53,7 +25,7 @@ public final class EmailEvent {
                 Json.required(data, "emailId", Json::asString),
                 Json.required(data, "status", Json::asString),
                 Json.required(data, "createdAt", Json::asString),
-                Json.optional(data, "data", Json::any));
+                Json.optional(data, "data", Json.map(Json::any)));
     }
 
     /** @return the API's {@code emailId} */
@@ -72,7 +44,7 @@ public final class EmailEvent {
     }
 
     /** @return the API's {@code data} (null when the API sends none) */
-    public Object getData() {
+    public Map<String, Object> getData() {
         return data;
     }
 

@@ -9,30 +9,15 @@ namespace Meeng;
 /// <summary>Domain is a resource of meeng's API.</summary>
 public sealed record Domain
 {
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusNotStarted = "NOT_STARTED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusPending = "PENDING";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusSuccess = "SUCCESS";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusFailed = "FAILED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusTemporaryFailure = "TEMPORARY_FAILURE";
-
-    /// <summary>The ID of the domain</summary>
+    /// <summary>The API's <c>id</c>.</summary>
     [JsonPropertyName("id")]
     public required long Id { get; init; }
 
-    /// <summary>The name of the domain</summary>
+    /// <summary>The API's <c>name</c>.</summary>
     [JsonPropertyName("name")]
     public required string Name { get; init; }
 
-    /// <summary>The ID of the team</summary>
+    /// <summary>The API's <c>teamId</c>.</summary>
     [JsonPropertyName("teamId")]
     public required long TeamId { get; init; }
 
@@ -40,45 +25,41 @@ public sealed record Domain
     [JsonPropertyName("status")]
     public required string Status { get; init; }
 
-    /// <summary>The API's <c>region</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>region</c>.</summary>
     [JsonPropertyName("region")]
-    public string? Region { get; init; }
+    public required string Region { get; init; }
 
-    /// <summary>The API's <c>clickTracking</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>clickTracking</c>.</summary>
     [JsonPropertyName("clickTracking")]
-    public bool? ClickTracking { get; init; }
+    public required bool ClickTracking { get; init; }
 
-    /// <summary>The API's <c>openTracking</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>openTracking</c>.</summary>
     [JsonPropertyName("openTracking")]
-    public bool? OpenTracking { get; init; }
+    public required bool OpenTracking { get; init; }
 
     /// <summary>The API's <c>publicKey</c>.</summary>
     [JsonPropertyName("publicKey")]
     public required string PublicKey { get; init; }
 
-    /// <summary>The API's <c>dkimStatus</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>dkimSelector</c>.</summary>
+    [JsonPropertyName("dkimSelector")]
+    public required string DkimSelector { get; init; }
+
+    /// <summary>The API's <c>dkimStatus</c>.</summary>
     [JsonPropertyName("dkimStatus")]
-    public string? DkimStatus { get; init; }
+    public required string DkimStatus { get; init; }
 
-    /// <summary>The API's <c>spfDetails</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>spfDetails</c>.</summary>
     [JsonPropertyName("spfDetails")]
-    public string? SpfDetails { get; init; }
+    public required string SpfDetails { get; init; }
 
-    /// <summary>The API's <c>createdAt</c>.</summary>
-    [JsonPropertyName("createdAt")]
-    public required string CreatedAt { get; init; }
-
-    /// <summary>The API's <c>updatedAt</c>.</summary>
-    [JsonPropertyName("updatedAt")]
-    public required string UpdatedAt { get; init; }
-
-    /// <summary>The API's <c>dmarcAdded</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>dmarcAdded</c>.</summary>
     [JsonPropertyName("dmarcAdded")]
-    public bool? DmarcAdded { get; init; }
+    public required bool DmarcAdded { get; init; }
 
-    /// <summary>The API's <c>isVerifying</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>isVerifying</c>.</summary>
     [JsonPropertyName("isVerifying")]
-    public bool? IsVerifying { get; init; }
+    public required bool IsVerifying { get; init; }
 
     /// <summary>The API's <c>errorMessage</c>. Null when the API sends none.</summary>
     [JsonPropertyName("errorMessage")]
@@ -95,6 +76,14 @@ public sealed record Domain
     /// <summary>The API's <c>lastCheckedTime</c>. Null when the API sends none.</summary>
     [JsonPropertyName("lastCheckedTime")]
     public string? LastCheckedTime { get; init; }
+
+    /// <summary>The API's <c>createdAt</c>.</summary>
+    [JsonPropertyName("createdAt")]
+    public required string CreatedAt { get; init; }
+
+    /// <summary>The API's <c>updatedAt</c>.</summary>
+    [JsonPropertyName("updatedAt")]
+    public required string UpdatedAt { get; init; }
 
     /// <summary>The API's <c>dnsRecords</c>.</summary>
     [JsonPropertyName("dnsRecords")]

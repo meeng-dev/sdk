@@ -200,7 +200,7 @@ class CampaignsService:
         data, error = self._client.request("GET", f"/v1/campaigns/{segment(campaign_id)}")
         return data, error
 
-    def delete(self, campaign_id: str | int) -> tuple[models.Campaign | None, ErrorResponse | None]:
+    def delete(self, campaign_id: str | int) -> tuple[models.CampaignRow | None, ErrorResponse | None]:
         """Removes a campaign."""
         data, error = self._client.request("DELETE", f"/v1/campaigns/{segment(campaign_id)}")
         return data, error

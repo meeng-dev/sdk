@@ -19,23 +19,7 @@ public sealed record Email
 
     /// <summary>The API's <c>to</c>.</summary>
     [JsonPropertyName("to")]
-    [JsonConverter(typeof(StringListConverter))]
     public required IReadOnlyList<string> To { get; init; }
-
-    /// <summary>The API's <c>replyTo</c>. Null when the API sends none.</summary>
-    [JsonPropertyName("replyTo")]
-    [JsonConverter(typeof(StringListConverter))]
-    public IReadOnlyList<string>? ReplyTo { get; init; }
-
-    /// <summary>The API's <c>cc</c>. Null when the API sends none.</summary>
-    [JsonPropertyName("cc")]
-    [JsonConverter(typeof(StringListConverter))]
-    public IReadOnlyList<string>? Cc { get; init; }
-
-    /// <summary>The API's <c>bcc</c>. Null when the API sends none.</summary>
-    [JsonPropertyName("bcc")]
-    [JsonConverter(typeof(StringListConverter))]
-    public IReadOnlyList<string>? Bcc { get; init; }
 
     /// <summary>The API's <c>from</c>.</summary>
     [JsonPropertyName("from")]

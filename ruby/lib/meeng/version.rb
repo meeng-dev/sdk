@@ -12,7 +12,7 @@ module Meeng
   # Where meeng's API lives. The client appends +/api/v1+ to it, so
   # MEENG_BASE_URL, like the +base_url+ argument, is the address of the app and
   # nothing more.
-  DEFAULT_BASE_URL = "https://app.meeng.dev"
+  DEFAULT_BASE_URL = "https://meeng.dev"
 
   # What every path starts with, after the base URL.
   API_PREFIX = "/api"

@@ -224,10 +224,10 @@ defmodule Meeng.Contacts do
   The path parameters are strings or integers.
 
   Options, the filters, named in snake case:
-  `:emails`: Only the contacts with these emails, separated by commas.
+  `:emails`: Comma separated e-mail addresses; an exact match.
   `:page`: The page, from 1.
-  `:limit`: The items a page: 1 to 100, 50 by default.
-  `:ids`: Only the contacts with these ids, separated by commas.
+  `:limit`: Contacts to a page; 5000 when it is not given.
+  `:ids`: Comma separated contact ids.
   """
   @spec list(Client.t(), String.t() | integer(), keyword()) ::
           {:ok, [map()]} | {:error, Error.t()}
@@ -445,9 +445,9 @@ defmodule Meeng.Campaigns do
   Lists campaigns, optionally by status or a search text.
 
   Options, the filters, named in snake case:
-  `:page`: The page, from 1.
-  `:status`: Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.
-  `:search`: Only campaigns whose name matches this text.
+  `:page`: The page, from 1; 30 campaigns to a page.
+  `:status`: Only campaigns in this status.
+  `:search`: Part of the name or of the subject.
   """
   @spec list(Client.t(), keyword()) ::
           {:ok, map()} | {:error, Error.t()}
@@ -534,8 +534,8 @@ defmodule Meeng.Analytics do
   Counts emails by day over the last 7 or 30 days.
 
   Options, the filters, named in snake case:
-  `:days`: How many days to count: 7 or 30.
-  `:domain_id`: Only emails of these domains; a list sends one domainId for each value.
+  `:days`: How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
+  `:domain_id`: Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
   """
   @spec email_time_series(Client.t(), keyword()) ::
           {:ok, map()} | {:error, Error.t()}
@@ -547,7 +547,7 @@ defmodule Meeng.Analytics do
   Reads the bounce and complaint rates of the sending reputation.
 
   Options, the filters, named in snake case:
-  `:domain_id`: Only emails of these domains; a list sends one domainId for each value.
+  `:domain_id`: Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
   """
   @spec reputation_metrics(Client.t(), keyword()) ::
           {:ok, map()} | {:error, Error.t()}

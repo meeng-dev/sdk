@@ -15,6 +15,7 @@ namespace Meeng;
 [JsonSerializable(typeof(AnalyticsReputationMetricsResponse), TypeInfoPropertyName = "AnalyticsReputationMetricsResponse")]
 [JsonSerializable(typeof(Campaign), TypeInfoPropertyName = "Campaign")]
 [JsonSerializable(typeof(CampaignActionResponse), TypeInfoPropertyName = "CampaignActionResponse")]
+[JsonSerializable(typeof(CampaignRow), TypeInfoPropertyName = "CampaignRow")]
 [JsonSerializable(typeof(CampaignsListResponse), TypeInfoPropertyName = "CampaignsListResponse")]
 [JsonSerializable(typeof(CampaignsScheduleResponse), TypeInfoPropertyName = "CampaignsScheduleResponse")]
 [JsonSerializable(typeof(Contact), TypeInfoPropertyName = "Contact")]

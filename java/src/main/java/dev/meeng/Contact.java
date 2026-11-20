@@ -12,18 +12,20 @@ public final class Contact {
     private final String firstName;
     private final String lastName;
     private final String email;
-    private final Boolean subscribed;
+    private final boolean subscribed;
+    private final String unsubscribeReason;
     private final Map<String, String> properties;
     private final String contactBookId;
     private final String createdAt;
     private final String updatedAt;
 
-    Contact(String id, String firstName, String lastName, String email, Boolean subscribed, Map<String, String> properties, String contactBookId, String createdAt, String updatedAt) {
+    Contact(String id, String firstName, String lastName, String email, boolean subscribed, String unsubscribeReason, Map<String, String> properties, String contactBookId, String createdAt, String updatedAt) {
         this.id = id;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
         this.subscribed = subscribed;
+        this.unsubscribeReason = unsubscribeReason;
         this.properties = properties;
         this.contactBookId = contactBookId;
         this.createdAt = createdAt;
@@ -36,7 +38,8 @@ public final class Contact {
                 Json.optional(data, "firstName", Json::asString),
                 Json.optional(data, "lastName", Json::asString),
                 Json.required(data, "email", Json::asString),
-                Json.optional(data, "subscribed", Json::asBoolean),
+                Json.required(data, "subscribed", Json::asBoolean),
+                Json.optional(data, "unsubscribeReason", Json::asString),
                 Json.required(data, "properties", Json.map(Json::asString)),
                 Json.required(data, "contactBookId", Json::asString),
                 Json.required(data, "createdAt", Json::asString),
@@ -63,9 +66,14 @@ public final class Contact {
         return email;
     }
 
-    /** @return the API's {@code subscribed} (null when the API sends none) */
-    public Boolean getSubscribed() {
+    /** @return the API's {@code subscribed} */
+    public boolean getSubscribed() {
         return subscribed;
+    }
+
+    /** @return the API's {@code unsubscribeReason} (null when the API sends none) */
+    public String getUnsubscribeReason() {
+        return unsubscribeReason;
     }
 
     /** @return the API's {@code properties} */
@@ -90,6 +98,6 @@ public final class Contact {
 
     @Override
     public String toString() {
-        return "Contact{" + "id=" + id + ", firstName=" + firstName + ", lastName=" + lastName + ", email=" + email + ", subscribed=" + subscribed + ", properties=" + properties + ", contactBookId=" + contactBookId + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + "}";
+        return "Contact{" + "id=" + id + ", firstName=" + firstName + ", lastName=" + lastName + ", email=" + email + ", subscribed=" + subscribed + ", unsubscribeReason=" + unsubscribeReason + ", properties=" + properties + ", contactBookId=" + contactBookId + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + "}";
     }
 }

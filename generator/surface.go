@@ -68,7 +68,7 @@ var operations = []operationDef{
 	{Key: "POST /v1/campaigns", Service: "campaigns", Name: "create", Summary: "Creates a campaign, and sends it now when sendNow is true", Readme: "cria uma campanha, e a envia agora quando `sendNow` é verdadeiro", Response: "Campaign"},
 	{Key: "GET /v1/campaigns", Service: "campaigns", Name: "list", Summary: "Lists campaigns, optionally by status or a search text", Readme: "lista campanhas, com filtro opcional por status ou texto", Aliases: []string{"getAll"}},
 	{Key: "GET /v1/campaigns/{campaignId}", Service: "campaigns", Name: "get", Summary: "Reads one campaign with its counters", Readme: "lê uma campanha com os seus contadores", Response: "Campaign"},
-	{Key: "DELETE /v1/campaigns/{campaignId}", Service: "campaigns", Name: "delete", Summary: "Removes a campaign", Readme: "remove uma campanha", Response: "Campaign"},
+	{Key: "DELETE /v1/campaigns/{campaignId}", Service: "campaigns", Name: "delete", Summary: "Removes a campaign", Readme: "remove uma campanha", Response: "CampaignRow"},
 	{Key: "POST /v1/campaigns/{campaignId}/schedule", Service: "campaigns", Name: "schedule", Summary: "Schedules a campaign, or sends it now when no time is given", Readme: "agenda uma campanha, ou a envia agora quando não há horário"},
 	{Key: "POST /v1/campaigns/{campaignId}/pause", Service: "campaigns", Name: "pause", Summary: "Pauses a running or scheduled campaign", Readme: "pausa uma campanha em andamento ou agendada", Response: "CampaignActionResponse"},
 	{Key: "POST /v1/campaigns/{campaignId}/resume", Service: "campaigns", Name: "resume", Summary: "Resumes a paused campaign", Readme: "retoma uma campanha pausada", Response: "CampaignActionResponse"},

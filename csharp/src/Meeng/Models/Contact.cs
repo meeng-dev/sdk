@@ -25,9 +25,13 @@ public sealed record Contact
     [JsonPropertyName("email")]
     public required string Email { get; init; }
 
-    /// <summary>The API's <c>subscribed</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>subscribed</c>.</summary>
     [JsonPropertyName("subscribed")]
-    public bool? Subscribed { get; init; }
+    public required bool Subscribed { get; init; }
+
+    /// <summary>The API's <c>unsubscribeReason</c>. Null when the API sends none.</summary>
+    [JsonPropertyName("unsubscribeReason")]
+    public string? UnsubscribeReason { get; init; }
 
     /// <summary>The API's <c>properties</c>.</summary>
     [JsonPropertyName("properties")]

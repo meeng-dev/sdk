@@ -34,7 +34,7 @@ public final class ContactsService {
         private final String email;
         private final String firstName;
         private final String lastName;
-        private final Map<String, String> properties;
+        private final Map<String, Object> properties;
         private final Boolean subscribed;
 
         private CreateParams(Builder builder) {
@@ -66,7 +66,7 @@ public final class ContactsService {
         }
 
         /** @return the {@code properties} sent (null when left out) */
-        public Map<String, String> getProperties() {
+        public Map<String, Object> getProperties() {
             return properties;
         }
 
@@ -98,7 +98,7 @@ public final class ContactsService {
             private String email;
             private String firstName;
             private String lastName;
-            private Map<String, String> properties;
+            private Map<String, Object> properties;
             private Boolean subscribed;
 
             private Builder() {
@@ -135,7 +135,7 @@ public final class ContactsService {
              * @param properties the {@code properties} to send
              * @return this builder
              */
-            public Builder properties(Map<String, String> properties) {
+            public Builder properties(Map<String, Object> properties) {
                 this.properties = properties;
                 return this;
             }
@@ -204,7 +204,7 @@ public final class ContactsService {
             return new Builder();
         }
 
-        /** @return Only the contacts with these emails, separated by commas. (null when not filtered) */
+        /** @return Comma separated e-mail addresses; an exact match. (null when not filtered) */
         public String getEmails() {
             return emails;
         }
@@ -214,12 +214,12 @@ public final class ContactsService {
             return page;
         }
 
-        /** @return The items a page: 1 to 100, 50 by default. (null when not filtered) */
+        /** @return Contacts to a page; 5000 when it is not given. (null when not filtered) */
         public Integer getLimit() {
             return limit;
         }
 
-        /** @return Only the contacts with these ids, separated by commas. (null when not filtered) */
+        /** @return Comma separated contact ids. (null when not filtered) */
         public String getIds() {
             return ids;
         }
@@ -244,7 +244,7 @@ public final class ContactsService {
             }
 
             /**
-             * @param emails Only the contacts with these emails, separated by commas.
+             * @param emails Comma separated e-mail addresses; an exact match.
              * @return this builder
              */
             public Builder emails(String emails) {
@@ -262,7 +262,7 @@ public final class ContactsService {
             }
 
             /**
-             * @param limit The items a page: 1 to 100, 50 by default.
+             * @param limit Contacts to a page; 5000 when it is not given.
              * @return this builder
              */
             public Builder limit(Integer limit) {
@@ -271,7 +271,7 @@ public final class ContactsService {
             }
 
             /**
-             * @param ids Only the contacts with these ids, separated by commas.
+             * @param ids Comma separated contact ids.
              * @return this builder
              */
             public Builder ids(String ids) {
@@ -316,7 +316,7 @@ public final class ContactsService {
 
         private final String firstName;
         private final String lastName;
-        private final Map<String, String> properties;
+        private final Map<String, Object> properties;
         private final Boolean subscribed;
 
         private UpdateParams(Builder builder) {
@@ -342,7 +342,7 @@ public final class ContactsService {
         }
 
         /** @return the {@code properties} sent (null when left out) */
-        public Map<String, String> getProperties() {
+        public Map<String, Object> getProperties() {
             return properties;
         }
 
@@ -372,7 +372,7 @@ public final class ContactsService {
         public static final class Builder {
             private String firstName;
             private String lastName;
-            private Map<String, String> properties;
+            private Map<String, Object> properties;
             private Boolean subscribed;
 
             private Builder() {
@@ -400,7 +400,7 @@ public final class ContactsService {
              * @param properties the {@code properties} to send
              * @return this builder
              */
-            public Builder properties(Map<String, String> properties) {
+            public Builder properties(Map<String, Object> properties) {
                 this.properties = properties;
                 return this;
             }
@@ -444,7 +444,7 @@ public final class ContactsService {
         private final String email;
         private final String firstName;
         private final String lastName;
-        private final Map<String, String> properties;
+        private final Map<String, Object> properties;
         private final Boolean subscribed;
 
         private UpsertParams(Builder builder) {
@@ -476,7 +476,7 @@ public final class ContactsService {
         }
 
         /** @return the {@code properties} sent (null when left out) */
-        public Map<String, String> getProperties() {
+        public Map<String, Object> getProperties() {
             return properties;
         }
 
@@ -508,7 +508,7 @@ public final class ContactsService {
             private String email;
             private String firstName;
             private String lastName;
-            private Map<String, String> properties;
+            private Map<String, Object> properties;
             private Boolean subscribed;
 
             private Builder() {
@@ -545,7 +545,7 @@ public final class ContactsService {
              * @param properties the {@code properties} to send
              * @return this builder
              */
-            public Builder properties(Map<String, String> properties) {
+            public Builder properties(Map<String, Object> properties) {
                 this.properties = properties;
                 return this;
             }
@@ -603,7 +603,7 @@ public final class ContactsService {
         private final String email;
         private final String firstName;
         private final String lastName;
-        private final Map<String, String> properties;
+        private final Map<String, Object> properties;
         private final Boolean subscribed;
 
         private BulkCreateParams(Builder builder) {
@@ -635,7 +635,7 @@ public final class ContactsService {
         }
 
         /** @return the {@code properties} sent (null when left out) */
-        public Map<String, String> getProperties() {
+        public Map<String, Object> getProperties() {
             return properties;
         }
 
@@ -667,7 +667,7 @@ public final class ContactsService {
             private String email;
             private String firstName;
             private String lastName;
-            private Map<String, String> properties;
+            private Map<String, Object> properties;
             private Boolean subscribed;
 
             private Builder() {
@@ -704,7 +704,7 @@ public final class ContactsService {
              * @param properties the {@code properties} to send
              * @return this builder
              */
-            public Builder properties(Map<String, String> properties) {
+            public Builder properties(Map<String, Object> properties) {
                 this.properties = properties;
                 return this;
             }

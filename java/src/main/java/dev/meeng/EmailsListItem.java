@@ -7,34 +7,6 @@ import java.util.Map;
 
 /** One item of data in EmailsListResponse. */
 public final class EmailsListItem {
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_SCHEDULED = "SCHEDULED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_QUEUED = "QUEUED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_SENT = "SENT";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_DELIVERY_DELAYED = "DELIVERY_DELAYED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_BOUNCED = "BOUNCED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_REJECTED = "REJECTED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_RENDERING_FAILURE = "RENDERING_FAILURE";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_DELIVERED = "DELIVERED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_OPENED = "OPENED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_CLICKED = "CLICKED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_COMPLAINED = "COMPLAINED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_FAILED = "FAILED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_CANCELLED = "CANCELLED";
-    /** A value of {@link #getLatestStatus()}. */
-    public static final String LATESTSTATUS_SUPPRESSED = "SUPPRESSED";
 
     private final String id;
     private final List<String> to;
@@ -71,10 +43,10 @@ public final class EmailsListItem {
     static EmailsListItem fromJson(Map<String, Object> data) {
         return new EmailsListItem(
                 Json.required(data, "id", Json::asString),
-                Json.required(data, "to", Json::asStringList),
-                Json.optional(data, "replyTo", Json::asStringList),
-                Json.optional(data, "cc", Json::asStringList),
-                Json.optional(data, "bcc", Json::asStringList),
+                Json.required(data, "to", Json.list(Json::asString)),
+                Json.required(data, "replyTo", Json.list(Json::asString)),
+                Json.required(data, "cc", Json.list(Json::asString)),
+                Json.required(data, "bcc", Json.list(Json::asString)),
                 Json.required(data, "from", Json::asString),
                 Json.required(data, "subject", Json::asString),
                 Json.optional(data, "html", Json::asString),
@@ -96,17 +68,17 @@ public final class EmailsListItem {
         return to;
     }
 
-    /** @return the API's {@code replyTo} (null when the API sends none) */
+    /** @return the API's {@code replyTo} */
     public List<String> getReplyTo() {
         return replyTo;
     }
 
-    /** @return the API's {@code cc} (null when the API sends none) */
+    /** @return the API's {@code cc} */
     public List<String> getCc() {
         return cc;
     }
 
-    /** @return the API's {@code bcc} (null when the API sends none) */
+    /** @return the API's {@code bcc} */
     public List<String> getBcc() {
         return bcc;
     }

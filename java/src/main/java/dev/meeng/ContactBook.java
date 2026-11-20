@@ -14,7 +14,7 @@ public final class ContactBook {
     private final Map<String, String> properties;
     private final List<String> variables;
     private final String emoji;
-    private final Boolean doubleOptInEnabled;
+    private final boolean doubleOptInEnabled;
     private final String doubleOptInFrom;
     private final String doubleOptInSubject;
     private final String doubleOptInContent;
@@ -22,7 +22,7 @@ public final class ContactBook {
     private final String updatedAt;
     private final ContactBookCount count;
 
-    ContactBook(String id, String name, long teamId, Map<String, String> properties, List<String> variables, String emoji, Boolean doubleOptInEnabled, String doubleOptInFrom, String doubleOptInSubject, String doubleOptInContent, String createdAt, String updatedAt, ContactBookCount count) {
+    ContactBook(String id, String name, long teamId, Map<String, String> properties, List<String> variables, String emoji, boolean doubleOptInEnabled, String doubleOptInFrom, String doubleOptInSubject, String doubleOptInContent, String createdAt, String updatedAt, ContactBookCount count) {
         this.id = id;
         this.name = name;
         this.teamId = teamId;
@@ -46,7 +46,7 @@ public final class ContactBook {
                 Json.required(data, "properties", Json.map(Json::asString)),
                 Json.required(data, "variables", Json.list(Json::asString)),
                 Json.required(data, "emoji", Json::asString),
-                Json.optional(data, "doubleOptInEnabled", Json::asBoolean),
+                Json.required(data, "doubleOptInEnabled", Json::asBoolean),
                 Json.optional(data, "doubleOptInFrom", Json::asString),
                 Json.optional(data, "doubleOptInSubject", Json::asString),
                 Json.optional(data, "doubleOptInContent", Json::asString),
@@ -55,62 +55,62 @@ public final class ContactBook {
                 Json.optional(data, "_count", Json.model(ContactBookCount::fromJson)));
     }
 
-    /** @return The ID of the contact book */
+    /** @return the API's {@code id} */
     public String getId() {
         return id;
     }
 
-    /** @return The name of the contact book */
+    /** @return the API's {@code name} */
     public String getName() {
         return name;
     }
 
-    /** @return The ID of the team */
+    /** @return the API's {@code teamId} */
     public long getTeamId() {
         return teamId;
     }
 
-    /** @return Custom properties for the contact book */
+    /** @return the API's {@code properties} */
     public Map<String, String> getProperties() {
         return properties;
     }
 
-    /** @return Allowed personalization variables for contacts in this book */
+    /** @return the API's {@code variables} */
     public List<String> getVariables() {
         return variables;
     }
 
-    /** @return The emoji associated with the contact book */
+    /** @return the API's {@code emoji} */
     public String getEmoji() {
         return emoji;
     }
 
-    /** @return Whether double opt-in is enabled for new contacts (null when the API sends none) */
-    public Boolean getDoubleOptInEnabled() {
+    /** @return the API's {@code doubleOptInEnabled} */
+    public boolean getDoubleOptInEnabled() {
         return doubleOptInEnabled;
     }
 
-    /** @return From address used for double opt-in emails (must use a verified domain) (null when the API sends none) */
+    /** @return the API's {@code doubleOptInFrom} (null when the API sends none) */
     public String getDoubleOptInFrom() {
         return doubleOptInFrom;
     }
 
-    /** @return Subject line used for double opt-in confirmation email (null when the API sends none) */
+    /** @return the API's {@code doubleOptInSubject} (null when the API sends none) */
     public String getDoubleOptInSubject() {
         return doubleOptInSubject;
     }
 
-    /** @return Email editor JSON content used for double opt-in confirmation (null when the API sends none) */
+    /** @return the API's {@code doubleOptInContent} (null when the API sends none) */
     public String getDoubleOptInContent() {
         return doubleOptInContent;
     }
 
-    /** @return The creation timestamp */
+    /** @return the API's {@code createdAt} */
     public String getCreatedAt() {
         return createdAt;
     }
 
-    /** @return The last update timestamp */
+    /** @return the API's {@code updatedAt} */
     public String getUpdatedAt() {
         return updatedAt;
     }

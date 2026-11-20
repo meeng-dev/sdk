@@ -73,7 +73,7 @@ func equal(a, b []string) bool {
 
 func TestTheServerIsSplitInTheAppAndThePrefix(t *testing.T) {
 	ir := loadContract(t)
-	if ir.BaseURL != "https://app.meeng.dev" || ir.APIPrefix != "/api" {
+	if ir.BaseURL != "https://meeng.dev" || ir.APIPrefix != "/api" {
 		t.Errorf("base %q, prefix %q", ir.BaseURL, ir.APIPrefix)
 	}
 }
@@ -171,7 +171,7 @@ func TestRecipientsAreAStringOrAListOfStrings(t *testing.T) {
 		t.Fatal("the list's item has no model")
 	}
 	for _, f := range list.Fields {
-		if f.Wire == "cc" && (!f.Nullable || f.Required) {
+		if f.Wire == "cc" && (f.Type.Kind != "array" || !f.Required) {
 			t.Errorf("cc of a listed email is %+v", f)
 		}
 	}
@@ -258,5 +258,61 @@ func TestPascalCamelAndSnake(t *testing.T) {
 		if got := Snake(c.in); got != c.snake {
 			t.Errorf("Snake(%q) = %q, want %q", c.in, got, c.snake)
 		}
+	}
+}
+
+// The contract writes a list as a named schema that refers to itself; the SDKs
+// read it as the list of its item.
+func TestAListThatRefersToItselfIsTheListOfItsItem(t *testing.T) {
+	ir := loadContract(t)
+	for id, item := range map[string]string{"domains.list": "Domain", "contactBooks.list": "ContactBook", "contacts.list": "Contact"} {
+		m := method(ir, id)
+		if m == nil || !m.ResponseList || m.Response != item {
+			t.Errorf("%s answers %+v, want a list of %s", id, m, item)
+		}
+	}
+}
+
+func TestTheAPIPrefixIsReadFromThePathsAndTheBaseURLIsTheApp(t *testing.T) {
+	ir := loadContract(t)
+	if ir.BaseURL != "https://meeng.dev" || ir.APIPrefix != "/api" {
+		t.Fatalf("base %q, prefix %q", ir.BaseURL, ir.APIPrefix)
+	}
+	if send := method(ir, "emails.send"); send.Path != "/v1/emails" {
+		t.Errorf("emails.send is at %s", send.Path)
+	}
+}
+
+// OpenAPI 3.1 writes a nullable value as a list of types, or as a schema or null.
+func TestNullableValuesAreReadInBothFormsOf31(t *testing.T) {
+	ir := loadContract(t)
+	fields := map[string]*Field{}
+	for _, f := range ir.model("Campaign").Fields {
+		fields[f.Wire] = f
+	}
+	if f := fields["previewText"]; f == nil || !f.Nullable || f.Type.Kind != "string" {
+		t.Errorf("previewText is %+v", f)
+	}
+	if f := fields["name"]; f == nil || f.Nullable {
+		t.Errorf("name is %+v", f)
+	}
+	var count *Field
+	for _, f := range ir.model("ContactBook").Fields {
+		if f.Wire == "_count" {
+			count = f
+		}
+	}
+	if count == nil || !count.Nullable || count.Required || count.Type.Kind != "model" {
+		t.Errorf("_count of a contact book is %+v", count)
+	}
+}
+
+func TestTheDeletedCampaignHasItsOwnModel(t *testing.T) {
+	ir := loadContract(t)
+	if got := method(ir, "campaigns.delete").Response; got != "CampaignRow" {
+		t.Errorf("campaigns.delete answers %s", got)
+	}
+	if ir.model("CampaignRow") == nil {
+		t.Error("CampaignRow has no model")
 	}
 }

@@ -71,6 +71,41 @@ export interface CampaignActionResponse {
   success: boolean;
 }
 
+/** CampaignRow is a resource of meeng's API. */
+export interface CampaignRow {
+  id: string;
+  name: string;
+  from: string;
+  subject: string;
+  previewText: string | null;
+  contactBookId: string | null;
+  html: string | null;
+  content: string | null;
+  status: string;
+  scheduledAt: string | null;
+  batchSize: number;
+  batchWindowMinutes: number;
+  total: number;
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  unsubscribed: number;
+  bounced: number;
+  hardBounced: number;
+  complained: number;
+  replyTo: string[];
+  cc: string[];
+  bcc: string[];
+  createdAt: string;
+  updatedAt: string;
+  teamId: number;
+  domainId: number;
+  isApi: boolean;
+  lastCursor: string | null;
+  lastSentAt: string | null;
+}
+
 /** The body of campaigns.create. */
 export interface CampaignsCreateParams {
   name: string;
@@ -80,11 +115,10 @@ export interface CampaignsCreateParams {
   contactBookId: string;
   content?: string;
   html?: string;
-  replyTo?: string | string[];
-  cc?: string | string[];
-  bcc?: string | string[];
+  replyTo?: string[];
+  cc?: string[];
+  bcc?: string[];
   sendNow?: boolean;
-  /** Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30') */
   scheduledAt?: string;
   batchSize?: number;
 }
@@ -113,7 +147,6 @@ export interface CampaignsListResponse {
 
 /** The body of campaigns.schedule. */
 export interface CampaignsScheduleParams {
-  /** Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30') */
   scheduledAt?: string;
   batchSize?: number;
 }
@@ -126,10 +159,11 @@ export interface CampaignsScheduleResponse {
 /** Contact is a resource of meeng's API. */
 export interface Contact {
   id: string;
-  firstName?: string | null;
-  lastName?: string | null;
+  firstName: string | null;
+  lastName: string | null;
   email: string;
-  subscribed?: boolean;
+  subscribed: boolean;
+  unsubscribeReason: string | null;
   properties: Record<string, string>;
   contactBookId: string;
   createdAt: string;
@@ -138,36 +172,23 @@ export interface Contact {
 
 /** ContactBook is a resource of meeng's API. */
 export interface ContactBook {
-  /** The ID of the contact book */
   id: string;
-  /** The name of the contact book */
   name: string;
-  /** The ID of the team */
   teamId: number;
-  /** Custom properties for the contact book */
   properties: Record<string, string>;
-  /** Allowed personalization variables for contacts in this book */
   variables: string[];
-  /** The emoji associated with the contact book */
   emoji: string;
-  /** Whether double opt-in is enabled for new contacts */
-  doubleOptInEnabled?: boolean;
-  /** From address used for double opt-in emails (must use a verified domain) */
-  doubleOptInFrom?: string | null;
-  /** Subject line used for double opt-in confirmation email */
-  doubleOptInSubject?: string | null;
-  /** Email editor JSON content used for double opt-in confirmation */
-  doubleOptInContent?: string | null;
-  /** The creation timestamp */
+  doubleOptInEnabled: boolean;
+  doubleOptInFrom: string | null;
+  doubleOptInSubject: string | null;
+  doubleOptInContent: string | null;
   createdAt: string;
-  /** The last update timestamp */
   updatedAt: string;
-  _count?: ContactBookCount;
+  _count?: ContactBookCount | null;
 }
 
 /** The _count of ContactBook. */
 export interface ContactBookCount {
-  /** The number of contacts in the contact book */
   contacts: number;
 }
 
@@ -175,7 +196,7 @@ export interface ContactBookCount {
 export interface ContactBooksCreateParams {
   name: string;
   emoji?: string;
-  properties?: Record<string, string>;
+  properties?: Record<string, unknown>;
   doubleOptInEnabled?: boolean;
   doubleOptInFrom?: string | null;
   doubleOptInSubject?: string;
@@ -194,7 +215,7 @@ export interface ContactBooksDeleteResponse {
 export interface ContactBooksUpdateParams {
   name?: string;
   emoji?: string;
-  properties?: Record<string, string>;
+  properties?: Record<string, unknown>;
   doubleOptInEnabled?: boolean;
   doubleOptInFrom?: string | null;
   doubleOptInSubject?: string;
@@ -220,7 +241,7 @@ export interface ContactsBulkCreateParams {
   email: string;
   firstName?: string;
   lastName?: string;
-  properties?: Record<string, string>;
+  properties?: Record<string, unknown>;
   subscribed?: boolean;
 }
 
@@ -246,13 +267,13 @@ export interface ContactsCreateParams {
   email: string;
   firstName?: string;
   lastName?: string;
-  properties?: Record<string, string>;
+  properties?: Record<string, unknown>;
   subscribed?: boolean;
 }
 
 /** ContactsCreateResponse is a resource of meeng's API. */
 export interface ContactsCreateResponse {
-  contactId?: string;
+  contactId: string;
 }
 
 /** ContactsDeleteResponse is a resource of meeng's API. */
@@ -264,13 +285,13 @@ export interface ContactsDeleteResponse {
 export interface ContactsUpdateParams {
   firstName?: string;
   lastName?: string;
-  properties?: Record<string, string>;
+  properties?: Record<string, unknown>;
   subscribed?: boolean;
 }
 
 /** ContactsUpdateResponse is a resource of meeng's API. */
 export interface ContactsUpdateResponse {
-  contactId?: string;
+  contactId: string;
 }
 
 /** The body of contacts.upsert. */
@@ -278,7 +299,7 @@ export interface ContactsUpsertParams {
   email: string;
   firstName?: string;
   lastName?: string;
-  properties?: Record<string, string>;
+  properties?: Record<string, unknown>;
   subscribed?: boolean;
 }
 
@@ -289,45 +310,37 @@ export interface ContactsUpsertResponse {
 
 /** Domain is a resource of meeng's API. */
 export interface Domain {
-  /** The ID of the domain */
   id: number;
-  /** The name of the domain */
   name: string;
-  /** The ID of the team */
   teamId: number;
-  status: "NOT_STARTED" | "PENDING" | "SUCCESS" | "FAILED" | "TEMPORARY_FAILURE";
-  region?: string;
-  clickTracking?: boolean;
-  openTracking?: boolean;
+  status: string;
+  region: string;
+  clickTracking: boolean;
+  openTracking: boolean;
   publicKey: string;
-  dkimStatus?: string | null;
-  spfDetails?: string | null;
+  dkimSelector: string;
+  dkimStatus: string;
+  spfDetails: string;
+  dmarcAdded: boolean;
+  isVerifying: boolean;
+  errorMessage: string | null;
+  subdomain: string | null;
+  verificationError: string | null;
+  lastCheckedTime: string | null;
   createdAt: string;
   updatedAt: string;
-  dmarcAdded?: boolean;
-  isVerifying?: boolean;
-  errorMessage?: string | null;
-  subdomain?: string | null;
-  verificationError?: string | null;
-  lastCheckedTime?: string | null;
   dnsRecords: DomainDnsRecord[];
 }
 
 /** One item of dnsRecords in Domain. */
 export interface DomainDnsRecord {
-  /** DNS record type */
-  type: "MX" | "TXT";
-  /** DNS record name */
+  type: string;
   name: string;
-  /** DNS record value */
   value: string;
-  /** DNS record TTL */
   ttl: string;
-  /** DNS record priority */
   priority?: string | null;
-  status: "NOT_STARTED" | "PENDING" | "SUCCESS" | "FAILED" | "TEMPORARY_FAILURE";
-  /** Whether the record is recommended */
-  recommended?: boolean;
+  status: string;
+  recommended?: boolean | null;
 }
 
 /** The data of the domain events. */
@@ -369,10 +382,7 @@ export interface DomainsVerifyResponse {
 export interface Email {
   id: string;
   teamId: number;
-  to: string | string[];
-  replyTo?: string | string[];
-  cc?: string | string[];
-  bcc?: string | string[];
+  to: string[];
   from: string;
   subject: string;
   html: string | null;
@@ -448,9 +458,9 @@ export interface EmailClickedPayload {
 /** One item of emailEvents in Email. */
 export interface EmailEvent {
   emailId: string;
-  status: "SCHEDULED" | "QUEUED" | "SENT" | "DELIVERY_DELAYED" | "BOUNCED" | "REJECTED" | "RENDERING_FAILURE" | "DELIVERED" | "OPENED" | "CLICKED" | "COMPLAINED" | "FAILED" | "CANCELLED" | "SUPPRESSED";
+  status: string;
   createdAt: string;
-  data?: unknown | null;
+  data?: Record<string, unknown>;
 }
 
 /** Why an email failed. */
@@ -524,6 +534,7 @@ export interface EmailSuppressedSuppression {
 /** One item of attachments in EmailsBatchParams. */
 export interface EmailsBatchAttachment {
   filename: string;
+  /** The file, in base64. */
   content: string;
 }
 
@@ -536,18 +547,19 @@ export interface EmailsBatchItem {
 export interface EmailsBatchParams {
   to: string | string[];
   from: string;
-  /** Optional when templateId is provided */
+  /** Optional when templateId is provided. */
   subject?: string;
-  /** ID of a template from the dashboard */
+  /** ID of a template from the dashboard. */
   templateId?: string;
-  variables?: Record<string, string>;
+  /** The values of the template's variables, as text. */
+  variables?: Record<string, unknown>;
   replyTo?: string | string[];
   cc?: string | string[];
   bcc?: string | string[];
   text?: string | null;
   html?: string | null;
-  /** Custom headers to included with the emails */
-  headers?: Record<string, string>;
+  /** Custom headers to include with the e-mail, name to value. */
+  headers?: Record<string, unknown>;
   attachments?: EmailsBatchAttachment[];
   scheduledAt?: string;
   inReplyToId?: string | null;
@@ -560,23 +572,23 @@ export interface EmailsBatchResponse {
 
 /** EmailsCancelResponse is a resource of meeng's API. */
 export interface EmailsCancelResponse {
-  emailId?: string;
+  emailId: string;
 }
 
 /** One item of data in EmailsListResponse. */
 export interface EmailsListItem {
   id: string;
-  to: string | string[];
-  replyTo?: string | string[] | null;
-  cc?: string | string[] | null;
-  bcc?: string | string[] | null;
+  to: string[];
+  replyTo: string[];
+  cc: string[];
+  bcc: string[];
   from: string;
   subject: string;
   html: string | null;
   text: string | null;
   createdAt: string;
   updatedAt: string;
-  latestStatus: "SCHEDULED" | "QUEUED" | "SENT" | "DELIVERY_DELAYED" | "BOUNCED" | "REJECTED" | "RENDERING_FAILURE" | "DELIVERED" | "OPENED" | "CLICKED" | "COMPLAINED" | "FAILED" | "CANCELLED" | "SUPPRESSED" | null;
+  latestStatus: string | null;
   scheduledAt: string | null;
   domainId: number | null;
 }
@@ -590,6 +602,7 @@ export interface EmailsListResponse {
 /** One item of attachments in EmailsSendParams. */
 export interface EmailsSendAttachment {
   filename: string;
+  /** The file, in base64. */
   content: string;
 }
 
@@ -597,18 +610,19 @@ export interface EmailsSendAttachment {
 export interface EmailsSendParams {
   to: string | string[];
   from: string;
-  /** Optional when templateId is provided */
+  /** Optional when templateId is provided. */
   subject?: string;
-  /** ID of a template from the dashboard */
+  /** ID of a template from the dashboard. */
   templateId?: string;
-  variables?: Record<string, string>;
+  /** The values of the template's variables, as text. */
+  variables?: Record<string, unknown>;
   replyTo?: string | string[];
   cc?: string | string[];
   bcc?: string | string[];
   text?: string | null;
   html?: string | null;
-  /** Custom headers to included with the emails */
-  headers?: Record<string, string>;
+  /** Custom headers to include with the e-mail, name to value. */
+  headers?: Record<string, unknown>;
   attachments?: EmailsSendAttachment[];
   scheduledAt?: string;
   inReplyToId?: string | null;
@@ -616,7 +630,7 @@ export interface EmailsSendParams {
 
 /** EmailsSendResponse is a resource of meeng's API. */
 export interface EmailsSendResponse {
-  emailId?: string;
+  emailId: string;
 }
 
 /** The body of emails.update. */
@@ -626,7 +640,7 @@ export interface EmailsUpdateParams {
 
 /** EmailsUpdateResponse is a resource of meeng's API. */
 export interface EmailsUpdateResponse {
-  emailId?: string;
+  emailId: string;
 }
 
 /** The data of webhook.test, which the dashboard sends to try an endpoint. */

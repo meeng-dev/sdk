@@ -9,7 +9,7 @@ namespace Meeng;
 /// <summary>EmailsUpdateResponse is a resource of meeng's API.</summary>
 public sealed record EmailsUpdateResponse
 {
-    /// <summary>The API's <c>emailId</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>emailId</c>.</summary>
     [JsonPropertyName("emailId")]
-    public string? EmailId { get; init; }
+    public required string EmailId { get; init; }
 }

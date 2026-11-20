@@ -50,13 +50,13 @@ func dig(doc map[string]any, keys ...string) map[string]any {
 // a string is escaped.
 func TestHostileTextStaysInsideItsComment(t *testing.T) {
 	ir, err := load(t, func(doc map[string]any) {
-		body := dig(doc, "paths", "/v1/emails", "post", "requestBody", "content", "application/json", "schema")
+		body := dig(doc, "paths", "/api/v1/emails", "post", "requestBody", "content", "application/json", "schema")
 		body["description"] = hostile
 		dig(body, "properties", "subject")["description"] = hostile
-		domain := dig(doc, "paths", "/v1/domains", "get", "responses", "200", "content", "application/json", "schema", "items")
+		domain := dig(doc, "components", "schemas", "Domain")
 		domain["description"] = hostile
 		dig(domain, "properties", "name")["description"] = hostile
-		query := dig(doc, "paths", "/v1/emails", "get")["parameters"].([]any)[0].(map[string]any)
+		query := dig(doc, "paths", "/api/v1/emails", "get")["parameters"].([]any)[0].(map[string]any)
 		query["description"] = hostile
 	})
 	if err != nil {
@@ -129,28 +129,28 @@ func TestHostileTextStaysInsideItsComment(t *testing.T) {
 func TestHostileIdentifiersAndValuesStopGeneration(t *testing.T) {
 	cases := map[string]func(doc map[string]any){
 		"an enum value with a quote": func(doc map[string]any) {
-			status := dig(doc, "paths", "/v1/domains/{id}", "get", "responses", "200", "content", "application/json", "schema", "properties", "status")
+			status := dig(doc, "components", "schemas", "Domain", "properties", "status")
 			status["enum"] = []any{"PENDING", `SUCCESS"; evil(); "`}
 		},
 		"an enum value with a new line": func(doc map[string]any) {
-			status := dig(doc, "paths", "/v1/domains/{id}", "get", "responses", "200", "content", "application/json", "schema", "properties", "status")
+			status := dig(doc, "components", "schemas", "Domain", "properties", "status")
 			status["enum"] = []any{"PENDING\nevil"}
 		},
 		"a field that is not an identifier": func(doc map[string]any) {
-			body := dig(doc, "paths", "/v1/emails", "post", "requestBody", "content", "application/json", "schema", "properties")
+			body := dig(doc, "paths", "/api/v1/emails", "post", "requestBody", "content", "application/json", "schema", "properties")
 			body[`x"]; evil(); ["`] = map[string]any{"type": "string"}
 		},
 		"a path with a quote": func(doc map[string]any) {
 			paths := dig(doc, "paths")
-			paths[`/v1/em"ails`] = paths["/v1/emails"]
+			paths[`/api/v1/em"ails`] = paths["/api/v1/emails"]
 		},
 		"a path parameter that is not an identifier": func(doc map[string]any) {
 			paths := dig(doc, "paths")
-			paths["/v1/emails/{a b}"] = paths["/v1/emails/{emailId}"]
+			paths["/api/v1/emails/{a b}"] = paths["/api/v1/emails/{emailId}"]
 		},
 		"a route the surface does not name": func(doc map[string]any) {
 			paths := dig(doc, "paths")
-			paths["/v1/secrets"] = paths["/v1/domains"]
+			paths["/api/v1/secrets"] = paths["/api/v1/domains"]
 		},
 		"a server address with a quote": func(doc map[string]any) {
 			doc["servers"] = []any{map[string]any{"url": `https://meeng.dev"; evil(); "`}}
@@ -158,11 +158,20 @@ func TestHostileIdentifiersAndValuesStopGeneration(t *testing.T) {
 		"a contract version with a new line": func(doc map[string]any) {
 			dig(doc, "info")["version"] = "1.0\nevil"
 		},
-		"a named schema, which the generator does not read": func(doc map[string]any) {
-			dig(doc, "components", "schemas")["Evil"] = map[string]any{"type": "object"}
+		"a reference to a schema the contract does not have": func(doc map[string]any) {
+			dig(doc, "components", "schemas", "Domain", "properties")["status"] = map[string]any{"$ref": "#/components/schemas/Nope"}
+		},
+		"a schema that contains itself": func(doc map[string]any) {
+			dig(doc, "components", "schemas", "Domain", "properties")["dnsRecords"] = map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/Domain"}}
+		},
+		"a list that refers to itself with no item named for it": func(doc map[string]any) {
+			schemas := dig(doc, "components", "schemas")
+			schemas["TeamList"] = map[string]any{"$ref": "#/components/schemas/TeamList"}
+			response := dig(doc, "paths", "/api/v1/domains", "get", "responses", "200", "content", "application/json", "schema")
+			response["$ref"] = "#/components/schemas/TeamList"
 		},
 		"a header the SDKs do not send": func(doc map[string]any) {
-			params := dig(doc, "paths", "/v1/emails", "post")["parameters"].([]any)
+			params := dig(doc, "paths", "/api/v1/emails", "post")["parameters"].([]any)
 			params[0].(map[string]any)["name"] = "X-Evil"
 		},
 	}
@@ -179,7 +188,7 @@ func TestHostileIdentifiersAndValuesStopGeneration(t *testing.T) {
 // every route the SDKs promise.
 func TestARouteTheContractLostStopsGeneration(t *testing.T) {
 	_, err := load(t, func(doc map[string]any) {
-		delete(dig(doc, "paths"), "/v1/analytics/reputation-metrics")
+		delete(dig(doc, "paths"), "/api/v1/analytics/reputation-metrics")
 	})
 	if err == nil || !strings.Contains(err.Error(), "reputation-metrics") {
 		t.Fatalf("generation went ahead or named the wrong route: %v", err)

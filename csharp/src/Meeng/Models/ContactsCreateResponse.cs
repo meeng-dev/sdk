@@ -9,7 +9,7 @@ namespace Meeng;
 /// <summary>ContactsCreateResponse is a resource of meeng's API.</summary>
 public sealed record ContactsCreateResponse
 {
-    /// <summary>The API's <c>contactId</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>contactId</c>.</summary>
     [JsonPropertyName("contactId")]
-    public string? ContactId { get; init; }
+    public required string ContactId { get; init; }
 }

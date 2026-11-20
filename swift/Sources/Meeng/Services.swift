@@ -116,10 +116,10 @@ public struct ContactsService: Sendable {
     /// Lists the contacts of a contact book, optionally by email or id.
     ///
     /// - Parameters:
-    ///   - emails: Only the contacts with these emails, separated by commas.
+    ///   - emails: Comma separated e-mail addresses; an exact match.
     ///   - page: The page, from 1.
-    ///   - limit: The items a page: 1 to 100, 50 by default.
-    ///   - ids: Only the contacts with these ids, separated by commas.
+    ///   - limit: Contacts to a page; 5000 when it is not given.
+    ///   - ids: Comma separated contact ids.
     public func list(_ contactBookID: String, emails: String? = nil, page: Int? = nil, limit: Int? = nil, ids: String? = nil) async throws -> [Contact] {
         var query: [(String, String?)] = []
         query.append(("emails", emails))
@@ -228,9 +228,9 @@ public struct CampaignsService: Sendable {
     /// Lists campaigns, optionally by status or a search text.
     ///
     /// - Parameters:
-    ///   - page: The page, from 1.
-    ///   - status: Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.
-    ///   - search: Only campaigns whose name matches this text.
+    ///   - page: The page, from 1; 30 campaigns to a page.
+    ///   - status: Only campaigns in this status.
+    ///   - search: Part of the name or of the subject.
     public func list(page: Int? = nil, status: String? = nil, search: String? = nil) async throws -> CampaignsListResponse {
         var query: [(String, String?)] = []
         query.append(("page", page.map(String.init)))
@@ -249,7 +249,7 @@ public struct CampaignsService: Sendable {
     }
 
     /// Removes a campaign.
-    public func delete(_ campaignID: String) async throws -> Campaign {
+    public func delete(_ campaignID: String) async throws -> CampaignRow {
         return try await requester.request(
             "DELETE", "/v1/campaigns/\(escape(campaignID))"
         )
@@ -284,8 +284,8 @@ public struct AnalyticsService: Sendable {
     /// Counts emails by day over the last 7 or 30 days.
     ///
     /// - Parameters:
-    ///   - days: How many days to count: 7 or 30.
-    ///   - domainID: Only emails of these domains; a list sends one domainId for each value.
+    ///   - days: How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
+    ///   - domainID: Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     public func emailTimeSeries(days: String? = nil, domainID: String? = nil) async throws -> AnalyticsEmailTimeSeriesResponse {
         var query: [(String, String?)] = []
         query.append(("days", days))
@@ -298,7 +298,7 @@ public struct AnalyticsService: Sendable {
     /// Reads the bounce and complaint rates of the sending reputation.
     ///
     /// - Parameters:
-    ///   - domainID: Only emails of these domains; a list sends one domainId for each value.
+    ///   - domainID: Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     public func reputationMetrics(domainID: String? = nil) async throws -> AnalyticsReputationMetricsResponse {
         var query: [(String, String?)] = []
         query.append(("domainId", domainID))

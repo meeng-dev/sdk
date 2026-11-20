@@ -15,7 +15,7 @@ final class Version
     public const API = '1.0.0';
 
     /** Where meeng's API lives. The client appends /api/v1 to it, so MEENG_BASE_URL, like the $baseUrl argument, is the address of the app and nothing more. */
-    public const DEFAULT_BASE_URL = 'https://app.meeng.dev';
+    public const DEFAULT_BASE_URL = 'https://meeng.dev';
 
     /** What every path starts with, after the base URL. */
     public const API_PREFIX = '/api';

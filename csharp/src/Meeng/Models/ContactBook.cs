@@ -9,51 +9,51 @@ namespace Meeng;
 /// <summary>ContactBook is a resource of meeng's API.</summary>
 public sealed record ContactBook
 {
-    /// <summary>The ID of the contact book</summary>
+    /// <summary>The API's <c>id</c>.</summary>
     [JsonPropertyName("id")]
     public required string Id { get; init; }
 
-    /// <summary>The name of the contact book</summary>
+    /// <summary>The API's <c>name</c>.</summary>
     [JsonPropertyName("name")]
     public required string Name { get; init; }
 
-    /// <summary>The ID of the team</summary>
+    /// <summary>The API's <c>teamId</c>.</summary>
     [JsonPropertyName("teamId")]
     public required long TeamId { get; init; }
 
-    /// <summary>Custom properties for the contact book</summary>
+    /// <summary>The API's <c>properties</c>.</summary>
     [JsonPropertyName("properties")]
     public required IReadOnlyDictionary<string, string> Properties { get; init; }
 
-    /// <summary>Allowed personalization variables for contacts in this book</summary>
+    /// <summary>The API's <c>variables</c>.</summary>
     [JsonPropertyName("variables")]
     public required IReadOnlyList<string> Variables { get; init; }
 
-    /// <summary>The emoji associated with the contact book</summary>
+    /// <summary>The API's <c>emoji</c>.</summary>
     [JsonPropertyName("emoji")]
     public required string Emoji { get; init; }
 
-    /// <summary>Whether double opt-in is enabled for new contacts Null when the API sends none.</summary>
+    /// <summary>The API's <c>doubleOptInEnabled</c>.</summary>
     [JsonPropertyName("doubleOptInEnabled")]
-    public bool? DoubleOptInEnabled { get; init; }
+    public required bool DoubleOptInEnabled { get; init; }
 
-    /// <summary>From address used for double opt-in emails (must use a verified domain) Null when the API sends none.</summary>
+    /// <summary>The API's <c>doubleOptInFrom</c>. Null when the API sends none.</summary>
     [JsonPropertyName("doubleOptInFrom")]
     public string? DoubleOptInFrom { get; init; }
 
-    /// <summary>Subject line used for double opt-in confirmation email Null when the API sends none.</summary>
+    /// <summary>The API's <c>doubleOptInSubject</c>. Null when the API sends none.</summary>
     [JsonPropertyName("doubleOptInSubject")]
     public string? DoubleOptInSubject { get; init; }
 
-    /// <summary>Email editor JSON content used for double opt-in confirmation Null when the API sends none.</summary>
+    /// <summary>The API's <c>doubleOptInContent</c>. Null when the API sends none.</summary>
     [JsonPropertyName("doubleOptInContent")]
     public string? DoubleOptInContent { get; init; }
 
-    /// <summary>The creation timestamp</summary>
+    /// <summary>The API's <c>createdAt</c>.</summary>
     [JsonPropertyName("createdAt")]
     public required string CreatedAt { get; init; }
 
-    /// <summary>The last update timestamp</summary>
+    /// <summary>The API's <c>updatedAt</c>.</summary>
     [JsonPropertyName("updatedAt")]
     public required string UpdatedAt { get; init; }
 

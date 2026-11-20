@@ -19,7 +19,7 @@ public final class ContactBookCount {
                 Json.required(data, "contacts", Json::asLong));
     }
 
-    /** @return The number of contacts in the contact book */
+    /** @return the API's {@code contacts} */
     public long getContacts() {
         return contacts;
     }

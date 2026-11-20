@@ -121,18 +121,18 @@ class MeengTest {
 
     @Test
     void aPathParameterIsEscaped() {
-        Recorder recorder = new Recorder(r -> json(200, map("id", "a/b c", "teamId", 1, "to", "a@x.com", "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
+        Recorder recorder = new Recorder(r -> json(200, map("id", "a/b c", "teamId", 1, "to", List.of("a@x.com"), "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
                 "createdAt", "x", "updatedAt", "x", "emailEvents", List.of(map("emailId", "a/b c", "status", "SENT", "createdAt", "x", "data", map("ip", "1.2.3.4"))))));
         Email email = client(recorder).emails().get("a/b c");
         assertEquals("https://meeng.test/api/v1/emails/a%2Fb%20c", recorder.seen.get(0).getUrl());
         assertEquals(List.of("a@x.com"), email.getTo());
-        assertEquals(EmailEvent.STATUS_SENT, email.getEmailEvents().get(0).getStatus());
+        assertEquals("SENT", email.getEmailEvents().get(0).getStatus());
     }
 
     @Test
     void aListTheApiAnswersWithoutAnObjectAroundItIsAList() {
         Recorder recorder = new Recorder(r -> json(200, List.of(map("id", "cb_1", "name", "News", "teamId", 1, "properties", map("plan", "string"),
-                "variables", List.of("plan"), "emoji", "x", "createdAt", "x", "updatedAt", "x", "_count", map("contacts", 4)))));
+                "variables", List.of("plan"), "emoji", "x", "doubleOptInEnabled", false, "doubleOptInFrom", null, "doubleOptInSubject", null, "doubleOptInContent", null, "createdAt", "x", "updatedAt", "x", "_count", map("contacts", 4)))));
         List<ContactBook> books = client(recorder).contactBooks().list();
         assertEquals("News", books.get(0).getName());
         assertEquals(4L, books.get(0).getCount().getContacts());
@@ -178,10 +178,10 @@ class MeengTest {
     }
 
     @Test
-    void anEmailsRecipientsMayComeAsOneStringOrAList() {
-        Recorder recorder = new Recorder(r -> json(200, map("id", "em_1", "teamId", 1, "to", "a@x.com", "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
+    void anEmailsRecipientsAreAList() {
+        Recorder recorder = new Recorder(r -> json(200, map("id", "em_1", "teamId", 1, "to", List.of("a@x.com", "b@x.com"), "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
                 "createdAt", "x", "updatedAt", "x", "emailEvents", List.of())));
-        assertEquals(List.of("a@x.com"), client(recorder).emails().get("em_1").getTo());
+        assertEquals(List.of("a@x.com", "b@x.com"), client(recorder).emails().get("em_1").getTo());
     }
 
     @Test

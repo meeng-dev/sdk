@@ -43,7 +43,7 @@ public final class Meeng {
      * MEENG_BASE_URL, like {@link Builder#baseUrl(String)}, is the address of
      * the app and nothing more.
      */
-    public static final String DEFAULT_BASE_URL = "https://app.meeng.dev";
+    public static final String DEFAULT_BASE_URL = "https://meeng.dev";
 
     /** What every path starts with, after the base URL. */
     public static final String API_PREFIX = "/api";

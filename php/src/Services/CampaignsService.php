@@ -18,7 +18,7 @@ final class CampaignsService
     /**
      * Creates a campaign, and sends it now when sendNow is true.
      *
-     * @param array{'name': string, 'from': string, 'subject': string, 'previewText'?: string, 'contactBookId': string, 'content'?: string, 'html'?: string, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'sendNow'?: bool, 'scheduledAt'?: string, 'batchSize'?: int} $payload
+     * @param array{'name': string, 'from': string, 'subject': string, 'previewText'?: string, 'contactBookId': string, 'content'?: string, 'html'?: string, 'replyTo'?: list<string>, 'cc'?: list<string>, 'bcc'?: list<string>, 'sendNow'?: bool, 'scheduledAt'?: string, 'batchSize'?: int} $payload
      * @return array{'id': string, 'name': string, 'from': string, 'subject': string, 'previewText': string|null, 'contactBookId': string|null, 'html': string|null, 'content': string|null, 'status': string, 'scheduledAt': string|null, 'batchSize': int, 'batchWindowMinutes': int, 'total': int, 'sent': int, 'delivered': int, 'opened': int, 'clicked': int, 'unsubscribed': int, 'bounced': int, 'hardBounced': int, 'complained': int, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'createdAt': string, 'updatedAt': string}
      */
     public function create(array $payload, ): array
@@ -55,11 +55,11 @@ final class CampaignsService
      * Removes a campaign.
      *
      * @param string|int $campaignId
-     * @return array{'id': string, 'name': string, 'from': string, 'subject': string, 'previewText': string|null, 'contactBookId': string|null, 'html': string|null, 'content': string|null, 'status': string, 'scheduledAt': string|null, 'batchSize': int, 'batchWindowMinutes': int, 'total': int, 'sent': int, 'delivered': int, 'opened': int, 'clicked': int, 'unsubscribed': int, 'bounced': int, 'hardBounced': int, 'complained': int, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'createdAt': string, 'updatedAt': string}
+     * @return array{'id': string, 'name': string, 'from': string, 'subject': string, 'previewText': string|null, 'contactBookId': string|null, 'html': string|null, 'content': string|null, 'status': string, 'scheduledAt': string|null, 'batchSize': int, 'batchWindowMinutes': int, 'total': int, 'sent': int, 'delivered': int, 'opened': int, 'clicked': int, 'unsubscribed': int, 'bounced': int, 'hardBounced': int, 'complained': int, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'createdAt': string, 'updatedAt': string, 'teamId': int, 'domainId': int, 'isApi': bool, 'lastCursor': string|null, 'lastSentAt': string|null}
      */
     public function delete(string|int $campaignId, ): array
     {
-        /** @var array{'id': string, 'name': string, 'from': string, 'subject': string, 'previewText': string|null, 'contactBookId': string|null, 'html': string|null, 'content': string|null, 'status': string, 'scheduledAt': string|null, 'batchSize': int, 'batchWindowMinutes': int, 'total': int, 'sent': int, 'delivered': int, 'opened': int, 'clicked': int, 'unsubscribed': int, 'bounced': int, 'hardBounced': int, 'complained': int, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'createdAt': string, 'updatedAt': string} */
+        /** @var array{'id': string, 'name': string, 'from': string, 'subject': string, 'previewText': string|null, 'contactBookId': string|null, 'html': string|null, 'content': string|null, 'status': string, 'scheduledAt': string|null, 'batchSize': int, 'batchWindowMinutes': int, 'total': int, 'sent': int, 'delivered': int, 'opened': int, 'clicked': int, 'unsubscribed': int, 'bounced': int, 'hardBounced': int, 'complained': int, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'createdAt': string, 'updatedAt': string, 'teamId': int, 'domainId': int, 'isApi': bool, 'lastCursor': string|null, 'lastSentAt': string|null} */
         return $this->client->request('DELETE', '/v1/campaigns/' . rawurlencode((string) $campaignId));
     }
 

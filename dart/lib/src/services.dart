@@ -349,12 +349,12 @@ class CampaignsService {
   }
 
   /// Removes a campaign.
-  Future<Campaign> delete(String campaignId) async {
+  Future<CampaignRow> delete(String campaignId) async {
     final data = await _client.request(
       'DELETE',
       '/v1/campaigns/${Uri.encodeComponent(campaignId)}',
     );
-    return Campaign.fromJson(readObject(data));
+    return CampaignRow.fromJson(readObject(data));
   }
 
   /// Schedules a campaign, or sends it now when no time is given.

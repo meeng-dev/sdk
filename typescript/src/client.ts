@@ -69,7 +69,7 @@ export class Meeng implements Requester {
 
   /**
    * @param key The API key; MEENG_API_KEY when left out.
-   * @param baseUrl The address of the app, such as a self-hosted one; MEENG_BASE_URL, then "https://app.meeng.dev", when left out. It must be https; http is accepted only for localhost, 127.0.0.0/8 and ::1.
+   * @param baseUrl The address of the app, such as a self-hosted one; MEENG_BASE_URL, then "https://meeng.dev", when left out. It must be https; http is accepted only for localhost, 127.0.0.0/8 and ::1.
    */
   constructor(key?: string, baseUrl?: string, options: ClientOptions = {}) {
     const apiKey = key || environment("MEENG_API_KEY");

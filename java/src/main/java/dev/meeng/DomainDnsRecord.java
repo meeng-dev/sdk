@@ -7,20 +7,6 @@ import java.util.Map;
 
 /** One item of dnsRecords in Domain. */
 public final class DomainDnsRecord {
-    /** A value of {@link #getType()}. */
-    public static final String TYPE_MX = "MX";
-    /** A value of {@link #getType()}. */
-    public static final String TYPE_TXT = "TXT";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_NOT_STARTED = "NOT_STARTED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_PENDING = "PENDING";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_SUCCESS = "SUCCESS";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_FAILED = "FAILED";
-    /** A value of {@link #getStatus()}. */
-    public static final String STATUS_TEMPORARY_FAILURE = "TEMPORARY_FAILURE";
 
     private final String type;
     private final String name;
@@ -51,27 +37,27 @@ public final class DomainDnsRecord {
                 Json.optional(data, "recommended", Json::asBoolean));
     }
 
-    /** @return DNS record type */
+    /** @return the API's {@code type} */
     public String getType() {
         return type;
     }
 
-    /** @return DNS record name */
+    /** @return the API's {@code name} */
     public String getName() {
         return name;
     }
 
-    /** @return DNS record value */
+    /** @return the API's {@code value} */
     public String getValue() {
         return value;
     }
 
-    /** @return DNS record TTL */
+    /** @return the API's {@code ttl} */
     public String getTtl() {
         return ttl;
     }
 
-    /** @return DNS record priority (null when the API sends none) */
+    /** @return the API's {@code priority} (null when the API sends none) */
     public String getPriority() {
         return priority;
     }
@@ -81,7 +67,7 @@ public final class DomainDnsRecord {
         return status;
     }
 
-    /** @return Whether the record is recommended (null when the API sends none) */
+    /** @return the API's {@code recommended} (null when the API sends none) */
     public Boolean getRecommended() {
         return recommended;
     }

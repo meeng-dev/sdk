@@ -105,6 +105,57 @@ pub struct CampaignActionResponse {
     pub success: bool,
 }
 
+/// CampaignRow is a resource of meeng's API.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct CampaignRow {
+    pub id: String,
+    pub name: String,
+    pub from: String,
+    pub subject: String,
+    #[serde(rename = "previewText")]
+    pub preview_text: Option<String>,
+    #[serde(rename = "contactBookId")]
+    pub contact_book_id: Option<String>,
+    pub html: Option<String>,
+    pub content: Option<String>,
+    pub status: String,
+    #[serde(rename = "scheduledAt")]
+    pub scheduled_at: Option<String>,
+    #[serde(rename = "batchSize")]
+    pub batch_size: i64,
+    #[serde(rename = "batchWindowMinutes")]
+    pub batch_window_minutes: i64,
+    pub total: i64,
+    pub sent: i64,
+    pub delivered: i64,
+    pub opened: i64,
+    pub clicked: i64,
+    pub unsubscribed: i64,
+    pub bounced: i64,
+    #[serde(rename = "hardBounced")]
+    pub hard_bounced: i64,
+    pub complained: i64,
+    #[serde(rename = "replyTo")]
+    pub reply_to: Vec<String>,
+    pub cc: Vec<String>,
+    pub bcc: Vec<String>,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+    #[serde(rename = "teamId")]
+    pub team_id: i64,
+    #[serde(rename = "domainId")]
+    pub domain_id: i64,
+    #[serde(rename = "isApi")]
+    pub is_api: bool,
+    #[serde(rename = "lastCursor")]
+    pub last_cursor: Option<String>,
+    #[serde(rename = "lastSentAt")]
+    pub last_sent_at: Option<String>,
+}
+
 /// One item of campaigns in CampaignsListResponse.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -147,13 +198,14 @@ pub struct CampaignsScheduleResponse {
 #[non_exhaustive]
 pub struct Contact {
     pub id: String,
-    #[serde(rename = "firstName", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "firstName")]
     pub first_name: Option<String>,
-    #[serde(rename = "lastName", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "lastName")]
     pub last_name: Option<String>,
     pub email: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub subscribed: Option<bool>,
+    pub subscribed: bool,
+    #[serde(rename = "unsubscribeReason")]
+    pub unsubscribe_reason: Option<String>,
     pub properties: std::collections::HashMap<String, String>,
     #[serde(rename = "contactBookId")]
     pub contact_book_id: String,
@@ -167,35 +219,23 @@ pub struct Contact {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ContactBook {
-    /// The ID of the contact book
     pub id: String,
-    /// The name of the contact book
     pub name: String,
-    /// The ID of the team
     #[serde(rename = "teamId")]
     pub team_id: i64,
-    /// Custom properties for the contact book
     pub properties: std::collections::HashMap<String, String>,
-    /// Allowed personalization variables for contacts in this book
     pub variables: Vec<String>,
-    /// The emoji associated with the contact book
     pub emoji: String,
-    /// Whether double opt-in is enabled for new contacts
-    #[serde(rename = "doubleOptInEnabled", default, skip_serializing_if = "Option::is_none")]
-    pub double_opt_in_enabled: Option<bool>,
-    /// From address used for double opt-in emails (must use a verified domain)
-    #[serde(rename = "doubleOptInFrom", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "doubleOptInEnabled")]
+    pub double_opt_in_enabled: bool,
+    #[serde(rename = "doubleOptInFrom")]
     pub double_opt_in_from: Option<String>,
-    /// Subject line used for double opt-in confirmation email
-    #[serde(rename = "doubleOptInSubject", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "doubleOptInSubject")]
     pub double_opt_in_subject: Option<String>,
-    /// Email editor JSON content used for double opt-in confirmation
-    #[serde(rename = "doubleOptInContent", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "doubleOptInContent")]
     pub double_opt_in_content: Option<String>,
-    /// The creation timestamp
     #[serde(rename = "createdAt")]
     pub created_at: String,
-    /// The last update timestamp
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
     #[serde(rename = "_count", default, skip_serializing_if = "Option::is_none")]
@@ -206,7 +246,6 @@ pub struct ContactBook {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ContactBookCount {
-    /// The number of contacts in the contact book
     pub contacts: i64,
 }
 
@@ -259,8 +298,8 @@ pub struct ContactsBulkDeleteResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ContactsCreateResponse {
-    #[serde(rename = "contactId", default, skip_serializing_if = "Option::is_none")]
-    pub contact_id: Option<String>,
+    #[serde(rename = "contactId")]
+    pub contact_id: String,
 }
 
 /// ContactsDeleteResponse is a resource of meeng's API.
@@ -274,8 +313,8 @@ pub struct ContactsDeleteResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ContactsUpdateResponse {
-    #[serde(rename = "contactId", default, skip_serializing_if = "Option::is_none")]
-    pub contact_id: Option<String>,
+    #[serde(rename = "contactId")]
+    pub contact_id: String,
 }
 
 /// ContactsUpsertResponse is a resource of meeng's API.
@@ -290,42 +329,39 @@ pub struct ContactsUpsertResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Domain {
-    /// The ID of the domain
     pub id: i64,
-    /// The name of the domain
     pub name: String,
-    /// The ID of the team
     #[serde(rename = "teamId")]
     pub team_id: i64,
-    pub status: DomainStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
-    #[serde(rename = "clickTracking", default, skip_serializing_if = "Option::is_none")]
-    pub click_tracking: Option<bool>,
-    #[serde(rename = "openTracking", default, skip_serializing_if = "Option::is_none")]
-    pub open_tracking: Option<bool>,
+    pub status: String,
+    pub region: String,
+    #[serde(rename = "clickTracking")]
+    pub click_tracking: bool,
+    #[serde(rename = "openTracking")]
+    pub open_tracking: bool,
     #[serde(rename = "publicKey")]
     pub public_key: String,
-    #[serde(rename = "dkimStatus", default, skip_serializing_if = "Option::is_none")]
-    pub dkim_status: Option<String>,
-    #[serde(rename = "spfDetails", default, skip_serializing_if = "Option::is_none")]
-    pub spf_details: Option<String>,
+    #[serde(rename = "dkimSelector")]
+    pub dkim_selector: String,
+    #[serde(rename = "dkimStatus")]
+    pub dkim_status: String,
+    #[serde(rename = "spfDetails")]
+    pub spf_details: String,
+    #[serde(rename = "dmarcAdded")]
+    pub dmarc_added: bool,
+    #[serde(rename = "isVerifying")]
+    pub is_verifying: bool,
+    #[serde(rename = "errorMessage")]
+    pub error_message: Option<String>,
+    pub subdomain: Option<String>,
+    #[serde(rename = "verificationError")]
+    pub verification_error: Option<String>,
+    #[serde(rename = "lastCheckedTime")]
+    pub last_checked_time: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
-    #[serde(rename = "dmarcAdded", default, skip_serializing_if = "Option::is_none")]
-    pub dmarc_added: Option<bool>,
-    #[serde(rename = "isVerifying", default, skip_serializing_if = "Option::is_none")]
-    pub is_verifying: Option<bool>,
-    #[serde(rename = "errorMessage", default, skip_serializing_if = "Option::is_none")]
-    pub error_message: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub subdomain: Option<String>,
-    #[serde(rename = "verificationError", default, skip_serializing_if = "Option::is_none")]
-    pub verification_error: Option<String>,
-    #[serde(rename = "lastCheckedTime", default, skip_serializing_if = "Option::is_none")]
-    pub last_checked_time: Option<String>,
     #[serde(rename = "dnsRecords")]
     pub dns_records: Vec<DomainDnsRecord>,
 }
@@ -334,20 +370,14 @@ pub struct Domain {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct DomainDnsRecord {
-    /// DNS record type
     #[serde(rename = "type")]
-    pub type_: DomainDnsRecordType,
-    /// DNS record name
+    pub type_: String,
     pub name: String,
-    /// DNS record value
     pub value: String,
-    /// DNS record TTL
     pub ttl: String,
-    /// DNS record priority
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<String>,
-    pub status: DomainDnsRecordStatus,
-    /// Whether the record is recommended
+    pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recommended: Option<bool>,
 }
@@ -403,14 +433,7 @@ pub struct Email {
     pub id: String,
     #[serde(rename = "teamId")]
     pub team_id: i64,
-    #[serde(deserialize_with = "crate::json::string_list")]
     pub to: Vec<String>,
-    #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
-    pub reply_to: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
-    pub cc: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
-    pub bcc: Option<Vec<String>>,
     pub from: String,
     pub subject: String,
     pub html: Option<String>,
@@ -529,11 +552,11 @@ pub struct EmailClickedPayload {
 pub struct EmailEvent {
     #[serde(rename = "emailId")]
     pub email_id: String,
-    pub status: EmailEventStatus,
+    pub status: String,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
+    pub data: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
 /// Why an email failed.
@@ -661,8 +684,8 @@ pub struct EmailsBatchResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct EmailsCancelResponse {
-    #[serde(rename = "emailId", default, skip_serializing_if = "Option::is_none")]
-    pub email_id: Option<String>,
+    #[serde(rename = "emailId")]
+    pub email_id: String,
 }
 
 /// One item of data in EmailsListResponse.
@@ -670,14 +693,11 @@ pub struct EmailsCancelResponse {
 #[non_exhaustive]
 pub struct EmailsListItem {
     pub id: String,
-    #[serde(deserialize_with = "crate::json::string_list")]
     pub to: Vec<String>,
-    #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
-    pub reply_to: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
-    pub cc: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
-    pub bcc: Option<Vec<String>>,
+    #[serde(rename = "replyTo")]
+    pub reply_to: Vec<String>,
+    pub cc: Vec<String>,
+    pub bcc: Vec<String>,
     pub from: String,
     pub subject: String,
     pub html: Option<String>,
@@ -687,7 +707,7 @@ pub struct EmailsListItem {
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
     #[serde(rename = "latestStatus")]
-    pub latest_status: Option<EmailsListItemLatestStatus>,
+    pub latest_status: Option<String>,
     #[serde(rename = "scheduledAt")]
     pub scheduled_at: Option<String>,
     #[serde(rename = "domainId")]
@@ -706,16 +726,16 @@ pub struct EmailsListResponse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct EmailsSendResponse {
-    #[serde(rename = "emailId", default, skip_serializing_if = "Option::is_none")]
-    pub email_id: Option<String>,
+    #[serde(rename = "emailId")]
+    pub email_id: String,
 }
 
 /// EmailsUpdateResponse is a resource of meeng's API.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct EmailsUpdateResponse {
-    #[serde(rename = "emailId", default, skip_serializing_if = "Option::is_none")]
-    pub email_id: Option<String>,
+    #[serde(rename = "emailId")]
+    pub email_id: String,
 }
 
 /// The data of webhook.test, which the dashboard sends to try an endpoint.
@@ -747,15 +767,14 @@ pub struct CampaignsCreateParams {
     pub content: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
-    #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
+    #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none")]
     pub reply_to: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cc: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bcc: Option<Vec<String>>,
     #[serde(rename = "sendNow", default, skip_serializing_if = "Option::is_none")]
     pub send_now: Option<bool>,
-    /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
     #[serde(rename = "scheduledAt", default, skip_serializing_if = "Option::is_none")]
     pub scheduled_at: Option<String>,
     #[serde(rename = "batchSize", default, skip_serializing_if = "Option::is_none")]
@@ -824,7 +843,7 @@ impl CampaignsCreateParams {
         self
     }
 
-    /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
+    /// Sets `scheduledAt`.
     pub fn scheduled_at(mut self, scheduled_at: impl Into<String>) -> Self {
         self.scheduled_at = Some(scheduled_at.into());
         self
@@ -844,7 +863,6 @@ impl CampaignsCreateParams {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CampaignsScheduleParams {
-    /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
     #[serde(rename = "scheduledAt", default, skip_serializing_if = "Option::is_none")]
     pub scheduled_at: Option<String>,
     #[serde(rename = "batchSize", default, skip_serializing_if = "Option::is_none")]
@@ -860,7 +878,7 @@ impl CampaignsScheduleParams {
         }
     }
 
-    /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
+    /// Sets `scheduledAt`.
     pub fn scheduled_at(mut self, scheduled_at: impl Into<String>) -> Self {
         self.scheduled_at = Some(scheduled_at.into());
         self
@@ -884,7 +902,7 @@ pub struct ContactBooksCreateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emoji: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub properties: Option<std::collections::HashMap<String, String>>,
+    pub properties: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(rename = "doubleOptInEnabled", default, skip_serializing_if = "Option::is_none")]
     pub double_opt_in_enabled: Option<bool>,
     #[serde(rename = "doubleOptInFrom", default, skip_serializing_if = "Option::is_none")]
@@ -919,7 +937,7 @@ impl ContactBooksCreateParams {
     }
 
     /// Sets `properties`.
-    pub fn properties(mut self, properties: std::collections::HashMap<String, String>) -> Self {
+    pub fn properties(mut self, properties: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.properties = Some(properties);
         self
     }
@@ -967,7 +985,7 @@ pub struct ContactBooksUpdateParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emoji: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub properties: Option<std::collections::HashMap<String, String>>,
+    pub properties: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(rename = "doubleOptInEnabled", default, skip_serializing_if = "Option::is_none")]
     pub double_opt_in_enabled: Option<bool>,
     #[serde(rename = "doubleOptInFrom", default, skip_serializing_if = "Option::is_none")]
@@ -1008,7 +1026,7 @@ impl ContactBooksUpdateParams {
     }
 
     /// Sets `properties`.
-    pub fn properties(mut self, properties: std::collections::HashMap<String, String>) -> Self {
+    pub fn properties(mut self, properties: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.properties = Some(properties);
         self
     }
@@ -1057,7 +1075,7 @@ pub struct ContactsBulkCreateParams {
     #[serde(rename = "lastName", default, skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub properties: Option<std::collections::HashMap<String, String>>,
+    pub properties: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscribed: Option<bool>,
 }
@@ -1087,7 +1105,7 @@ impl ContactsBulkCreateParams {
     }
 
     /// Sets `properties`.
-    pub fn properties(mut self, properties: std::collections::HashMap<String, String>) -> Self {
+    pub fn properties(mut self, properties: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.properties = Some(properties);
         self
     }
@@ -1132,7 +1150,7 @@ pub struct ContactsCreateParams {
     #[serde(rename = "lastName", default, skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub properties: Option<std::collections::HashMap<String, String>>,
+    pub properties: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscribed: Option<bool>,
 }
@@ -1162,7 +1180,7 @@ impl ContactsCreateParams {
     }
 
     /// Sets `properties`.
-    pub fn properties(mut self, properties: std::collections::HashMap<String, String>) -> Self {
+    pub fn properties(mut self, properties: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.properties = Some(properties);
         self
     }
@@ -1186,7 +1204,7 @@ pub struct ContactsUpdateParams {
     #[serde(rename = "lastName", default, skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub properties: Option<std::collections::HashMap<String, String>>,
+    pub properties: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscribed: Option<bool>,
 }
@@ -1215,7 +1233,7 @@ impl ContactsUpdateParams {
     }
 
     /// Sets `properties`.
-    pub fn properties(mut self, properties: std::collections::HashMap<String, String>) -> Self {
+    pub fn properties(mut self, properties: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.properties = Some(properties);
         self
     }
@@ -1240,7 +1258,7 @@ pub struct ContactsUpsertParams {
     #[serde(rename = "lastName", default, skip_serializing_if = "Option::is_none")]
     pub last_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub properties: Option<std::collections::HashMap<String, String>>,
+    pub properties: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscribed: Option<bool>,
 }
@@ -1270,7 +1288,7 @@ impl ContactsUpsertParams {
     }
 
     /// Sets `properties`.
-    pub fn properties(mut self, properties: std::collections::HashMap<String, String>) -> Self {
+    pub fn properties(mut self, properties: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.properties = Some(properties);
         self
     }
@@ -1311,6 +1329,7 @@ impl DomainsCreateParams {
 #[non_exhaustive]
 pub struct EmailsBatchAttachment {
     pub filename: String,
+    /// The file, in base64.
     pub content: String,
 }
 
@@ -1334,14 +1353,15 @@ pub struct EmailsBatchParams {
     #[serde(deserialize_with = "crate::json::string_list")]
     pub to: Vec<String>,
     pub from: String,
-    /// Optional when templateId is provided
+    /// Optional when templateId is provided.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
-    /// ID of a template from the dashboard
+    /// ID of a template from the dashboard.
     #[serde(rename = "templateId", default, skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
+    /// The values of the template's variables, as text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub variables: Option<std::collections::HashMap<String, String>>,
+    pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
     pub reply_to: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
@@ -1352,9 +1372,9 @@ pub struct EmailsBatchParams {
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
-    /// Custom headers to included with the emails
+    /// Custom headers to include with the e-mail, name to value.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub headers: Option<std::collections::HashMap<String, String>>,
+    pub headers: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<EmailsBatchAttachment>>,
     #[serde(rename = "scheduledAt", default, skip_serializing_if = "Option::is_none")]
@@ -1384,20 +1404,20 @@ impl EmailsBatchParams {
         }
     }
 
-    /// Optional when templateId is provided
+    /// Optional when templateId is provided.
     pub fn subject(mut self, subject: impl Into<String>) -> Self {
         self.subject = Some(subject.into());
         self
     }
 
-    /// ID of a template from the dashboard
+    /// ID of a template from the dashboard.
     pub fn template_id(mut self, template_id: impl Into<String>) -> Self {
         self.template_id = Some(template_id.into());
         self
     }
 
-    /// Sets `variables`.
-    pub fn variables(mut self, variables: std::collections::HashMap<String, String>) -> Self {
+    /// The values of the template's variables, as text.
+    pub fn variables(mut self, variables: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.variables = Some(variables);
         self
     }
@@ -1432,8 +1452,8 @@ impl EmailsBatchParams {
         self
     }
 
-    /// Custom headers to included with the emails
-    pub fn headers(mut self, headers: std::collections::HashMap<String, String>) -> Self {
+    /// Custom headers to include with the e-mail, name to value.
+    pub fn headers(mut self, headers: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.headers = Some(headers);
         self
     }
@@ -1465,6 +1485,7 @@ impl EmailsBatchParams {
 #[non_exhaustive]
 pub struct EmailsSendAttachment {
     pub filename: String,
+    /// The file, in base64.
     pub content: String,
 }
 
@@ -1488,14 +1509,15 @@ pub struct EmailsSendParams {
     #[serde(deserialize_with = "crate::json::string_list")]
     pub to: Vec<String>,
     pub from: String,
-    /// Optional when templateId is provided
+    /// Optional when templateId is provided.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
-    /// ID of a template from the dashboard
+    /// ID of a template from the dashboard.
     #[serde(rename = "templateId", default, skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
+    /// The values of the template's variables, as text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub variables: Option<std::collections::HashMap<String, String>>,
+    pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
     pub reply_to: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
@@ -1506,9 +1528,9 @@ pub struct EmailsSendParams {
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
-    /// Custom headers to included with the emails
+    /// Custom headers to include with the e-mail, name to value.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub headers: Option<std::collections::HashMap<String, String>>,
+    pub headers: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<EmailsSendAttachment>>,
     #[serde(rename = "scheduledAt", default, skip_serializing_if = "Option::is_none")]
@@ -1538,20 +1560,20 @@ impl EmailsSendParams {
         }
     }
 
-    /// Optional when templateId is provided
+    /// Optional when templateId is provided.
     pub fn subject(mut self, subject: impl Into<String>) -> Self {
         self.subject = Some(subject.into());
         self
     }
 
-    /// ID of a template from the dashboard
+    /// ID of a template from the dashboard.
     pub fn template_id(mut self, template_id: impl Into<String>) -> Self {
         self.template_id = Some(template_id.into());
         self
     }
 
-    /// Sets `variables`.
-    pub fn variables(mut self, variables: std::collections::HashMap<String, String>) -> Self {
+    /// The values of the template's variables, as text.
+    pub fn variables(mut self, variables: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.variables = Some(variables);
         self
     }
@@ -1586,8 +1608,8 @@ impl EmailsSendParams {
         self
     }
 
-    /// Custom headers to included with the emails
-    pub fn headers(mut self, headers: std::collections::HashMap<String, String>) -> Self {
+    /// Custom headers to include with the e-mail, name to value.
+    pub fn headers(mut self, headers: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.headers = Some(headers);
         self
     }
@@ -1628,210 +1650,6 @@ impl EmailsUpdateParams {
         Self {
             scheduled_at: scheduled_at.into(),
         }
-    }
-}
-
-/// The values of `Domain.status`.
-///
-/// A value this SDK does not know yet is kept, as it came, in
-/// [`DomainStatus::Unrecognized`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum DomainStatus {
-    /// `NOT_STARTED`
-    NotStarted,
-    /// `PENDING`
-    Pending,
-    /// `SUCCESS`
-    Success,
-    /// `FAILED`
-    Failed,
-    /// `TEMPORARY_FAILURE`
-    TemporaryFailure,
-    /// A value this SDK does not know yet.
-    Unrecognized(String),
-}
-
-impl DomainStatus {
-    /// The value as the API writes it.
-    pub fn as_str(&self) -> &str {
-        match self {
-            DomainStatus::NotStarted => "NOT_STARTED",
-            DomainStatus::Pending => "PENDING",
-            DomainStatus::Success => "SUCCESS",
-            DomainStatus::Failed => "FAILED",
-            DomainStatus::TemporaryFailure => "TEMPORARY_FAILURE",
-            DomainStatus::Unrecognized(value) => value,
-        }
-    }
-}
-
-impl From<&str> for DomainStatus {
-    fn from(value: &str) -> Self {
-        match value {
-            "NOT_STARTED" => DomainStatus::NotStarted,
-            "PENDING" => DomainStatus::Pending,
-            "SUCCESS" => DomainStatus::Success,
-            "FAILED" => DomainStatus::Failed,
-            "TEMPORARY_FAILURE" => DomainStatus::TemporaryFailure,
-            other => DomainStatus::Unrecognized(other.to_owned()),
-        }
-    }
-}
-
-impl From<String> for DomainStatus {
-    fn from(value: String) -> Self {
-        Self::from(value.as_str())
-    }
-}
-
-impl fmt::Display for DomainStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl Serialize for DomainStatus {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for DomainStatus {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        String::deserialize(deserializer).map(Self::from)
-    }
-}
-
-/// The values of `DomainDnsRecord.type`. DNS record type
-///
-/// A value this SDK does not know yet is kept, as it came, in
-/// [`DomainDnsRecordType::Unrecognized`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum DomainDnsRecordType {
-    /// `MX`
-    Mx,
-    /// `TXT`
-    Txt,
-    /// A value this SDK does not know yet.
-    Unrecognized(String),
-}
-
-impl DomainDnsRecordType {
-    /// The value as the API writes it.
-    pub fn as_str(&self) -> &str {
-        match self {
-            DomainDnsRecordType::Mx => "MX",
-            DomainDnsRecordType::Txt => "TXT",
-            DomainDnsRecordType::Unrecognized(value) => value,
-        }
-    }
-}
-
-impl From<&str> for DomainDnsRecordType {
-    fn from(value: &str) -> Self {
-        match value {
-            "MX" => DomainDnsRecordType::Mx,
-            "TXT" => DomainDnsRecordType::Txt,
-            other => DomainDnsRecordType::Unrecognized(other.to_owned()),
-        }
-    }
-}
-
-impl From<String> for DomainDnsRecordType {
-    fn from(value: String) -> Self {
-        Self::from(value.as_str())
-    }
-}
-
-impl fmt::Display for DomainDnsRecordType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl Serialize for DomainDnsRecordType {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for DomainDnsRecordType {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        String::deserialize(deserializer).map(Self::from)
-    }
-}
-
-/// The values of `DomainDnsRecord.status`.
-///
-/// A value this SDK does not know yet is kept, as it came, in
-/// [`DomainDnsRecordStatus::Unrecognized`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum DomainDnsRecordStatus {
-    /// `NOT_STARTED`
-    NotStarted,
-    /// `PENDING`
-    Pending,
-    /// `SUCCESS`
-    Success,
-    /// `FAILED`
-    Failed,
-    /// `TEMPORARY_FAILURE`
-    TemporaryFailure,
-    /// A value this SDK does not know yet.
-    Unrecognized(String),
-}
-
-impl DomainDnsRecordStatus {
-    /// The value as the API writes it.
-    pub fn as_str(&self) -> &str {
-        match self {
-            DomainDnsRecordStatus::NotStarted => "NOT_STARTED",
-            DomainDnsRecordStatus::Pending => "PENDING",
-            DomainDnsRecordStatus::Success => "SUCCESS",
-            DomainDnsRecordStatus::Failed => "FAILED",
-            DomainDnsRecordStatus::TemporaryFailure => "TEMPORARY_FAILURE",
-            DomainDnsRecordStatus::Unrecognized(value) => value,
-        }
-    }
-}
-
-impl From<&str> for DomainDnsRecordStatus {
-    fn from(value: &str) -> Self {
-        match value {
-            "NOT_STARTED" => DomainDnsRecordStatus::NotStarted,
-            "PENDING" => DomainDnsRecordStatus::Pending,
-            "SUCCESS" => DomainDnsRecordStatus::Success,
-            "FAILED" => DomainDnsRecordStatus::Failed,
-            "TEMPORARY_FAILURE" => DomainDnsRecordStatus::TemporaryFailure,
-            other => DomainDnsRecordStatus::Unrecognized(other.to_owned()),
-        }
-    }
-}
-
-impl From<String> for DomainDnsRecordStatus {
-    fn from(value: String) -> Self {
-        Self::from(value.as_str())
-    }
-}
-
-impl fmt::Display for DomainDnsRecordStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl Serialize for DomainDnsRecordStatus {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for DomainDnsRecordStatus {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        String::deserialize(deserializer).map(Self::from)
     }
 }
 
@@ -2307,114 +2125,6 @@ impl<'de> Deserialize<'de> for EmailClickedPayloadStatus {
     }
 }
 
-/// The values of `EmailEvent.status`.
-///
-/// A value this SDK does not know yet is kept, as it came, in
-/// [`EmailEventStatus::Unrecognized`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum EmailEventStatus {
-    /// `SCHEDULED`
-    Scheduled,
-    /// `QUEUED`
-    Queued,
-    /// `SENT`
-    Sent,
-    /// `DELIVERY_DELAYED`
-    DeliveryDelayed,
-    /// `BOUNCED`
-    Bounced,
-    /// `REJECTED`
-    Rejected,
-    /// `RENDERING_FAILURE`
-    RenderingFailure,
-    /// `DELIVERED`
-    Delivered,
-    /// `OPENED`
-    Opened,
-    /// `CLICKED`
-    Clicked,
-    /// `COMPLAINED`
-    Complained,
-    /// `FAILED`
-    Failed,
-    /// `CANCELLED`
-    Cancelled,
-    /// `SUPPRESSED`
-    Suppressed,
-    /// A value this SDK does not know yet.
-    Unrecognized(String),
-}
-
-impl EmailEventStatus {
-    /// The value as the API writes it.
-    pub fn as_str(&self) -> &str {
-        match self {
-            EmailEventStatus::Scheduled => "SCHEDULED",
-            EmailEventStatus::Queued => "QUEUED",
-            EmailEventStatus::Sent => "SENT",
-            EmailEventStatus::DeliveryDelayed => "DELIVERY_DELAYED",
-            EmailEventStatus::Bounced => "BOUNCED",
-            EmailEventStatus::Rejected => "REJECTED",
-            EmailEventStatus::RenderingFailure => "RENDERING_FAILURE",
-            EmailEventStatus::Delivered => "DELIVERED",
-            EmailEventStatus::Opened => "OPENED",
-            EmailEventStatus::Clicked => "CLICKED",
-            EmailEventStatus::Complained => "COMPLAINED",
-            EmailEventStatus::Failed => "FAILED",
-            EmailEventStatus::Cancelled => "CANCELLED",
-            EmailEventStatus::Suppressed => "SUPPRESSED",
-            EmailEventStatus::Unrecognized(value) => value,
-        }
-    }
-}
-
-impl From<&str> for EmailEventStatus {
-    fn from(value: &str) -> Self {
-        match value {
-            "SCHEDULED" => EmailEventStatus::Scheduled,
-            "QUEUED" => EmailEventStatus::Queued,
-            "SENT" => EmailEventStatus::Sent,
-            "DELIVERY_DELAYED" => EmailEventStatus::DeliveryDelayed,
-            "BOUNCED" => EmailEventStatus::Bounced,
-            "REJECTED" => EmailEventStatus::Rejected,
-            "RENDERING_FAILURE" => EmailEventStatus::RenderingFailure,
-            "DELIVERED" => EmailEventStatus::Delivered,
-            "OPENED" => EmailEventStatus::Opened,
-            "CLICKED" => EmailEventStatus::Clicked,
-            "COMPLAINED" => EmailEventStatus::Complained,
-            "FAILED" => EmailEventStatus::Failed,
-            "CANCELLED" => EmailEventStatus::Cancelled,
-            "SUPPRESSED" => EmailEventStatus::Suppressed,
-            other => EmailEventStatus::Unrecognized(other.to_owned()),
-        }
-    }
-}
-
-impl From<String> for EmailEventStatus {
-    fn from(value: String) -> Self {
-        Self::from(value.as_str())
-    }
-}
-
-impl fmt::Display for EmailEventStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl Serialize for EmailEventStatus {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for EmailEventStatus {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        String::deserialize(deserializer).map(Self::from)
-    }
-}
-
 /// The values of `EmailFailedPayload.status`.
 ///
 /// A value this SDK does not know yet is kept, as it came, in
@@ -2798,114 +2508,6 @@ impl Serialize for EmailSuppressedSuppressionType {
 }
 
 impl<'de> Deserialize<'de> for EmailSuppressedSuppressionType {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        String::deserialize(deserializer).map(Self::from)
-    }
-}
-
-/// The values of `EmailsListItem.latestStatus`.
-///
-/// A value this SDK does not know yet is kept, as it came, in
-/// [`EmailsListItemLatestStatus::Unrecognized`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum EmailsListItemLatestStatus {
-    /// `SCHEDULED`
-    Scheduled,
-    /// `QUEUED`
-    Queued,
-    /// `SENT`
-    Sent,
-    /// `DELIVERY_DELAYED`
-    DeliveryDelayed,
-    /// `BOUNCED`
-    Bounced,
-    /// `REJECTED`
-    Rejected,
-    /// `RENDERING_FAILURE`
-    RenderingFailure,
-    /// `DELIVERED`
-    Delivered,
-    /// `OPENED`
-    Opened,
-    /// `CLICKED`
-    Clicked,
-    /// `COMPLAINED`
-    Complained,
-    /// `FAILED`
-    Failed,
-    /// `CANCELLED`
-    Cancelled,
-    /// `SUPPRESSED`
-    Suppressed,
-    /// A value this SDK does not know yet.
-    Unrecognized(String),
-}
-
-impl EmailsListItemLatestStatus {
-    /// The value as the API writes it.
-    pub fn as_str(&self) -> &str {
-        match self {
-            EmailsListItemLatestStatus::Scheduled => "SCHEDULED",
-            EmailsListItemLatestStatus::Queued => "QUEUED",
-            EmailsListItemLatestStatus::Sent => "SENT",
-            EmailsListItemLatestStatus::DeliveryDelayed => "DELIVERY_DELAYED",
-            EmailsListItemLatestStatus::Bounced => "BOUNCED",
-            EmailsListItemLatestStatus::Rejected => "REJECTED",
-            EmailsListItemLatestStatus::RenderingFailure => "RENDERING_FAILURE",
-            EmailsListItemLatestStatus::Delivered => "DELIVERED",
-            EmailsListItemLatestStatus::Opened => "OPENED",
-            EmailsListItemLatestStatus::Clicked => "CLICKED",
-            EmailsListItemLatestStatus::Complained => "COMPLAINED",
-            EmailsListItemLatestStatus::Failed => "FAILED",
-            EmailsListItemLatestStatus::Cancelled => "CANCELLED",
-            EmailsListItemLatestStatus::Suppressed => "SUPPRESSED",
-            EmailsListItemLatestStatus::Unrecognized(value) => value,
-        }
-    }
-}
-
-impl From<&str> for EmailsListItemLatestStatus {
-    fn from(value: &str) -> Self {
-        match value {
-            "SCHEDULED" => EmailsListItemLatestStatus::Scheduled,
-            "QUEUED" => EmailsListItemLatestStatus::Queued,
-            "SENT" => EmailsListItemLatestStatus::Sent,
-            "DELIVERY_DELAYED" => EmailsListItemLatestStatus::DeliveryDelayed,
-            "BOUNCED" => EmailsListItemLatestStatus::Bounced,
-            "REJECTED" => EmailsListItemLatestStatus::Rejected,
-            "RENDERING_FAILURE" => EmailsListItemLatestStatus::RenderingFailure,
-            "DELIVERED" => EmailsListItemLatestStatus::Delivered,
-            "OPENED" => EmailsListItemLatestStatus::Opened,
-            "CLICKED" => EmailsListItemLatestStatus::Clicked,
-            "COMPLAINED" => EmailsListItemLatestStatus::Complained,
-            "FAILED" => EmailsListItemLatestStatus::Failed,
-            "CANCELLED" => EmailsListItemLatestStatus::Cancelled,
-            "SUPPRESSED" => EmailsListItemLatestStatus::Suppressed,
-            other => EmailsListItemLatestStatus::Unrecognized(other.to_owned()),
-        }
-    }
-}
-
-impl From<String> for EmailsListItemLatestStatus {
-    fn from(value: String) -> Self {
-        Self::from(value.as_str())
-    }
-}
-
-impl fmt::Display for EmailsListItemLatestStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl Serialize for EmailsListItemLatestStatus {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for EmailsListItemLatestStatus {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         String::deserialize(deserializer).map(Self::from)
     }

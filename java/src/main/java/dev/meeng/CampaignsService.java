@@ -120,7 +120,7 @@ public final class CampaignsService {
             return sendNow;
         }
 
-        /** @return Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30') (null when left out) */
+        /** @return the {@code scheduledAt} sent (null when left out) */
         public String getScheduledAt() {
             return scheduledAt;
         }
@@ -285,7 +285,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param scheduledAt Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
+             * @param scheduledAt the {@code scheduledAt} to send
              * @return this builder
              */
             public Builder scheduledAt(String scheduledAt) {
@@ -362,17 +362,17 @@ public final class CampaignsService {
             return new Builder();
         }
 
-        /** @return The page, from 1. (null when not filtered) */
+        /** @return The page, from 1; 30 campaigns to a page. (null when not filtered) */
         public Integer getPage() {
             return page;
         }
 
-        /** @return Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT. (null when not filtered) */
+        /** @return Only campaigns in this status. (null when not filtered) */
         public String getStatus() {
             return status;
         }
 
-        /** @return Only campaigns whose name matches this text. (null when not filtered) */
+        /** @return Part of the name or of the subject. (null when not filtered) */
         public String getSearch() {
             return search;
         }
@@ -395,7 +395,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param page The page, from 1.
+             * @param page The page, from 1; 30 campaigns to a page.
              * @return this builder
              */
             public Builder page(Integer page) {
@@ -404,7 +404,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param status Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.
+             * @param status Only campaigns in this status.
              * @return this builder
              */
             public Builder status(String status) {
@@ -413,7 +413,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param search Only campaigns whose name matches this text.
+             * @param search Part of the name or of the subject.
              * @return this builder
              */
             public Builder search(String search) {
@@ -442,12 +442,12 @@ public final class CampaignsService {
     /**
      * Removes a campaign.
      * @param campaignId the campaignId
-     * @return the campaign
+     * @return the campaignrow
      * @throws MeengException when the API refuses the call
      */
-    public Campaign delete(String campaignId) {
+    public CampaignRow delete(String campaignId) {
         Object data = client.request("DELETE", "/v1/campaigns/" + Meeng.segment(campaignId), null, null, null);
-        return Campaign.fromJson(Json.asObject(data));
+        return CampaignRow.fromJson(Json.asObject(data));
     }
 
     /**
@@ -478,7 +478,7 @@ public final class CampaignsService {
             return new Builder();
         }
 
-        /** @return Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30') (null when left out) */
+        /** @return the {@code scheduledAt} sent (null when left out) */
         public String getScheduledAt() {
             return scheduledAt;
         }
@@ -508,7 +508,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param scheduledAt Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
+             * @param scheduledAt the {@code scheduledAt} to send
              * @return this builder
              */
             public Builder scheduledAt(String scheduledAt) {

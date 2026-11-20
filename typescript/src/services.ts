@@ -120,13 +120,13 @@ export class DomainsService {
 
 /** The filters of contacts.list. */
 export interface ContactsListQuery {
-  /** Only the contacts with these emails, separated by commas. */
+  /** Comma separated e-mail addresses; an exact match. */
   emails?: string;
   /** The page, from 1. */
   page?: number;
-  /** The items a page: 1 to 100, 50 by default. */
+  /** Contacts to a page; 5000 when it is not given. */
   limit?: number;
-  /** Only the contacts with these ids, separated by commas. */
+  /** Comma separated contact ids. */
   ids?: string;
 }
 
@@ -241,11 +241,11 @@ export class ContactBooksService {
 
 /** The filters of campaigns.list. */
 export interface CampaignsListQuery {
-  /** The page, from 1. */
+  /** The page, from 1; 30 campaigns to a page. */
   page?: number;
-  /** Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT. */
+  /** Only campaigns in this status. */
   status?: string;
-  /** Only campaigns whose name matches this text. */
+  /** Part of the name or of the subject. */
   search?: string;
 }
 
@@ -286,8 +286,8 @@ export class CampaignsService {
   /**
    * Removes a campaign.
    */
-  async delete(campaignId: string | number, options?: CallOptions): Promise<Result<models.Campaign>> {
-    return this.#client.request<models.Campaign>("DELETE", `/v1/campaigns/${encodeURIComponent(String(campaignId))}`, { options });
+  async delete(campaignId: string | number, options?: CallOptions): Promise<Result<models.CampaignRow>> {
+    return this.#client.request<models.CampaignRow>("DELETE", `/v1/campaigns/${encodeURIComponent(String(campaignId))}`, { options });
   }
 
   /**
@@ -314,15 +314,15 @@ export class CampaignsService {
 
 /** The filters of analytics.emailTimeSeries. */
 export interface AnalyticsEmailTimeSeriesQuery {
-  /** How many days to count: 7 or 30. */
+  /** How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today. */
   days?: string;
-  /** Only emails of these domains; a list sends one domainId for each value. */
+  /** Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. */
   domainId?: string;
 }
 
 /** The filters of analytics.reputationMetrics. */
 export interface AnalyticsReputationMetricsQuery {
-  /** Only emails of these domains; a list sends one domainId for each value. */
+  /** Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. */
   domainId?: string;
 }
 

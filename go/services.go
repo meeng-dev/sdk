@@ -191,13 +191,13 @@ func (s *ContactsService) Create(ctx context.Context, contactBookId string, para
 
 // ContactsListQuery are the filters of contacts.list; a zero field is left out.
 type ContactsListQuery struct {
-	// Only the contacts with these emails, separated by commas.
+	// Comma separated e-mail addresses; an exact match.
 	Emails string
 	// The page, from 1.
 	Page int
-	// The items a page: 1 to 100, 50 by default.
+	// Contacts to a page; 5000 when it is not given.
 	Limit int
-	// Only the contacts with these ids, separated by commas.
+	// Comma separated contact ids.
 	Ids string
 }
 
@@ -359,11 +359,11 @@ func (s *CampaignsService) Create(ctx context.Context, params CampaignsCreatePar
 
 // CampaignsListQuery are the filters of campaigns.list; a zero field is left out.
 type CampaignsListQuery struct {
-	// The page, from 1.
+	// The page, from 1; 30 campaigns to a page.
 	Page int
-	// Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.
+	// Only campaigns in this status.
 	Status string
-	// Only campaigns whose name matches this text.
+	// Part of the name or of the subject.
 	Search string
 }
 
@@ -405,8 +405,8 @@ func (s *CampaignsService) Get(ctx context.Context, campaignId string, opts ...R
 }
 
 // Delete: Removes a campaign.
-func (s *CampaignsService) Delete(ctx context.Context, campaignId string, opts ...RequestOption) (*Campaign, error) {
-	var out Campaign
+func (s *CampaignsService) Delete(ctx context.Context, campaignId string, opts ...RequestOption) (*CampaignRow, error) {
+	var out CampaignRow
 	err := s.client.do(ctx, http.MethodDelete, "/v1/campaigns/"+url.PathEscape(campaignId), nil, nil, &out, opts)
 	if err != nil {
 		return nil, err
@@ -449,9 +449,9 @@ type AnalyticsService struct{ client *Client }
 
 // AnalyticsEmailTimeSeriesQuery are the filters of analytics.emailTimeSeries; a zero field is left out.
 type AnalyticsEmailTimeSeriesQuery struct {
-	// How many days to count: 7 or 30.
+	// How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
 	Days string
-	// Only emails of these domains; a list sends one domainId for each value.
+	// Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
 	DomainID string
 }
 
@@ -481,7 +481,7 @@ func (s *AnalyticsService) EmailTimeSeries(ctx context.Context, query *Analytics
 
 // AnalyticsReputationMetricsQuery are the filters of analytics.reputationMetrics; a zero field is left out.
 type AnalyticsReputationMetricsQuery struct {
-	// Only emails of these domains; a list sends one domainId for each value.
+	// Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
 	DomainID string
 }
 

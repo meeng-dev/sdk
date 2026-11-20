@@ -109,11 +109,11 @@ public class MeengTests
     [Fact]
     public async Task ListingEmailsSendsTheFiltersAListOnceForEachValue()
     {
-        var recorder = Replying(HttpStatusCode.OK, """{"data":[{"id":"em_1","to":"a@x.com","from":"h@acme.com","subject":"Hi","html":null,"text":"Hi","createdAt":"x","updatedAt":"x","latestStatus":"DELIVERED","scheduledAt":null,"domainId":3}],"count":1}""");
+        var recorder = Replying(HttpStatusCode.OK, """{"data":[{"id":"em_1","to":["a@x.com"],"replyTo":[],"cc":[],"bcc":[],"from":"h@acme.com","subject":"Hi","html":null,"text":"Hi","createdAt":"x","updatedAt":"x","latestStatus":"DELIVERED","scheduledAt":null,"domainId":3}],"count":1}""");
         var got = await Client(recorder).Emails.ListAsync(new EmailsListQuery { Page = 2, Limit = 10, StartDate = "2026-11-01T00:00:00Z", DomainId = ["1", "2"] });
         Assert.Equal(1, got.Count);
         Assert.Equal(["a@x.com"], got.Data[0].To);
-        Assert.Equal(EmailsListItem.LatestStatusDelivered, got.Data[0].LatestStatus);
+        Assert.Equal("DELIVERED", got.Data[0].LatestStatus);
         var seen = Assert.Single(recorder.Requests);
         Assert.Equal(HttpMethod.Get, seen.Method);
         Assert.Equal("https://meeng.test/api/v1/emails?page=2&limit=10&startDate=2026-11-01T00%3A00%3A00Z&domainId=1&domainId=2", seen.Url.ToString());
@@ -125,13 +125,13 @@ public class MeengTests
         var recorder = Replying(HttpStatusCode.OK, """{"id":"a/b c","teamId":1,"to":["a@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[{"emailId":"a/b c","status":"SENT","createdAt":"x","data":{"ip":"1.2.3.4"}}]}""");
         var email = await Client(recorder).Emails.GetAsync("a/b c");
         Assert.Equal("https://meeng.test/api/v1/emails/a%2Fb%20c", recorder.Requests[0].Url.AbsoluteUri);
-        Assert.Equal(EmailEvent.StatusSent, email.EmailEvents[0].Status);
+        Assert.Equal("SENT", email.EmailEvents[0].Status);
     }
 
     [Fact]
     public async Task AListTheApiAnswersWithoutAnObjectAroundItIsAList()
     {
-        var recorder = Replying(HttpStatusCode.OK, """[{"id":"cb_1","name":"News","teamId":1,"properties":{"plan":"string"},"variables":["plan"],"emoji":"x","createdAt":"x","updatedAt":"x","_count":{"contacts":4}}]""");
+        var recorder = Replying(HttpStatusCode.OK, """[{"id":"cb_1","name":"News","teamId":1,"properties":{"plan":"string"},"variables":["plan"],"emoji":"x","doubleOptInEnabled":false,"doubleOptInFrom":null,"doubleOptInSubject":null,"doubleOptInContent":null,"createdAt":"x","updatedAt":"x","_count":{"contacts":4}}]""");
         var books = await Client(recorder).ContactBooks.ListAsync();
         Assert.Equal("News", Assert.Single(books).Name);
         Assert.Equal(4, books[0].Count!.Contacts);
@@ -175,11 +175,11 @@ public class MeengTests
     }
 
     [Fact]
-    public async Task AnEmailsRecipientsMayComeAsOneStringOrAList()
+    public async Task AnEmailsRecipientsAreAList()
     {
-        var recorder = Replying(HttpStatusCode.OK, """{"id":"em_1","teamId":1,"to":"a@x.com","from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[]}""");
+        var recorder = Replying(HttpStatusCode.OK, """{"id":"em_1","teamId":1,"to":["a@x.com","b@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[]}""");
         var email = await Client(recorder).Emails.GetAsync("em_1");
-        Assert.Equal(["a@x.com"], email.To);
+        Assert.Equal(["a@x.com", "b@x.com"], email.To);
     }
 
     [Fact]

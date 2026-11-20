@@ -98,17 +98,17 @@ public sealed record EmailsSendParams
     [JsonPropertyName("from")]
     public required string From { get; init; }
 
-    /// <summary>Optional when templateId is provided Left out of the request when null.</summary>
+    /// <summary>Optional when templateId is provided. Left out of the request when null.</summary>
     [JsonPropertyName("subject")]
     public string? Subject { get; init; }
 
-    /// <summary>ID of a template from the dashboard Left out of the request when null.</summary>
+    /// <summary>ID of a template from the dashboard. Left out of the request when null.</summary>
     [JsonPropertyName("templateId")]
     public string? TemplateId { get; init; }
 
-    /// <summary>The <c>variables</c> to send. Left out of the request when null.</summary>
+    /// <summary>The values of the template's variables, as text. Left out of the request when null.</summary>
     [JsonPropertyName("variables")]
-    public IReadOnlyDictionary<string, string>? Variables { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Variables { get; init; }
 
     /// <summary>The <c>replyTo</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("replyTo")]
@@ -133,9 +133,9 @@ public sealed record EmailsSendParams
     [JsonPropertyName("html")]
     public string? Html { get; init; }
 
-    /// <summary>Custom headers to included with the emails Left out of the request when null.</summary>
+    /// <summary>Custom headers to include with the e-mail, name to value. Left out of the request when null.</summary>
     [JsonPropertyName("headers")]
-    public IReadOnlyDictionary<string, string>? Headers { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Headers { get; init; }
 
     /// <summary>The <c>attachments</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("attachments")]
@@ -158,7 +158,7 @@ public sealed record EmailsSendAttachment
     [JsonPropertyName("filename")]
     public required string Filename { get; init; }
 
-    /// <summary>The <c>content</c> to send.</summary>
+    /// <summary>The file, in base64.</summary>
     [JsonPropertyName("content")]
     public required string Content { get; init; }
 }
@@ -176,17 +176,17 @@ public sealed record EmailsBatchParams
     [JsonPropertyName("from")]
     public required string From { get; init; }
 
-    /// <summary>Optional when templateId is provided Left out of the request when null.</summary>
+    /// <summary>Optional when templateId is provided. Left out of the request when null.</summary>
     [JsonPropertyName("subject")]
     public string? Subject { get; init; }
 
-    /// <summary>ID of a template from the dashboard Left out of the request when null.</summary>
+    /// <summary>ID of a template from the dashboard. Left out of the request when null.</summary>
     [JsonPropertyName("templateId")]
     public string? TemplateId { get; init; }
 
-    /// <summary>The <c>variables</c> to send. Left out of the request when null.</summary>
+    /// <summary>The values of the template's variables, as text. Left out of the request when null.</summary>
     [JsonPropertyName("variables")]
-    public IReadOnlyDictionary<string, string>? Variables { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Variables { get; init; }
 
     /// <summary>The <c>replyTo</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("replyTo")]
@@ -211,9 +211,9 @@ public sealed record EmailsBatchParams
     [JsonPropertyName("html")]
     public string? Html { get; init; }
 
-    /// <summary>Custom headers to included with the emails Left out of the request when null.</summary>
+    /// <summary>Custom headers to include with the e-mail, name to value. Left out of the request when null.</summary>
     [JsonPropertyName("headers")]
-    public IReadOnlyDictionary<string, string>? Headers { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Headers { get; init; }
 
     /// <summary>The <c>attachments</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("attachments")]
@@ -236,7 +236,7 @@ public sealed record EmailsBatchAttachment
     [JsonPropertyName("filename")]
     public required string Filename { get; init; }
 
-    /// <summary>The <c>content</c> to send.</summary>
+    /// <summary>The file, in base64.</summary>
     [JsonPropertyName("content")]
     public required string Content { get; init; }
 }

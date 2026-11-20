@@ -10,7 +10,7 @@ const (
 	// DefaultBaseURL is where meeng's API lives. The client appends
 	// /api/v1 to it, so MEENG_BASE_URL and WithBaseURL name the app and
 	// nothing more.
-	DefaultBaseURL = "https://app.meeng.dev"
+	DefaultBaseURL = "https://meeng.dev"
 	// apiPrefix is what every path starts with, after the base URL.
 	apiPrefix = "/api"
 )

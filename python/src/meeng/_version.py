@@ -6,7 +6,7 @@ VERSION = "0.1.0"
 API_VERSION = "1.0.0"
 """The contract this SDK was generated from."""
 
-DEFAULT_BASE_URL = "https://app.meeng.dev"
+DEFAULT_BASE_URL = "https://meeng.dev"
 """Where meeng's API lives. The client appends ``/api/v1`` to it, so MEENG_BASE_URL, like the ``url`` argument, is the address of the app and nothing more."""
 
 API_PREFIX = "/api"

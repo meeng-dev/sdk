@@ -223,13 +223,13 @@ impl<'a> DomainsService<'a> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ContactsListQuery {
-    /// Only the contacts with these emails, separated by commas.
+    /// Comma separated e-mail addresses; an exact match.
     pub emails: Option<String>,
     /// The page, from 1.
     pub page: Option<u32>,
-    /// The items a page: 1 to 100, 50 by default.
+    /// Contacts to a page; 5000 when it is not given.
     pub limit: Option<u32>,
-    /// Only the contacts with these ids, separated by commas.
+    /// Comma separated contact ids.
     pub ids: Option<String>,
 }
 
@@ -239,7 +239,7 @@ impl ContactsListQuery {
         Self::default()
     }
 
-    /// Only the contacts with these emails, separated by commas.
+    /// Comma separated e-mail addresses; an exact match.
     pub fn emails(mut self, emails: impl Into<String>) -> Self {
         self.emails = Some(emails.into());
         self
@@ -251,13 +251,13 @@ impl ContactsListQuery {
         self
     }
 
-    /// The items a page: 1 to 100, 50 by default.
+    /// Contacts to a page; 5000 when it is not given.
     pub fn limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }
 
-    /// Only the contacts with these ids, separated by commas.
+    /// Comma separated contact ids.
     pub fn ids(mut self, ids: impl Into<String>) -> Self {
         self.ids = Some(ids.into());
         self
@@ -398,11 +398,11 @@ impl<'a> ContactBooksService<'a> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CampaignsListQuery {
-    /// The page, from 1.
+    /// The page, from 1; 30 campaigns to a page.
     pub page: Option<u32>,
-    /// Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.
+    /// Only campaigns in this status.
     pub status: Option<String>,
-    /// Only campaigns whose name matches this text.
+    /// Part of the name or of the subject.
     pub search: Option<String>,
 }
 
@@ -412,19 +412,19 @@ impl CampaignsListQuery {
         Self::default()
     }
 
-    /// The page, from 1.
+    /// The page, from 1; 30 campaigns to a page.
     pub fn page(mut self, page: u32) -> Self {
         self.page = Some(page);
         self
     }
 
-    /// Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.
+    /// Only campaigns in this status.
     pub fn status(mut self, status: impl Into<String>) -> Self {
         self.status = Some(status.into());
         self
     }
 
-    /// Only campaigns whose name matches this text.
+    /// Part of the name or of the subject.
     pub fn search(mut self, search: impl Into<String>) -> Self {
         self.search = Some(search.into());
         self
@@ -484,7 +484,7 @@ impl<'a> CampaignsService<'a> {
     }
 
     /// Removes a campaign.
-    pub fn delete(&self, campaign_id: &str) -> Result<Campaign, Error> {
+    pub fn delete(&self, campaign_id: &str) -> Result<CampaignRow, Error> {
         self.client.request("DELETE", &format!("/v1/campaigns/{}", crate::client::escape(campaign_id)), &[], None::<&()>, &self.options)
     }
 
@@ -508,9 +508,9 @@ impl<'a> CampaignsService<'a> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct AnalyticsEmailTimeSeriesQuery {
-    /// How many days to count: 7 or 30.
+    /// How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
     pub days: Option<String>,
-    /// Only emails of these domains; a list sends one domainId for each value.
+    /// Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     pub domain_id: Option<String>,
 }
 
@@ -520,13 +520,13 @@ impl AnalyticsEmailTimeSeriesQuery {
         Self::default()
     }
 
-    /// How many days to count: 7 or 30.
+    /// How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
     pub fn days(mut self, days: impl Into<String>) -> Self {
         self.days = Some(days.into());
         self
     }
 
-    /// Only emails of these domains; a list sends one domainId for each value.
+    /// Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     pub fn domain_id(mut self, domain_id: impl Into<String>) -> Self {
         self.domain_id = Some(domain_id.into());
         self
@@ -548,7 +548,7 @@ impl AnalyticsEmailTimeSeriesQuery {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct AnalyticsReputationMetricsQuery {
-    /// Only emails of these domains; a list sends one domainId for each value.
+    /// Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     pub domain_id: Option<String>,
 }
 
@@ -558,7 +558,7 @@ impl AnalyticsReputationMetricsQuery {
         Self::default()
     }
 
-    /// Only emails of these domains; a list sends one domainId for each value.
+    /// Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
     pub fn domain_id(mut self, domain_id: impl Into<String>) -> Self {
         self.domain_id = Some(domain_id.into());
         self

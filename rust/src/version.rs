@@ -9,7 +9,7 @@ pub const API_VERSION: &str = "1.0.0";
 /// Where meeng's API lives. The client appends `/api/v1` to it, so
 /// `MEENG_BASE_URL`, like [`ClientBuilder::base_url`](crate::ClientBuilder::base_url),
 /// is the address of the app and nothing more.
-pub const DEFAULT_BASE_URL: &str = "https://app.meeng.dev";
+pub const DEFAULT_BASE_URL: &str = "https://meeng.dev";
 
 /// What every path starts with, after the base URL.
 pub const API_PREFIX: &str = "/api";

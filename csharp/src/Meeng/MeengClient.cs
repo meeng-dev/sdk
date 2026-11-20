@@ -35,7 +35,7 @@ public sealed class MeengClient
     /// Where meeng's API lives. The client appends <c>/api/v1</c> to it, so
     /// <c>MEENG_BASE_URL</c>, like <see cref="MeengClientOptions.BaseUrl"/>, is the address of the app and nothing more.
     /// </summary>
-    public const string DefaultBaseUrl = "https://app.meeng.dev";
+    public const string DefaultBaseUrl = "https://meeng.dev";
 
     /// <summary>What every path starts with, after the base URL.</summary>
     public const string ApiPrefix = "/api";

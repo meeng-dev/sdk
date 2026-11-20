@@ -9,71 +9,25 @@ namespace Meeng;
 /// <summary>One item of data in EmailsListResponse.</summary>
 public sealed record EmailsListItem
 {
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusScheduled = "SCHEDULED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusQueued = "QUEUED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusSent = "SENT";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusDeliveryDelayed = "DELIVERY_DELAYED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusBounced = "BOUNCED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusRejected = "REJECTED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusRenderingFailure = "RENDERING_FAILURE";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusDelivered = "DELIVERED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusOpened = "OPENED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusClicked = "CLICKED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusComplained = "COMPLAINED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusFailed = "FAILED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusCancelled = "CANCELLED";
-
-    /// <summary>A value of <see cref="LatestStatus"/>.</summary>
-    public const string LatestStatusSuppressed = "SUPPRESSED";
-
     /// <summary>The API's <c>id</c>.</summary>
     [JsonPropertyName("id")]
     public required string Id { get; init; }
 
     /// <summary>The API's <c>to</c>.</summary>
     [JsonPropertyName("to")]
-    [JsonConverter(typeof(StringListConverter))]
     public required IReadOnlyList<string> To { get; init; }
 
-    /// <summary>The API's <c>replyTo</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>replyTo</c>.</summary>
     [JsonPropertyName("replyTo")]
-    [JsonConverter(typeof(StringListConverter))]
-    public IReadOnlyList<string>? ReplyTo { get; init; }
+    public required IReadOnlyList<string> ReplyTo { get; init; }
 
-    /// <summary>The API's <c>cc</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>cc</c>.</summary>
     [JsonPropertyName("cc")]
-    [JsonConverter(typeof(StringListConverter))]
-    public IReadOnlyList<string>? Cc { get; init; }
+    public required IReadOnlyList<string> Cc { get; init; }
 
-    /// <summary>The API's <c>bcc</c>. Null when the API sends none.</summary>
+    /// <summary>The API's <c>bcc</c>.</summary>
     [JsonPropertyName("bcc")]
-    [JsonConverter(typeof(StringListConverter))]
-    public IReadOnlyList<string>? Bcc { get; init; }
+    public required IReadOnlyList<string> Bcc { get; init; }
 
     /// <summary>The API's <c>from</c>.</summary>
     [JsonPropertyName("from")]

@@ -19,12 +19,12 @@ final class ContactsService
      * Adds a contact to a contact book.
      *
      * @param string|int $contactBookId
-     * @param array{'email': string, 'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, string>, 'subscribed'?: bool} $payload
-     * @return array{'contactId'?: string}
+     * @param array{'email': string, 'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, mixed>, 'subscribed'?: bool} $payload
+     * @return array{'contactId': string}
      */
     public function create(string|int $contactBookId, array $payload, ): array
     {
-        /** @var array{'contactId'?: string} */
+        /** @var array{'contactId': string} */
         return $this->client->request('POST', '/v1/contactBooks/' . rawurlencode((string) $contactBookId) . '/contacts', body: $payload);
     }
 
@@ -33,11 +33,11 @@ final class ContactsService
      *
      * @param string|int $contactBookId
      * @param array{'emails'?: string, 'page'?: int, 'limit'?: int, 'ids'?: string} $query
-     * @return list<array{'id': string, 'firstName'?: string|null, 'lastName'?: string|null, 'email': string, 'subscribed'?: bool, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string}>
+     * @return list<array{'id': string, 'firstName': string|null, 'lastName': string|null, 'email': string, 'subscribed': bool, 'unsubscribeReason': string|null, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string}>
      */
     public function list(string|int $contactBookId, array $query = [], ): array
     {
-        /** @var list<array{'id': string, 'firstName'?: string|null, 'lastName'?: string|null, 'email': string, 'subscribed'?: bool, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string}> */
+        /** @var list<array{'id': string, 'firstName': string|null, 'lastName': string|null, 'email': string, 'subscribed': bool, 'unsubscribeReason': string|null, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string}> */
         return $this->client->request('GET', '/v1/contactBooks/' . rawurlencode((string) $contactBookId) . '/contacts', query: $query);
     }
 
@@ -46,11 +46,11 @@ final class ContactsService
      *
      * @param string|int $contactBookId
      * @param string|int $contactId
-     * @return array{'id': string, 'firstName'?: string|null, 'lastName'?: string|null, 'email': string, 'subscribed'?: bool, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string}
+     * @return array{'id': string, 'firstName': string|null, 'lastName': string|null, 'email': string, 'subscribed': bool, 'unsubscribeReason': string|null, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string}
      */
     public function get(string|int $contactBookId, string|int $contactId, ): array
     {
-        /** @var array{'id': string, 'firstName'?: string|null, 'lastName'?: string|null, 'email': string, 'subscribed'?: bool, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string} */
+        /** @var array{'id': string, 'firstName': string|null, 'lastName': string|null, 'email': string, 'subscribed': bool, 'unsubscribeReason': string|null, 'properties': array<string, string>, 'contactBookId': string, 'createdAt': string, 'updatedAt': string} */
         return $this->client->request('GET', '/v1/contactBooks/' . rawurlencode((string) $contactBookId) . '/contacts/' . rawurlencode((string) $contactId));
     }
 
@@ -59,12 +59,12 @@ final class ContactsService
      *
      * @param string|int $contactBookId
      * @param string|int $contactId
-     * @param array{'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, string>, 'subscribed'?: bool} $payload
-     * @return array{'contactId'?: string}
+     * @param array{'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, mixed>, 'subscribed'?: bool} $payload
+     * @return array{'contactId': string}
      */
     public function update(string|int $contactBookId, string|int $contactId, array $payload, ): array
     {
-        /** @var array{'contactId'?: string} */
+        /** @var array{'contactId': string} */
         return $this->client->request('PATCH', '/v1/contactBooks/' . rawurlencode((string) $contactBookId) . '/contacts/' . rawurlencode((string) $contactId), body: $payload);
     }
 
@@ -73,7 +73,7 @@ final class ContactsService
      *
      * @param string|int $contactBookId
      * @param string|int $contactId
-     * @param array{'email': string, 'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, string>, 'subscribed'?: bool} $payload
+     * @param array{'email': string, 'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, mixed>, 'subscribed'?: bool} $payload
      * @return array{'contactId': string}
      */
     public function upsert(string|int $contactBookId, string|int $contactId, array $payload, ): array
@@ -99,7 +99,7 @@ final class ContactsService
      * Adds many contacts to a contact book in one request.
      *
      * @param string|int $contactBookId
-     * @param list<array{'email': string, 'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, string>, 'subscribed'?: bool}> $payload
+     * @param list<array{'email': string, 'firstName'?: string, 'lastName'?: string, 'properties'?: array<string, mixed>, 'subscribed'?: bool}> $payload
      * @return array{'message': string, 'count': int}
      */
     public function bulkCreate(string|int $contactBookId, array $payload, ): array

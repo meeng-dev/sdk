@@ -203,6 +203,109 @@ public struct CampaignActionResponse: Codable, Sendable, Hashable {
     }
 }
 
+/// CampaignRow is a resource of meeng's API.
+public struct CampaignRow: Codable, Sendable, Hashable {
+    public let id: String
+    public let name: String
+    public let from: String
+    public let subject: String
+    public let previewText: String?
+    public let contactBookID: String?
+    public let html: String?
+    public let content: String?
+    public let status: String
+    public let scheduledAt: String?
+    public let batchSize: Int
+    public let batchWindowMinutes: Int
+    public let total: Int
+    public let sent: Int
+    public let delivered: Int
+    public let opened: Int
+    public let clicked: Int
+    public let unsubscribed: Int
+    public let bounced: Int
+    public let hardBounced: Int
+    public let complained: Int
+    public let replyTo: [String]
+    public let cc: [String]
+    public let bcc: [String]
+    public let createdAt: String
+    public let updatedAt: String
+    public let teamID: Int
+    public let domainID: Int
+    public let isApi: Bool
+    public let lastCursor: String?
+    public let lastSentAt: String?
+
+    public init(id: String, name: String, from: String, subject: String, previewText: String?, contactBookID: String?, html: String?, content: String?, status: String, scheduledAt: String?, batchSize: Int, batchWindowMinutes: Int, total: Int, sent: Int, delivered: Int, opened: Int, clicked: Int, unsubscribed: Int, bounced: Int, hardBounced: Int, complained: Int, replyTo: [String], cc: [String], bcc: [String], createdAt: String, updatedAt: String, teamID: Int, domainID: Int, isApi: Bool, lastCursor: String?, lastSentAt: String?) {
+        self.id = id
+        self.name = name
+        self.from = from
+        self.subject = subject
+        self.previewText = previewText
+        self.contactBookID = contactBookID
+        self.html = html
+        self.content = content
+        self.status = status
+        self.scheduledAt = scheduledAt
+        self.batchSize = batchSize
+        self.batchWindowMinutes = batchWindowMinutes
+        self.total = total
+        self.sent = sent
+        self.delivered = delivered
+        self.opened = opened
+        self.clicked = clicked
+        self.unsubscribed = unsubscribed
+        self.bounced = bounced
+        self.hardBounced = hardBounced
+        self.complained = complained
+        self.replyTo = replyTo
+        self.cc = cc
+        self.bcc = bcc
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.teamID = teamID
+        self.domainID = domainID
+        self.isApi = isApi
+        self.lastCursor = lastCursor
+        self.lastSentAt = lastSentAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case from
+        case subject
+        case previewText
+        case contactBookID = "contactBookId"
+        case html
+        case content
+        case status
+        case scheduledAt
+        case batchSize
+        case batchWindowMinutes
+        case total
+        case sent
+        case delivered
+        case opened
+        case clicked
+        case unsubscribed
+        case bounced
+        case hardBounced
+        case complained
+        case replyTo
+        case cc
+        case bcc
+        case createdAt
+        case updatedAt
+        case teamID = "teamId"
+        case domainID = "domainId"
+        case isApi
+        case lastCursor
+        case lastSentAt
+    }
+}
+
 /// One item of campaigns in CampaignsListResponse.
 public struct CampaignsListCampaign: Codable, Sendable, Hashable {
     public let id: String
@@ -284,18 +387,20 @@ public struct Contact: Codable, Sendable, Hashable {
     public let firstName: String?
     public let lastName: String?
     public let email: String
-    public let subscribed: Bool?
+    public let subscribed: Bool
+    public let unsubscribeReason: String?
     public let properties: [String: String]
     public let contactBookID: String
     public let createdAt: String
     public let updatedAt: String
 
-    public init(id: String, email: String, properties: [String: String], contactBookID: String, createdAt: String, updatedAt: String, firstName: String? = nil, lastName: String? = nil, subscribed: Bool? = nil) {
+    public init(id: String, firstName: String?, lastName: String?, email: String, subscribed: Bool, unsubscribeReason: String?, properties: [String: String], contactBookID: String, createdAt: String, updatedAt: String) {
         self.id = id
         self.firstName = firstName
         self.lastName = lastName
         self.email = email
         self.subscribed = subscribed
+        self.unsubscribeReason = unsubscribeReason
         self.properties = properties
         self.contactBookID = contactBookID
         self.createdAt = createdAt
@@ -308,6 +413,7 @@ public struct Contact: Codable, Sendable, Hashable {
         case lastName
         case email
         case subscribed
+        case unsubscribeReason
         case properties
         case contactBookID = "contactBookId"
         case createdAt
@@ -317,33 +423,21 @@ public struct Contact: Codable, Sendable, Hashable {
 
 /// ContactBook is a resource of meeng's API.
 public struct ContactBook: Codable, Sendable, Hashable {
-    /// The ID of the contact book
     public let id: String
-    /// The name of the contact book
     public let name: String
-    /// The ID of the team
     public let teamID: Int
-    /// Custom properties for the contact book
     public let properties: [String: String]
-    /// Allowed personalization variables for contacts in this book
     public let variables: [String]
-    /// The emoji associated with the contact book
     public let emoji: String
-    /// Whether double opt-in is enabled for new contacts
-    public let doubleOptInEnabled: Bool?
-    /// From address used for double opt-in emails (must use a verified domain)
+    public let doubleOptInEnabled: Bool
     public let doubleOptInFrom: String?
-    /// Subject line used for double opt-in confirmation email
     public let doubleOptInSubject: String?
-    /// Email editor JSON content used for double opt-in confirmation
     public let doubleOptInContent: String?
-    /// The creation timestamp
     public let createdAt: String
-    /// The last update timestamp
     public let updatedAt: String
     public let count: ContactBookCount?
 
-    public init(id: String, name: String, teamID: Int, properties: [String: String], variables: [String], emoji: String, createdAt: String, updatedAt: String, doubleOptInEnabled: Bool? = nil, doubleOptInFrom: String? = nil, doubleOptInSubject: String? = nil, doubleOptInContent: String? = nil, count: ContactBookCount? = nil) {
+    public init(id: String, name: String, teamID: Int, properties: [String: String], variables: [String], emoji: String, doubleOptInEnabled: Bool, doubleOptInFrom: String?, doubleOptInSubject: String?, doubleOptInContent: String?, createdAt: String, updatedAt: String, count: ContactBookCount? = nil) {
         self.id = id
         self.name = name
         self.teamID = teamID
@@ -378,7 +472,6 @@ public struct ContactBook: Codable, Sendable, Hashable {
 
 /// The _count of ContactBook.
 public struct ContactBookCount: Codable, Sendable, Hashable {
-    /// The number of contacts in the contact book
     public let contacts: Int
 
     public init(contacts: Int) {
@@ -480,9 +573,9 @@ public struct ContactsBulkDeleteResponse: Codable, Sendable, Hashable {
 
 /// ContactsCreateResponse is a resource of meeng's API.
 public struct ContactsCreateResponse: Codable, Sendable, Hashable {
-    public let contactID: String?
+    public let contactID: String
 
-    public init(contactID: String? = nil) {
+    public init(contactID: String) {
         self.contactID = contactID
     }
 
@@ -506,9 +599,9 @@ public struct ContactsDeleteResponse: Codable, Sendable, Hashable {
 
 /// ContactsUpdateResponse is a resource of meeng's API.
 public struct ContactsUpdateResponse: Codable, Sendable, Hashable {
-    public let contactID: String?
+    public let contactID: String
 
-    public init(contactID: String? = nil) {
+    public init(contactID: String) {
         self.contactID = contactID
     }
 
@@ -532,30 +625,28 @@ public struct ContactsUpsertResponse: Codable, Sendable, Hashable {
 
 /// Domain is a resource of meeng's API.
 public struct Domain: Codable, Sendable, Hashable {
-    /// The ID of the domain
     public let id: Int
-    /// The name of the domain
     public let name: String
-    /// The ID of the team
     public let teamID: Int
-    public let status: DomainStatus
-    public let region: String?
-    public let clickTracking: Bool?
-    public let openTracking: Bool?
+    public let status: String
+    public let region: String
+    public let clickTracking: Bool
+    public let openTracking: Bool
     public let publicKey: String
-    public let dkimStatus: String?
-    public let spfDetails: String?
-    public let createdAt: String
-    public let updatedAt: String
-    public let dmarcAdded: Bool?
-    public let isVerifying: Bool?
+    public let dkimSelector: String
+    public let dkimStatus: String
+    public let spfDetails: String
+    public let dmarcAdded: Bool
+    public let isVerifying: Bool
     public let errorMessage: String?
     public let subdomain: String?
     public let verificationError: String?
     public let lastCheckedTime: String?
+    public let createdAt: String
+    public let updatedAt: String
     public let dnsRecords: [DomainDnsRecord]
 
-    public init(id: Int, name: String, teamID: Int, status: DomainStatus, publicKey: String, createdAt: String, updatedAt: String, dnsRecords: [DomainDnsRecord], region: String? = nil, clickTracking: Bool? = nil, openTracking: Bool? = nil, dkimStatus: String? = nil, spfDetails: String? = nil, dmarcAdded: Bool? = nil, isVerifying: Bool? = nil, errorMessage: String? = nil, subdomain: String? = nil, verificationError: String? = nil, lastCheckedTime: String? = nil) {
+    public init(id: Int, name: String, teamID: Int, status: String, region: String, clickTracking: Bool, openTracking: Bool, publicKey: String, dkimSelector: String, dkimStatus: String, spfDetails: String, dmarcAdded: Bool, isVerifying: Bool, errorMessage: String?, subdomain: String?, verificationError: String?, lastCheckedTime: String?, createdAt: String, updatedAt: String, dnsRecords: [DomainDnsRecord]) {
         self.id = id
         self.name = name
         self.teamID = teamID
@@ -564,16 +655,17 @@ public struct Domain: Codable, Sendable, Hashable {
         self.clickTracking = clickTracking
         self.openTracking = openTracking
         self.publicKey = publicKey
+        self.dkimSelector = dkimSelector
         self.dkimStatus = dkimStatus
         self.spfDetails = spfDetails
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
         self.dmarcAdded = dmarcAdded
         self.isVerifying = isVerifying
         self.errorMessage = errorMessage
         self.subdomain = subdomain
         self.verificationError = verificationError
         self.lastCheckedTime = lastCheckedTime
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.dnsRecords = dnsRecords
     }
 
@@ -586,37 +678,32 @@ public struct Domain: Codable, Sendable, Hashable {
         case clickTracking
         case openTracking
         case publicKey
+        case dkimSelector
         case dkimStatus
         case spfDetails
-        case createdAt
-        case updatedAt
         case dmarcAdded
         case isVerifying
         case errorMessage
         case subdomain
         case verificationError
         case lastCheckedTime
+        case createdAt
+        case updatedAt
         case dnsRecords
     }
 }
 
 /// One item of dnsRecords in Domain.
 public struct DomainDnsRecord: Codable, Sendable, Hashable {
-    /// DNS record type
-    public let type: DomainDnsRecordType
-    /// DNS record name
+    public let type: String
     public let name: String
-    /// DNS record value
     public let value: String
-    /// DNS record TTL
     public let ttl: String
-    /// DNS record priority
     public let priority: String?
-    public let status: DomainDnsRecordStatus
-    /// Whether the record is recommended
+    public let status: String
     public let recommended: Bool?
 
-    public init(type: DomainDnsRecordType, name: String, value: String, ttl: String, status: DomainDnsRecordStatus, priority: String? = nil, recommended: Bool? = nil) {
+    public init(type: String, name: String, value: String, ttl: String, status: String, priority: String? = nil, recommended: Bool? = nil) {
         self.type = type
         self.name = name
         self.value = value
@@ -722,10 +809,7 @@ public struct DomainsVerifyResponse: Codable, Sendable, Hashable {
 public struct Email: Codable, Sendable, Hashable {
     public let id: String
     public let teamID: Int
-    public let to: StringList
-    public let replyTo: StringList?
-    public let cc: StringList?
-    public let bcc: StringList?
+    public let to: [String]
     public let from: String
     public let subject: String
     public let html: String?
@@ -734,13 +818,10 @@ public struct Email: Codable, Sendable, Hashable {
     public let updatedAt: String
     public let emailEvents: [EmailEvent]
 
-    public init(id: String, teamID: Int, to: StringList, from: String, subject: String, html: String?, text: String?, createdAt: String, updatedAt: String, emailEvents: [EmailEvent], replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil) {
+    public init(id: String, teamID: Int, to: [String], from: String, subject: String, html: String?, text: String?, createdAt: String, updatedAt: String, emailEvents: [EmailEvent]) {
         self.id = id
         self.teamID = teamID
         self.to = to
-        self.replyTo = replyTo
-        self.cc = cc
-        self.bcc = bcc
         self.from = from
         self.subject = subject
         self.html = html
@@ -754,9 +835,6 @@ public struct Email: Codable, Sendable, Hashable {
         case id
         case teamID = "teamId"
         case to
-        case replyTo
-        case cc
-        case bcc
         case from
         case subject
         case html
@@ -949,11 +1027,11 @@ public struct EmailClickedPayload: Codable, Sendable, Hashable {
 /// One item of emailEvents in Email.
 public struct EmailEvent: Codable, Sendable, Hashable {
     public let emailID: String
-    public let status: EmailEventStatus
+    public let status: String
     public let createdAt: String
-    public let data: JSONValue?
+    public let data: [String: JSONValue]?
 
-    public init(emailID: String, status: EmailEventStatus, createdAt: String, data: JSONValue? = nil) {
+    public init(emailID: String, status: String, createdAt: String, data: [String: JSONValue]? = nil) {
         self.emailID = emailID
         self.status = status
         self.createdAt = createdAt
@@ -1188,9 +1266,9 @@ public struct EmailsBatchResponse: Codable, Sendable, Hashable {
 
 /// EmailsCancelResponse is a resource of meeng's API.
 public struct EmailsCancelResponse: Codable, Sendable, Hashable {
-    public let emailID: String?
+    public let emailID: String
 
-    public init(emailID: String? = nil) {
+    public init(emailID: String) {
         self.emailID = emailID
     }
 
@@ -1202,21 +1280,21 @@ public struct EmailsCancelResponse: Codable, Sendable, Hashable {
 /// One item of data in EmailsListResponse.
 public struct EmailsListItem: Codable, Sendable, Hashable {
     public let id: String
-    public let to: StringList
-    public let replyTo: StringList?
-    public let cc: StringList?
-    public let bcc: StringList?
+    public let to: [String]
+    public let replyTo: [String]
+    public let cc: [String]
+    public let bcc: [String]
     public let from: String
     public let subject: String
     public let html: String?
     public let text: String?
     public let createdAt: String
     public let updatedAt: String
-    public let latestStatus: EmailsListItemLatestStatus?
+    public let latestStatus: String?
     public let scheduledAt: String?
     public let domainID: Int?
 
-    public init(id: String, to: StringList, from: String, subject: String, html: String?, text: String?, createdAt: String, updatedAt: String, latestStatus: EmailsListItemLatestStatus?, scheduledAt: String?, domainID: Int?, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil) {
+    public init(id: String, to: [String], replyTo: [String], cc: [String], bcc: [String], from: String, subject: String, html: String?, text: String?, createdAt: String, updatedAt: String, latestStatus: String?, scheduledAt: String?, domainID: Int?) {
         self.id = id
         self.to = to
         self.replyTo = replyTo
@@ -1269,9 +1347,9 @@ public struct EmailsListResponse: Codable, Sendable, Hashable {
 
 /// EmailsSendResponse is a resource of meeng's API.
 public struct EmailsSendResponse: Codable, Sendable, Hashable {
-    public let emailID: String?
+    public let emailID: String
 
-    public init(emailID: String? = nil) {
+    public init(emailID: String) {
         self.emailID = emailID
     }
 
@@ -1282,9 +1360,9 @@ public struct EmailsSendResponse: Codable, Sendable, Hashable {
 
 /// EmailsUpdateResponse is a resource of meeng's API.
 public struct EmailsUpdateResponse: Codable, Sendable, Hashable {
-    public let emailID: String?
+    public let emailID: String
 
-    public init(emailID: String? = nil) {
+    public init(emailID: String) {
         self.emailID = emailID
     }
 
@@ -1324,15 +1402,14 @@ public struct CampaignsCreateParams: Encodable, Sendable, Hashable {
     public var contactBookID: String
     public var content: String?
     public var html: String?
-    public var replyTo: StringList?
-    public var cc: StringList?
-    public var bcc: StringList?
+    public var replyTo: [String]?
+    public var cc: [String]?
+    public var bcc: [String]?
     public var sendNow: Bool?
-    /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
     public var scheduledAt: String?
     public var batchSize: Int?
 
-    public init(name: String, from: String, subject: String, contactBookID: String, previewText: String? = nil, content: String? = nil, html: String? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, sendNow: Bool? = nil, scheduledAt: String? = nil, batchSize: Int? = nil) {
+    public init(name: String, from: String, subject: String, contactBookID: String, previewText: String? = nil, content: String? = nil, html: String? = nil, replyTo: [String]? = nil, cc: [String]? = nil, bcc: [String]? = nil, sendNow: Bool? = nil, scheduledAt: String? = nil, batchSize: Int? = nil) {
         self.name = name
         self.from = from
         self.subject = subject
@@ -1387,7 +1464,6 @@ public struct CampaignsCreateParams: Encodable, Sendable, Hashable {
 /// The initializer takes the required fields first; an optional field left
 /// nil is not sent.
 public struct CampaignsScheduleParams: Encodable, Sendable, Hashable {
-    /// Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30')
     public var scheduledAt: String?
     public var batchSize: Int?
 
@@ -1415,14 +1491,14 @@ public struct CampaignsScheduleParams: Encodable, Sendable, Hashable {
 public struct ContactBooksCreateParams: Encodable, Sendable, Hashable {
     public var name: String
     public var emoji: String?
-    public var properties: [String: String]?
+    public var properties: [String: JSONValue]?
     public var doubleOptInEnabled: Bool?
     public var doubleOptInFrom: String?
     public var doubleOptInSubject: String?
     public var doubleOptInContent: String?
     public var variables: [String]?
 
-    public init(name: String, emoji: String? = nil, properties: [String: String]? = nil, doubleOptInEnabled: Bool? = nil, doubleOptInFrom: String? = nil, doubleOptInSubject: String? = nil, doubleOptInContent: String? = nil, variables: [String]? = nil) {
+    public init(name: String, emoji: String? = nil, properties: [String: JSONValue]? = nil, doubleOptInEnabled: Bool? = nil, doubleOptInFrom: String? = nil, doubleOptInSubject: String? = nil, doubleOptInContent: String? = nil, variables: [String]? = nil) {
         self.name = name
         self.emoji = emoji
         self.properties = properties
@@ -1464,14 +1540,14 @@ public struct ContactBooksCreateParams: Encodable, Sendable, Hashable {
 public struct ContactBooksUpdateParams: Encodable, Sendable, Hashable {
     public var name: String?
     public var emoji: String?
-    public var properties: [String: String]?
+    public var properties: [String: JSONValue]?
     public var doubleOptInEnabled: Bool?
     public var doubleOptInFrom: String?
     public var doubleOptInSubject: String?
     public var doubleOptInContent: String?
     public var variables: [String]?
 
-    public init(name: String? = nil, emoji: String? = nil, properties: [String: String]? = nil, doubleOptInEnabled: Bool? = nil, doubleOptInFrom: String? = nil, doubleOptInSubject: String? = nil, doubleOptInContent: String? = nil, variables: [String]? = nil) {
+    public init(name: String? = nil, emoji: String? = nil, properties: [String: JSONValue]? = nil, doubleOptInEnabled: Bool? = nil, doubleOptInFrom: String? = nil, doubleOptInSubject: String? = nil, doubleOptInContent: String? = nil, variables: [String]? = nil) {
         self.name = name
         self.emoji = emoji
         self.properties = properties
@@ -1514,10 +1590,10 @@ public struct ContactsBulkCreateParams: Encodable, Sendable, Hashable {
     public var email: String
     public var firstName: String?
     public var lastName: String?
-    public var properties: [String: String]?
+    public var properties: [String: JSONValue]?
     public var subscribed: Bool?
 
-    public init(email: String, firstName: String? = nil, lastName: String? = nil, properties: [String: String]? = nil, subscribed: Bool? = nil) {
+    public init(email: String, firstName: String? = nil, lastName: String? = nil, properties: [String: JSONValue]? = nil, subscribed: Bool? = nil) {
         self.email = email
         self.firstName = firstName
         self.lastName = lastName
@@ -1572,10 +1648,10 @@ public struct ContactsCreateParams: Encodable, Sendable, Hashable {
     public var email: String
     public var firstName: String?
     public var lastName: String?
-    public var properties: [String: String]?
+    public var properties: [String: JSONValue]?
     public var subscribed: Bool?
 
-    public init(email: String, firstName: String? = nil, lastName: String? = nil, properties: [String: String]? = nil, subscribed: Bool? = nil) {
+    public init(email: String, firstName: String? = nil, lastName: String? = nil, properties: [String: JSONValue]? = nil, subscribed: Bool? = nil) {
         self.email = email
         self.firstName = firstName
         self.lastName = lastName
@@ -1608,10 +1684,10 @@ public struct ContactsCreateParams: Encodable, Sendable, Hashable {
 public struct ContactsUpdateParams: Encodable, Sendable, Hashable {
     public var firstName: String?
     public var lastName: String?
-    public var properties: [String: String]?
+    public var properties: [String: JSONValue]?
     public var subscribed: Bool?
 
-    public init(firstName: String? = nil, lastName: String? = nil, properties: [String: String]? = nil, subscribed: Bool? = nil) {
+    public init(firstName: String? = nil, lastName: String? = nil, properties: [String: JSONValue]? = nil, subscribed: Bool? = nil) {
         self.firstName = firstName
         self.lastName = lastName
         self.properties = properties
@@ -1642,10 +1718,10 @@ public struct ContactsUpsertParams: Encodable, Sendable, Hashable {
     public var email: String
     public var firstName: String?
     public var lastName: String?
-    public var properties: [String: String]?
+    public var properties: [String: JSONValue]?
     public var subscribed: Bool?
 
-    public init(email: String, firstName: String? = nil, lastName: String? = nil, properties: [String: String]? = nil, subscribed: Bool? = nil) {
+    public init(email: String, firstName: String? = nil, lastName: String? = nil, properties: [String: JSONValue]? = nil, subscribed: Bool? = nil) {
         self.email = email
         self.firstName = firstName
         self.lastName = lastName
@@ -1702,6 +1778,7 @@ public struct DomainsCreateParams: Encodable, Sendable, Hashable {
 /// nil is not sent.
 public struct EmailsBatchAttachment: Encodable, Sendable, Hashable {
     public var filename: String
+    /// The file, in base64.
     public var content: String
 
     public init(filename: String, content: String) {
@@ -1728,23 +1805,24 @@ public struct EmailsBatchAttachment: Encodable, Sendable, Hashable {
 public struct EmailsBatchParams: Encodable, Sendable, Hashable {
     public var to: StringList
     public var from: String
-    /// Optional when templateId is provided
+    /// Optional when templateId is provided.
     public var subject: String?
-    /// ID of a template from the dashboard
+    /// ID of a template from the dashboard.
     public var templateID: String?
-    public var variables: [String: String]?
+    /// The values of the template's variables, as text.
+    public var variables: [String: JSONValue]?
     public var replyTo: StringList?
     public var cc: StringList?
     public var bcc: StringList?
     public var text: String?
     public var html: String?
-    /// Custom headers to included with the emails
-    public var headers: [String: String]?
+    /// Custom headers to include with the e-mail, name to value.
+    public var headers: [String: JSONValue]?
     public var attachments: [EmailsBatchAttachment]?
     public var scheduledAt: String?
     public var inReplyToID: String?
 
-    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: String]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: String]? = nil, attachments: [EmailsBatchAttachment]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
+    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: JSONValue]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: JSONValue]? = nil, attachments: [EmailsBatchAttachment]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
         self.to = to
         self.from = from
         self.subject = subject
@@ -1803,6 +1881,7 @@ public struct EmailsBatchParams: Encodable, Sendable, Hashable {
 /// nil is not sent.
 public struct EmailsSendAttachment: Encodable, Sendable, Hashable {
     public var filename: String
+    /// The file, in base64.
     public var content: String
 
     public init(filename: String, content: String) {
@@ -1829,23 +1908,24 @@ public struct EmailsSendAttachment: Encodable, Sendable, Hashable {
 public struct EmailsSendParams: Encodable, Sendable, Hashable {
     public var to: StringList
     public var from: String
-    /// Optional when templateId is provided
+    /// Optional when templateId is provided.
     public var subject: String?
-    /// ID of a template from the dashboard
+    /// ID of a template from the dashboard.
     public var templateID: String?
-    public var variables: [String: String]?
+    /// The values of the template's variables, as text.
+    public var variables: [String: JSONValue]?
     public var replyTo: StringList?
     public var cc: StringList?
     public var bcc: StringList?
     public var text: String?
     public var html: String?
-    /// Custom headers to included with the emails
-    public var headers: [String: String]?
+    /// Custom headers to include with the e-mail, name to value.
+    public var headers: [String: JSONValue]?
     public var attachments: [EmailsSendAttachment]?
     public var scheduledAt: String?
     public var inReplyToID: String?
 
-    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: String]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: String]? = nil, attachments: [EmailsSendAttachment]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
+    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: JSONValue]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: JSONValue]? = nil, attachments: [EmailsSendAttachment]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
         self.to = to
         self.from = from
         self.subject = subject
@@ -1917,78 +1997,6 @@ public struct EmailsUpdateParams: Encodable, Sendable, Hashable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(scheduledAt, forKey: .scheduledAt)
     }
-}
-
-/// The values of `Domain.status`.
-///
-/// A value this SDK does not know yet is kept as it came, in `rawValue`.
-public struct DomainStatus: RawRepresentable, Codable, Sendable, Hashable, ExpressibleByStringLiteral {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    public init(stringLiteral value: String) {
-        self.rawValue = value
-    }
-
-    /// `NOT_STARTED`
-    public static let notStarted = DomainStatus(rawValue: "NOT_STARTED")
-    /// `PENDING`
-    public static let pending = DomainStatus(rawValue: "PENDING")
-    /// `SUCCESS`
-    public static let success = DomainStatus(rawValue: "SUCCESS")
-    /// `FAILED`
-    public static let failed = DomainStatus(rawValue: "FAILED")
-    /// `TEMPORARY_FAILURE`
-    public static let temporaryFailure = DomainStatus(rawValue: "TEMPORARY_FAILURE")
-}
-
-/// The values of `DomainDnsRecord.type`. DNS record type
-///
-/// A value this SDK does not know yet is kept as it came, in `rawValue`.
-public struct DomainDnsRecordType: RawRepresentable, Codable, Sendable, Hashable, ExpressibleByStringLiteral {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    public init(stringLiteral value: String) {
-        self.rawValue = value
-    }
-
-    /// `MX`
-    public static let mx = DomainDnsRecordType(rawValue: "MX")
-    /// `TXT`
-    public static let txt = DomainDnsRecordType(rawValue: "TXT")
-}
-
-/// The values of `DomainDnsRecord.status`.
-///
-/// A value this SDK does not know yet is kept as it came, in `rawValue`.
-public struct DomainDnsRecordStatus: RawRepresentable, Codable, Sendable, Hashable, ExpressibleByStringLiteral {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    public init(stringLiteral value: String) {
-        self.rawValue = value
-    }
-
-    /// `NOT_STARTED`
-    public static let notStarted = DomainDnsRecordStatus(rawValue: "NOT_STARTED")
-    /// `PENDING`
-    public static let pending = DomainDnsRecordStatus(rawValue: "PENDING")
-    /// `SUCCESS`
-    public static let success = DomainDnsRecordStatus(rawValue: "SUCCESS")
-    /// `FAILED`
-    public static let failed = DomainDnsRecordStatus(rawValue: "FAILED")
-    /// `TEMPORARY_FAILURE`
-    public static let temporaryFailure = DomainDnsRecordStatus(rawValue: "TEMPORARY_FAILURE")
 }
 
 /// The values of `EmailBasePayload.status`.
@@ -2177,50 +2185,6 @@ public struct EmailClickedPayloadStatus: RawRepresentable, Codable, Sendable, Ha
     public static let scheduled = EmailClickedPayloadStatus(rawValue: "SCHEDULED")
 }
 
-/// The values of `EmailEvent.status`.
-///
-/// A value this SDK does not know yet is kept as it came, in `rawValue`.
-public struct EmailEventStatus: RawRepresentable, Codable, Sendable, Hashable, ExpressibleByStringLiteral {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    public init(stringLiteral value: String) {
-        self.rawValue = value
-    }
-
-    /// `SCHEDULED`
-    public static let scheduled = EmailEventStatus(rawValue: "SCHEDULED")
-    /// `QUEUED`
-    public static let queued = EmailEventStatus(rawValue: "QUEUED")
-    /// `SENT`
-    public static let sent = EmailEventStatus(rawValue: "SENT")
-    /// `DELIVERY_DELAYED`
-    public static let deliveryDelayed = EmailEventStatus(rawValue: "DELIVERY_DELAYED")
-    /// `BOUNCED`
-    public static let bounced = EmailEventStatus(rawValue: "BOUNCED")
-    /// `REJECTED`
-    public static let rejected = EmailEventStatus(rawValue: "REJECTED")
-    /// `RENDERING_FAILURE`
-    public static let renderingFailure = EmailEventStatus(rawValue: "RENDERING_FAILURE")
-    /// `DELIVERED`
-    public static let delivered = EmailEventStatus(rawValue: "DELIVERED")
-    /// `OPENED`
-    public static let opened = EmailEventStatus(rawValue: "OPENED")
-    /// `CLICKED`
-    public static let clicked = EmailEventStatus(rawValue: "CLICKED")
-    /// `COMPLAINED`
-    public static let complained = EmailEventStatus(rawValue: "COMPLAINED")
-    /// `FAILED`
-    public static let failed = EmailEventStatus(rawValue: "FAILED")
-    /// `CANCELLED`
-    public static let cancelled = EmailEventStatus(rawValue: "CANCELLED")
-    /// `SUPPRESSED`
-    public static let suppressed = EmailEventStatus(rawValue: "SUPPRESSED")
-}
-
 /// The values of `EmailFailedPayload.status`.
 ///
 /// A value this SDK does not know yet is kept as it came, in `rawValue`.
@@ -2373,49 +2337,5 @@ public struct EmailSuppressedSuppressionType: RawRepresentable, Codable, Sendabl
     public static let complaint = EmailSuppressedSuppressionType(rawValue: "Complaint")
     /// `Manual`
     public static let manual = EmailSuppressedSuppressionType(rawValue: "Manual")
-}
-
-/// The values of `EmailsListItem.latestStatus`.
-///
-/// A value this SDK does not know yet is kept as it came, in `rawValue`.
-public struct EmailsListItemLatestStatus: RawRepresentable, Codable, Sendable, Hashable, ExpressibleByStringLiteral {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    public init(stringLiteral value: String) {
-        self.rawValue = value
-    }
-
-    /// `SCHEDULED`
-    public static let scheduled = EmailsListItemLatestStatus(rawValue: "SCHEDULED")
-    /// `QUEUED`
-    public static let queued = EmailsListItemLatestStatus(rawValue: "QUEUED")
-    /// `SENT`
-    public static let sent = EmailsListItemLatestStatus(rawValue: "SENT")
-    /// `DELIVERY_DELAYED`
-    public static let deliveryDelayed = EmailsListItemLatestStatus(rawValue: "DELIVERY_DELAYED")
-    /// `BOUNCED`
-    public static let bounced = EmailsListItemLatestStatus(rawValue: "BOUNCED")
-    /// `REJECTED`
-    public static let rejected = EmailsListItemLatestStatus(rawValue: "REJECTED")
-    /// `RENDERING_FAILURE`
-    public static let renderingFailure = EmailsListItemLatestStatus(rawValue: "RENDERING_FAILURE")
-    /// `DELIVERED`
-    public static let delivered = EmailsListItemLatestStatus(rawValue: "DELIVERED")
-    /// `OPENED`
-    public static let opened = EmailsListItemLatestStatus(rawValue: "OPENED")
-    /// `CLICKED`
-    public static let clicked = EmailsListItemLatestStatus(rawValue: "CLICKED")
-    /// `COMPLAINED`
-    public static let complained = EmailsListItemLatestStatus(rawValue: "COMPLAINED")
-    /// `FAILED`
-    public static let failed = EmailsListItemLatestStatus(rawValue: "FAILED")
-    /// `CANCELLED`
-    public static let cancelled = EmailsListItemLatestStatus(rawValue: "CANCELLED")
-    /// `SUPPRESSED`
-    public static let suppressed = EmailsListItemLatestStatus(rawValue: "SUPPRESSED")
 }
 

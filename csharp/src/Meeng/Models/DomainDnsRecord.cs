@@ -9,44 +9,23 @@ namespace Meeng;
 /// <summary>One item of dnsRecords in Domain.</summary>
 public sealed record DomainDnsRecord
 {
-    /// <summary>A value of <see cref="Type"/>.</summary>
-    public const string TypeMx = "MX";
-
-    /// <summary>A value of <see cref="Type"/>.</summary>
-    public const string TypeTxt = "TXT";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusNotStarted = "NOT_STARTED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusPending = "PENDING";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusSuccess = "SUCCESS";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusFailed = "FAILED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusTemporaryFailure = "TEMPORARY_FAILURE";
-
-    /// <summary>DNS record type</summary>
+    /// <summary>The API's <c>type</c>.</summary>
     [JsonPropertyName("type")]
     public required string Type { get; init; }
 
-    /// <summary>DNS record name</summary>
+    /// <summary>The API's <c>name</c>.</summary>
     [JsonPropertyName("name")]
     public required string Name { get; init; }
 
-    /// <summary>DNS record value</summary>
+    /// <summary>The API's <c>value</c>.</summary>
     [JsonPropertyName("value")]
     public required string Value { get; init; }
 
-    /// <summary>DNS record TTL</summary>
+    /// <summary>The API's <c>ttl</c>.</summary>
     [JsonPropertyName("ttl")]
     public required string Ttl { get; init; }
 
-    /// <summary>DNS record priority Null when the API sends none.</summary>
+    /// <summary>The API's <c>priority</c>. Null when the API sends none.</summary>
     [JsonPropertyName("priority")]
     public string? Priority { get; init; }
 
@@ -54,7 +33,7 @@ public sealed record DomainDnsRecord
     [JsonPropertyName("status")]
     public required string Status { get; init; }
 
-    /// <summary>Whether the record is recommended Null when the API sends none.</summary>
+    /// <summary>The API's <c>recommended</c>. Null when the API sends none.</summary>
     [JsonPropertyName("recommended")]
     public bool? Recommended { get; init; }
 }

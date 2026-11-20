@@ -9,48 +9,6 @@ namespace Meeng;
 /// <summary>One item of emailEvents in Email.</summary>
 public sealed record EmailEvent
 {
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusScheduled = "SCHEDULED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusQueued = "QUEUED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusSent = "SENT";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusDeliveryDelayed = "DELIVERY_DELAYED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusBounced = "BOUNCED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusRejected = "REJECTED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusRenderingFailure = "RENDERING_FAILURE";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusDelivered = "DELIVERED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusOpened = "OPENED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusClicked = "CLICKED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusComplained = "COMPLAINED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusFailed = "FAILED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusCancelled = "CANCELLED";
-
-    /// <summary>A value of <see cref="Status"/>.</summary>
-    public const string StatusSuppressed = "SUPPRESSED";
-
     /// <summary>The API's <c>emailId</c>.</summary>
     [JsonPropertyName("emailId")]
     public required string EmailId { get; init; }
@@ -65,5 +23,5 @@ public sealed record EmailEvent
 
     /// <summary>The API's <c>data</c>. Null when the API sends none.</summary>
     [JsonPropertyName("data")]
-    public JsonElement? Data { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Data { get; init; }
 }

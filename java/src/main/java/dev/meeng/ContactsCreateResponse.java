@@ -16,10 +16,10 @@ public final class ContactsCreateResponse {
 
     static ContactsCreateResponse fromJson(Map<String, Object> data) {
         return new ContactsCreateResponse(
-                Json.optional(data, "contactId", Json::asString));
+                Json.required(data, "contactId", Json::asString));
     }
 
-    /** @return the API's {@code contactId} (null when the API sends none) */
+    /** @return the API's {@code contactId} */
     public String getContactId() {
         return contactId;
     }

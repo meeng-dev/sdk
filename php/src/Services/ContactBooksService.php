@@ -18,23 +18,23 @@ final class ContactBooksService
     /**
      * Lists the contact books of the team.
      *
-     * @return list<array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}}>
+     * @return list<array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null}>
      */
     public function list(): array
     {
-        /** @var list<array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}}> */
+        /** @var list<array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null}> */
         return $this->client->request('GET', '/v1/contactBooks');
     }
 
     /**
      * Creates a contact book.
      *
-     * @param array{'name': string, 'emoji'?: string, 'properties'?: array<string, string>, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string, 'doubleOptInContent'?: string, 'variables'?: list<string>} $payload
-     * @return array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}}
+     * @param array{'name': string, 'emoji'?: string, 'properties'?: array<string, mixed>, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string, 'doubleOptInContent'?: string, 'variables'?: list<string>} $payload
+     * @return array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null}
      */
     public function create(array $payload, ): array
     {
-        /** @var array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}} */
+        /** @var array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null} */
         return $this->client->request('POST', '/v1/contactBooks', body: $payload);
     }
 
@@ -42,11 +42,11 @@ final class ContactBooksService
      * Reads one contact book.
      *
      * @param string|int $contactBookId
-     * @return array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}}
+     * @return array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null}
      */
     public function get(string|int $contactBookId, ): array
     {
-        /** @var array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}} */
+        /** @var array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null} */
         return $this->client->request('GET', '/v1/contactBooks/' . rawurlencode((string) $contactBookId));
     }
 
@@ -54,12 +54,12 @@ final class ContactBooksService
      * Changes the fields of a contact book that are sent.
      *
      * @param string|int $contactBookId
-     * @param array{'name'?: string, 'emoji'?: string, 'properties'?: array<string, string>, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string, 'doubleOptInContent'?: string, 'variables'?: list<string>} $payload
-     * @return array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}}
+     * @param array{'name'?: string, 'emoji'?: string, 'properties'?: array<string, mixed>, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string, 'doubleOptInContent'?: string, 'variables'?: list<string>} $payload
+     * @return array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null}
      */
     public function update(string|int $contactBookId, array $payload, ): array
     {
-        /** @var array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled'?: bool, 'doubleOptInFrom'?: string|null, 'doubleOptInSubject'?: string|null, 'doubleOptInContent'?: string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}} */
+        /** @var array{'id': string, 'name': string, 'teamId': int, 'properties': array<string, string>, 'variables': list<string>, 'emoji': string, 'doubleOptInEnabled': bool, 'doubleOptInFrom': string|null, 'doubleOptInSubject': string|null, 'doubleOptInContent': string|null, 'createdAt': string, 'updatedAt': string, '_count'?: array{'contacts': int}|null} */
         return $this->client->request('PATCH', '/v1/contactBooks/' . rawurlencode((string) $contactBookId), body: $payload);
     }
 

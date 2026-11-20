@@ -18,20 +18,20 @@ final class EmailsService
     /**
      * Sends an email, now or at scheduledAt.
      *
-     * @param array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, string>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, string>, 'attachments'?: list<array{'filename': string, 'content': string}>, 'scheduledAt'?: string, 'inReplyToId'?: string|null} $payload
+     * @param array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, mixed>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, mixed>, 'attachments'?: list<array{'filename': string, 'content': string}>, 'scheduledAt'?: string, 'inReplyToId'?: string|null} $payload
      * @param string|null $idempotencyKey makes the send safe to retry: the same key with the same body answers the first result again
-     * @return array{'emailId'?: string}
+     * @return array{'emailId': string}
      */
     public function send(array $payload, ?string $idempotencyKey = null): array
     {
-        /** @var array{'emailId'?: string} */
+        /** @var array{'emailId': string} */
         return $this->client->request('POST', '/v1/emails', body: $payload, idempotencyKey: $idempotencyKey);
     }
 
     /**
      * Sends up to 100 emails in one request.
      *
-     * @param list<array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, string>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, string>, 'attachments'?: list<array{'filename': string, 'content': string}>, 'scheduledAt'?: string, 'inReplyToId'?: string|null}> $payload
+     * @param list<array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, mixed>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, mixed>, 'attachments'?: list<array{'filename': string, 'content': string}>, 'scheduledAt'?: string, 'inReplyToId'?: string|null}> $payload
      * @param string|null $idempotencyKey makes the send safe to retry: the same key with the same body answers the first result again
      * @return array{'data': list<array{'emailId': string}>}
      */
@@ -45,11 +45,11 @@ final class EmailsService
      * Reads one email with its events.
      *
      * @param string|int $emailId
-     * @return array{'id': string, 'teamId': int, 'to': string|list<string>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'emailEvents': list<array{'emailId': string, 'status': 'SCHEDULED'|'QUEUED'|'SENT'|'DELIVERY_DELAYED'|'BOUNCED'|'REJECTED'|'RENDERING_FAILURE'|'DELIVERED'|'OPENED'|'CLICKED'|'COMPLAINED'|'FAILED'|'CANCELLED'|'SUPPRESSED', 'createdAt': string, 'data'?: mixed|null}>}
+     * @return array{'id': string, 'teamId': int, 'to': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'emailEvents': list<array{'emailId': string, 'status': string, 'createdAt': string, 'data'?: array<string, mixed>}>}
      */
     public function get(string|int $emailId, ): array
     {
-        /** @var array{'id': string, 'teamId': int, 'to': string|list<string>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'emailEvents': list<array{'emailId': string, 'status': 'SCHEDULED'|'QUEUED'|'SENT'|'DELIVERY_DELAYED'|'BOUNCED'|'REJECTED'|'RENDERING_FAILURE'|'DELIVERED'|'OPENED'|'CLICKED'|'COMPLAINED'|'FAILED'|'CANCELLED'|'SUPPRESSED', 'createdAt': string, 'data'?: mixed|null}>} */
+        /** @var array{'id': string, 'teamId': int, 'to': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'emailEvents': list<array{'emailId': string, 'status': string, 'createdAt': string, 'data'?: array<string, mixed>}>} */
         return $this->client->request('GET', '/v1/emails/' . rawurlencode((string) $emailId));
     }
 
@@ -57,11 +57,11 @@ final class EmailsService
      * Lists emails, newest first, with an optional date range and domain filter.
      *
      * @param array{'page'?: int, 'limit'?: int, 'startDate'?: string, 'endDate'?: string, 'domainId'?: string|list<string>} $query
-     * @return array{'data': list<array{'id': string, 'to': string|list<string>, 'replyTo'?: string|list<string>|null, 'cc'?: string|list<string>|null, 'bcc'?: string|list<string>|null, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'latestStatus': 'SCHEDULED'|'QUEUED'|'SENT'|'DELIVERY_DELAYED'|'BOUNCED'|'REJECTED'|'RENDERING_FAILURE'|'DELIVERED'|'OPENED'|'CLICKED'|'COMPLAINED'|'FAILED'|'CANCELLED'|'SUPPRESSED'|null, 'scheduledAt': string|null, 'domainId': int|null}>, 'count': int}
+     * @return array{'data': list<array{'id': string, 'to': list<string>, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'latestStatus': string|null, 'scheduledAt': string|null, 'domainId': int|null}>, 'count': int}
      */
     public function list(array $query = [], ): array
     {
-        /** @var array{'data': list<array{'id': string, 'to': string|list<string>, 'replyTo'?: string|list<string>|null, 'cc'?: string|list<string>|null, 'bcc'?: string|list<string>|null, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'latestStatus': 'SCHEDULED'|'QUEUED'|'SENT'|'DELIVERY_DELAYED'|'BOUNCED'|'REJECTED'|'RENDERING_FAILURE'|'DELIVERED'|'OPENED'|'CLICKED'|'COMPLAINED'|'FAILED'|'CANCELLED'|'SUPPRESSED'|null, 'scheduledAt': string|null, 'domainId': int|null}>, 'count': int} */
+        /** @var array{'data': list<array{'id': string, 'to': list<string>, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'latestStatus': string|null, 'scheduledAt': string|null, 'domainId': int|null}>, 'count': int} */
         return $this->client->request('GET', '/v1/emails', query: $query);
     }
 
@@ -70,11 +70,11 @@ final class EmailsService
      *
      * @param string|int $emailId
      * @param array{'scheduledAt': string} $payload
-     * @return array{'emailId'?: string}
+     * @return array{'emailId': string}
      */
     public function update(string|int $emailId, array $payload, ): array
     {
-        /** @var array{'emailId'?: string} */
+        /** @var array{'emailId': string} */
         return $this->client->request('PATCH', '/v1/emails/' . rawurlencode((string) $emailId), body: $payload);
     }
 
@@ -82,11 +82,11 @@ final class EmailsService
      * Cancels a scheduled email.
      *
      * @param string|int $emailId
-     * @return array{'emailId'?: string}
+     * @return array{'emailId': string}
      */
     public function cancel(string|int $emailId, ): array
     {
-        /** @var array{'emailId'?: string} */
+        /** @var array{'emailId': string} */
         return $this->client->request('POST', '/v1/emails/' . rawurlencode((string) $emailId) . '/cancel', body: []);
     }
 }

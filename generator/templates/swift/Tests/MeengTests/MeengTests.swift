@@ -96,7 +96,7 @@ final class MeengTests: XCTestCase {
 
     func testListingEmailsSendsTheFiltersAListOnceForEachValue() async throws {
         let item: [String: Any] = [
-            "id": "em_1", "to": "a@x.com", "from": "h@acme.com", "subject": "Hi", "html": NSNull(), "text": "Hi",
+            "id": "em_1", "to": ["a@x.com"], "replyTo": [String](), "cc": [String](), "bcc": [String](), "from": "h@acme.com", "subject": "Hi", "html": NSNull(), "text": "Hi",
             "createdAt": "x", "updatedAt": "x", "latestStatus": "DELIVERED", "scheduledAt": NSNull(), "domainId": 3,
         ]
         nonisolated(unsafe) let page: [String: Any] = ["data": [item], "count": 1]
@@ -104,7 +104,7 @@ final class MeengTests: XCTestCase {
         let got = try await meeng.emails.list(page: 2, limit: 10, startDate: "2026-11-01T00:00:00Z", domainID: ["1", "2"])
         XCTAssertEqual(got.count, 1)
         XCTAssertEqual(Array(got.data[0].to), ["a@x.com"])
-        XCTAssertEqual(got.data[0].latestStatus, EmailsListItemLatestStatus.delivered)
+        XCTAssertEqual(got.data[0].latestStatus, "DELIVERED")
         XCTAssertEqual(
             recorder.seen[0].url?.absoluteString,
             "https://meeng.test/api/v1/emails?page=2&limit=10&startDate=2026-11-01T00%3A00%3A00Z&domainId=1&domainId=2")
@@ -123,7 +123,7 @@ final class MeengTests: XCTestCase {
         }
         let email = try await meeng.emails.get("a/b c")
         XCTAssertEqual(recorder.seen[0].url?.absoluteString, "https://meeng.test/api/v1/emails/a%2Fb%20c")
-        XCTAssertEqual(email.emailEvents[0].status, EmailEventStatus.sent)
+        XCTAssertEqual(email.emailEvents[0].status, "SENT")
     }
 
     func testAListTheAPIAnswersWithoutAnObjectAroundItIsAList() async throws {
@@ -133,7 +133,7 @@ final class MeengTests: XCTestCase {
                 [
                     [
                         "id": "cb_1", "name": "News", "teamId": 1, "properties": ["plan": "string"], "variables": ["plan"],
-                        "emoji": "x", "createdAt": "x", "updatedAt": "x", "_count": ["contacts": 4],
+                        "emoji": "x", "doubleOptInEnabled": false, "doubleOptInFrom": NSNull(), "doubleOptInSubject": NSNull(), "doubleOptInContent": NSNull(), "createdAt": "x", "updatedAt": "x", "_count": ["contacts": 4],
                     ]
                 ]
             )
@@ -190,18 +190,18 @@ final class MeengTests: XCTestCase {
         }
     }
 
-    func testAnEmailsRecipientsMayComeAsOneStringOrAList() async throws {
+    func testAnEmailsRecipientsAreAList() async throws {
         let (meeng, _) = client { _ in
             (
                 200,
                 [
-                    "id": "em_1", "teamId": 1, "to": "a@x.com", "from": "h@acme.com", "subject": "Hi", "html": NSNull(),
+                    "id": "em_1", "teamId": 1, "to": ["a@x.com", "b@x.com"], "from": "h@acme.com", "subject": "Hi", "html": NSNull(),
                     "text": NSNull(), "createdAt": "x", "updatedAt": "x", "emailEvents": [Any](),
                 ]
             )
         }
         let email = try await meeng.emails.get("em_1")
-        XCTAssertEqual(Array(email.to), ["a@x.com"])
+        XCTAssertEqual(Array(email.to), ["a@x.com", "b@x.com"])
     }
 
     func testTheAddressMustBeHTTPSExceptToLocalhost() async throws {

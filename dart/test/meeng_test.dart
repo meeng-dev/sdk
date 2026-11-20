@@ -114,7 +114,10 @@ void main() {
         'data': [
           {
             'id': 'em_1',
-            'to': 'a@x.com',
+            'to': ['a@x.com'],
+            'replyTo': <String>[],
+            'cc': <String>[],
+            'bcc': <String>[],
             'from': 'h@acme.com',
             'subject': 'Hi',
             'html': null,
@@ -186,6 +189,10 @@ void main() {
             'properties': {'plan': 'string'},
             'variables': ['plan'],
             'emoji': 'x',
+            'doubleOptInEnabled': false,
+            'doubleOptInFrom': null,
+            'doubleOptInSubject': null,
+            'doubleOptInContent': null,
             'createdAt': 'x',
             'updatedAt': 'x',
             '_count': {'contacts': 4},
@@ -278,12 +285,12 @@ void main() {
     }
   });
 
-  test("an email's recipients may come as one string or a list", () async {
+  test("an email's recipients are a list", () async {
     final (meeng, _) = client(
       (_) => json(200, {
         'id': 'em_1',
         'teamId': 1,
-        'to': 'a@x.com',
+        'to': ['a@x.com', 'b@x.com'],
         'from': 'h@acme.com',
         'subject': 'Hi',
         'html': null,
@@ -293,7 +300,7 @@ void main() {
         'emailEvents': <Object?>[],
       }),
     );
-    expect((await meeng.emails.get('em_1')).to, ['a@x.com']);
+    expect((await meeng.emails.get('em_1')).to, ['a@x.com', 'b@x.com']);
   });
 
   test('the key and the address come from the environment', () {

@@ -53,11 +53,11 @@ public sealed class CampaignsService
     /// <summary>Removes a campaign.</summary>
     /// <param name="campaignId">The campaignId.</param>
     /// <param name="cancellationToken">Cancels the call.</param>
-    /// <returns>The campaign.</returns>
+    /// <returns>The campaignrow.</returns>
     /// <exception cref="MeengException">The API refused the call.</exception>
-    public async Task<Campaign> DeleteAsync(string campaignId, CancellationToken cancellationToken = default)
+    public async Task<CampaignRow> DeleteAsync(string campaignId, CancellationToken cancellationToken = default)
     {
-        return await client.RequestAsync(HttpMethod.Delete, "/v1/campaigns/" + MeengClient.Segment(campaignId), null, null, MeengJson.Default.Campaign, null, cancellationToken).ConfigureAwait(false);
+        return await client.RequestAsync(HttpMethod.Delete, "/v1/campaigns/" + MeengClient.Segment(campaignId), null, null, MeengJson.Default.CampaignRow, null, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Schedules a campaign, or sends it now when no time is given.</summary>
@@ -126,24 +126,21 @@ public sealed record CampaignsCreateParams
 
     /// <summary>The <c>replyTo</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("replyTo")]
-    [JsonConverter(typeof(StringListConverter))]
     public IReadOnlyList<string>? ReplyTo { get; init; }
 
     /// <summary>The <c>cc</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("cc")]
-    [JsonConverter(typeof(StringListConverter))]
     public IReadOnlyList<string>? Cc { get; init; }
 
     /// <summary>The <c>bcc</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("bcc")]
-    [JsonConverter(typeof(StringListConverter))]
     public IReadOnlyList<string>? Bcc { get; init; }
 
     /// <summary>The <c>sendNow</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("sendNow")]
     public bool? SendNow { get; init; }
 
-    /// <summary>Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30') Left out of the request when null.</summary>
+    /// <summary>The <c>scheduledAt</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("scheduledAt")]
     public string? ScheduledAt { get; init; }
 
@@ -156,13 +153,13 @@ public sealed record CampaignsCreateParams
 /// <summary>The filters of campaigns.list.</summary>
 public sealed record CampaignsListQuery
 {
-    /// <summary>The page, from 1.</summary>
+    /// <summary>The page, from 1; 30 campaigns to a page.</summary>
     public int? Page { get; init; }
 
-    /// <summary>Only campaigns in this status: DRAFT, SCHEDULED, RUNNING, PAUSED or SENT.</summary>
+    /// <summary>Only campaigns in this status.</summary>
     public string? Status { get; init; }
 
-    /// <summary>Only campaigns whose name matches this text.</summary>
+    /// <summary>Part of the name or of the subject.</summary>
     public string? Search { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()
@@ -176,7 +173,7 @@ public sealed record CampaignsListQuery
 /// <summary>The body of campaigns.schedule.</summary>
 public sealed record CampaignsScheduleParams
 {
-    /// <summary>Timestamp in ISO 8601 format or natural language (e.g., 'tomorrow 9am', 'next monday 10:30') Left out of the request when null.</summary>
+    /// <summary>The <c>scheduledAt</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("scheduledAt")]
     public string? ScheduledAt { get; init; }
 

@@ -45,13 +45,13 @@ public final class EmailsService {
         private final String from;
         private final String subject;
         private final String templateId;
-        private final Map<String, String> variables;
+        private final Map<String, Object> variables;
         private final List<String> replyTo;
         private final List<String> cc;
         private final List<String> bcc;
         private final String text;
         private final String html;
-        private final Map<String, String> headers;
+        private final Map<String, Object> headers;
         private final List<EmailsSendAttachment> attachments;
         private final String scheduledAt;
         private final String inReplyToId;
@@ -88,18 +88,18 @@ public final class EmailsService {
             return from;
         }
 
-        /** @return Optional when templateId is provided (null when left out) */
+        /** @return Optional when templateId is provided. (null when left out) */
         public String getSubject() {
             return subject;
         }
 
-        /** @return ID of a template from the dashboard (null when left out) */
+        /** @return ID of a template from the dashboard. (null when left out) */
         public String getTemplateId() {
             return templateId;
         }
 
-        /** @return the {@code variables} sent (null when left out) */
-        public Map<String, String> getVariables() {
+        /** @return The values of the template's variables, as text. (null when left out) */
+        public Map<String, Object> getVariables() {
             return variables;
         }
 
@@ -128,8 +128,8 @@ public final class EmailsService {
             return html;
         }
 
-        /** @return Custom headers to included with the emails (null when left out) */
-        public Map<String, String> getHeaders() {
+        /** @return Custom headers to include with the e-mail, name to value. (null when left out) */
+        public Map<String, Object> getHeaders() {
             return headers;
         }
 
@@ -197,13 +197,13 @@ public final class EmailsService {
             private String from;
             private String subject;
             private String templateId;
-            private Map<String, String> variables;
+            private Map<String, Object> variables;
             private List<String> replyTo;
             private List<String> cc;
             private List<String> bcc;
             private String text;
             private String html;
-            private Map<String, String> headers;
+            private Map<String, Object> headers;
             private List<EmailsSendAttachment> attachments;
             private String scheduledAt;
             private String inReplyToId;
@@ -230,7 +230,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param subject Optional when templateId is provided
+             * @param subject Optional when templateId is provided.
              * @return this builder
              */
             public Builder subject(String subject) {
@@ -239,7 +239,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param templateId ID of a template from the dashboard
+             * @param templateId ID of a template from the dashboard.
              * @return this builder
              */
             public Builder templateId(String templateId) {
@@ -248,10 +248,10 @@ public final class EmailsService {
             }
 
             /**
-             * @param variables the {@code variables} to send
+             * @param variables The values of the template's variables, as text.
              * @return this builder
              */
-            public Builder variables(Map<String, String> variables) {
+            public Builder variables(Map<String, Object> variables) {
                 this.variables = variables;
                 return this;
             }
@@ -302,10 +302,10 @@ public final class EmailsService {
             }
 
             /**
-             * @param headers Custom headers to included with the emails
+             * @param headers Custom headers to include with the e-mail, name to value.
              * @return this builder
              */
-            public Builder headers(Map<String, String> headers) {
+            public Builder headers(Map<String, Object> headers) {
                 this.headers = headers;
                 return this;
             }
@@ -375,7 +375,7 @@ public final class EmailsService {
             return filename;
         }
 
-        /** @return the {@code content} sent */
+        /** @return The file, in base64. */
         public String getContent() {
             return content;
         }
@@ -405,7 +405,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param content the {@code content} to send (required)
+             * @param content The file, in base64. (required)
              * @return this builder
              */
             public Builder content(String content) {
@@ -459,13 +459,13 @@ public final class EmailsService {
         private final String from;
         private final String subject;
         private final String templateId;
-        private final Map<String, String> variables;
+        private final Map<String, Object> variables;
         private final List<String> replyTo;
         private final List<String> cc;
         private final List<String> bcc;
         private final String text;
         private final String html;
-        private final Map<String, String> headers;
+        private final Map<String, Object> headers;
         private final List<EmailsBatchAttachment> attachments;
         private final String scheduledAt;
         private final String inReplyToId;
@@ -502,18 +502,18 @@ public final class EmailsService {
             return from;
         }
 
-        /** @return Optional when templateId is provided (null when left out) */
+        /** @return Optional when templateId is provided. (null when left out) */
         public String getSubject() {
             return subject;
         }
 
-        /** @return ID of a template from the dashboard (null when left out) */
+        /** @return ID of a template from the dashboard. (null when left out) */
         public String getTemplateId() {
             return templateId;
         }
 
-        /** @return the {@code variables} sent (null when left out) */
-        public Map<String, String> getVariables() {
+        /** @return The values of the template's variables, as text. (null when left out) */
+        public Map<String, Object> getVariables() {
             return variables;
         }
 
@@ -542,8 +542,8 @@ public final class EmailsService {
             return html;
         }
 
-        /** @return Custom headers to included with the emails (null when left out) */
-        public Map<String, String> getHeaders() {
+        /** @return Custom headers to include with the e-mail, name to value. (null when left out) */
+        public Map<String, Object> getHeaders() {
             return headers;
         }
 
@@ -611,13 +611,13 @@ public final class EmailsService {
             private String from;
             private String subject;
             private String templateId;
-            private Map<String, String> variables;
+            private Map<String, Object> variables;
             private List<String> replyTo;
             private List<String> cc;
             private List<String> bcc;
             private String text;
             private String html;
-            private Map<String, String> headers;
+            private Map<String, Object> headers;
             private List<EmailsBatchAttachment> attachments;
             private String scheduledAt;
             private String inReplyToId;
@@ -644,7 +644,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param subject Optional when templateId is provided
+             * @param subject Optional when templateId is provided.
              * @return this builder
              */
             public Builder subject(String subject) {
@@ -653,7 +653,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param templateId ID of a template from the dashboard
+             * @param templateId ID of a template from the dashboard.
              * @return this builder
              */
             public Builder templateId(String templateId) {
@@ -662,10 +662,10 @@ public final class EmailsService {
             }
 
             /**
-             * @param variables the {@code variables} to send
+             * @param variables The values of the template's variables, as text.
              * @return this builder
              */
-            public Builder variables(Map<String, String> variables) {
+            public Builder variables(Map<String, Object> variables) {
                 this.variables = variables;
                 return this;
             }
@@ -716,10 +716,10 @@ public final class EmailsService {
             }
 
             /**
-             * @param headers Custom headers to included with the emails
+             * @param headers Custom headers to include with the e-mail, name to value.
              * @return this builder
              */
-            public Builder headers(Map<String, String> headers) {
+            public Builder headers(Map<String, Object> headers) {
                 this.headers = headers;
                 return this;
             }
@@ -789,7 +789,7 @@ public final class EmailsService {
             return filename;
         }
 
-        /** @return the {@code content} sent */
+        /** @return The file, in base64. */
         public String getContent() {
             return content;
         }
@@ -819,7 +819,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param content the {@code content} to send (required)
+             * @param content The file, in base64. (required)
              * @return this builder
              */
             public Builder content(String content) {

@@ -85,7 +85,7 @@ public sealed record ContactBooksCreateParams
 
     /// <summary>The <c>properties</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("properties")]
-    public IReadOnlyDictionary<string, string>? Properties { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Properties { get; init; }
 
     /// <summary>The <c>doubleOptInEnabled</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("doubleOptInEnabled")]
@@ -122,7 +122,7 @@ public sealed record ContactBooksUpdateParams
 
     /// <summary>The <c>properties</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("properties")]
-    public IReadOnlyDictionary<string, string>? Properties { get; init; }
+    public IReadOnlyDictionary<string, JsonElement>? Properties { get; init; }
 
     /// <summary>The <c>doubleOptInEnabled</c> to send. Left out of the request when null.</summary>
     [JsonPropertyName("doubleOptInEnabled")]

@@ -9,7 +9,7 @@ namespace Meeng;
 /// <summary>The _count of ContactBook.</summary>
 public sealed record ContactBookCount
 {
-    /// <summary>The number of contacts in the contact book</summary>
+    /// <summary>The API's <c>contacts</c>.</summary>
     [JsonPropertyName("contacts")]
     public required long Contacts { get; init; }
 }

@@ -43,10 +43,10 @@ public sealed class AnalyticsService
 /// <summary>The filters of analytics.emailTimeSeries.</summary>
 public sealed record AnalyticsEmailTimeSeriesQuery
 {
-    /// <summary>How many days to count: 7 or 30.</summary>
+    /// <summary>How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.</summary>
     public string? Days { get; init; }
 
-    /// <summary>Only emails of these domains; a list sends one domainId for each value.</summary>
+    /// <summary>Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.</summary>
     public string? DomainId { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()
@@ -59,7 +59,7 @@ public sealed record AnalyticsEmailTimeSeriesQuery
 /// <summary>The filters of analytics.reputationMetrics.</summary>
 public sealed record AnalyticsReputationMetricsQuery
 {
-    /// <summary>Only emails of these domains; a list sends one domainId for each value.</summary>
+    /// <summary>Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.</summary>
     public string? DomainId { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()

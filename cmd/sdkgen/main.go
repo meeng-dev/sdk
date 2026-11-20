@@ -5,7 +5,9 @@
 //	go run ./cmd/sdkgen -sync ../meeng.dev/docs/contracts/api.openapi.json
 //
 // -sync copies the contract meeng.dev exports into openapi.json first, so the
-// contract the SDKs were written from is kept beside them.
+// contract the SDKs were written from is kept beside them. The copy is the
+// app's contract byte for byte, except for a sentence of its description that
+// names another product (generator.SanitizeContract).
 package main
 
 import (
@@ -28,6 +30,9 @@ func main() {
 	flag.Parse()
 	if *sync != "" {
 		raw, err := os.ReadFile(*sync)
+		if err == nil {
+			raw, err = generator.SanitizeContract(raw)
+		}
 		if err == nil {
 			err = os.WriteFile(*spec, raw, 0o644)
 		}
