@@ -16,8 +16,8 @@
 | `templateId` | texto | o id de um template criado no painel |
 | `variables` | objeto texto para texto | os valores do template; só texto |
 | `headers` | objeto texto para texto | cabeçalhos extras (veja abaixo) |
-| `attachments` | lista | até 10 anexos; veja [`lote-agendamento-anexos.md`](lote-agendamento-anexos.md) |
-| `scheduledAt` | texto | data e hora em ISO 8601 com fuso; veja o mesmo arquivo |
+| (sem `attachments`) | | o Meeng.dev não envia anexos: ponha o link do arquivo no corpo; veja [`lote-agendamento-e-arquivos.md`](lote-agendamento-e-arquivos.md) |
+| `scheduledAt` | texto | data e hora em ISO 8601 com fuso; veja [`lote-agendamento-e-arquivos.md`](lote-agendamento-e-arquivos.md) |
 | `inReplyToId` | texto | o `emailId` de um e-mail da mesma organização, para responder na mesma conversa |
 
 Os nomes são em `camelCase` (`replyTo`, `scheduledAt`, `templateId`). Os SDKs usam o mesmo nome em todas as linguagens, ajustado ao jeito de cada uma (em Go `ReplyTo` e `ScheduledAt`).

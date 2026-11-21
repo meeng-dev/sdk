@@ -1,6 +1,6 @@
 ---
 name: meeng-migrar-de-outro-provedor
-description: Ensina a trocar o envio de e-mail de um sistema que usa outro provedor para o Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, mantendo o formato do payload de envio, sem derrubar entregas e sem perder reputação. Use quando o pedido for migrar o envio de e-mail para o Meeng.dev, trocar a chamada de envio do provedor atual, mapear campos (destinatário, assunto, corpo, anexos, agendamento, tags), mover domínio e DNS, migrar webhooks e a assinatura, importar contatos e supressões, esquentar o volume aos poucos, ou planejar a virada com plano de volta. Cobre inventário, adaptador de envio, domínio, webhooks, contatos, virada gradual e reversão.
+description: Ensina a trocar o envio de e-mail de um sistema que usa outro provedor para o Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, mantendo o formato do payload de envio, sem derrubar entregas e sem perder reputação. Use quando o pedido for migrar o envio de e-mail para o Meeng.dev, trocar a chamada de envio do provedor atual, mapear campos (destinatário, assunto, corpo, links no lugar de anexos, agendamento, tags), mover domínio e DNS, migrar webhooks e a assinatura, importar contatos e supressões, esquentar o volume aos poucos, ou planejar a virada com plano de volta. Cobre inventário, adaptador de envio, domínio, webhooks, contatos, virada gradual e reversão.
 ---
 
 # Migrar o envio de e-mail para o Meeng.dev
@@ -25,11 +25,21 @@ Não use para migrar caixas de entrada (e-mail recebido de pessoas): isto é só
 6. **Webhooks mudam de formato e de assinatura.** O corpo, os nomes de evento e a conferência da assinatura são do Meeng.dev; um receptor feito para o outro provedor não confere a assinatura do Meeng.dev. Reescreva o receptor com o SDK (`meeng-webhooks`) e rode os dois em paralelo na virada.
 7. **A lista de quem não deve receber vai junto.** Exporte as supressões (bounces duros, reclamações, descadastros) do provedor antigo e carregue-as antes do primeiro envio. Sem isso, o Meeng.dev reenvia para quem já recusou, e a reputação cai logo.
 8. **Não importe contatos sem a prova do aceite.** Veja `meeng-contatos-e-campanhas`.
-9. O agente não troca o DNS do dono: mostre os registros e peça que ele (ou quem cuida do DNS) os publique. Nenhuma mudança de produção sem a aprovação do dono.
+9. **Sem anexos.** O Meeng.dev não anexa nem guarda arquivos, e a API recusa `attachments` com itens (`400`). Um envio que hoje leva anexo passa a levar o **link** do arquivo no corpo; até o sistema fazer essa troca, esse envio continua no provedor atual.
+10. O agente não troca o DNS do dono: mostre os registros e peça que ele (ou quem cuida do DNS) os publique. Nenhuma mudança de produção sem a aprovação do dono.
+
+## A troca mais curta: só o endereço e a chave
+
+Alguns sistemas já falam o formato de API que o Meeng.dev usa: os mesmos caminhos (`/v1/emails`, `/v1/domains`, `/v1/contacts`...), os mesmos campos e a mesma chave no cabeçalho `Authorization: Bearer`. Se o SDK ou o cliente HTTP do sistema deixa configurar o **endereço base** e a **chave**, a troca de código é só isto, sem adaptador:
+
+- endereço base: `https://meeng.dev/api` (o SDK do Meeng.dev recebe `https://meeng.dev` e acrescenta `/api`);
+- chave: uma chave nova do Meeng.dev, em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves), no formato `mg_<id>_<segredo>`, guardada em variável de ambiente.
+
+Mesmo assim, o resto do roteiro vale (domínio, supressões, esquenta e plano de volta), e os envios com anexo precisam trocar o arquivo por link. Para um sistema que fala outro formato, siga com o adaptador abaixo.
 
 ## Roteiro essencial
 
-1. **Inventário**: onde o sistema envia e-mail, com que volume, que formatos (transacional, lote, anexo, agendado, modelos, SMTP) e que webhooks recebe ([`referencias/plano-de-migracao.md`](referencias/plano-de-migracao.md), fase 1).
+1. **Inventário**: onde o sistema envia e-mail, com que volume, que formatos (transacional, lote, com arquivo, agendado, modelos, SMTP) e que webhooks recebe ([`referencias/plano-de-migracao.md`](referencias/plano-de-migracao.md), fase 1).
 2. **Domínio e DNS** no Meeng.dev, convivendo com o antigo (`meeng-dominios`).
 3. **Adaptador de envio**: uma função que recebe o payload no formato antigo e chama o Meeng.dev ([`referencias/mapeamento-de-campos.md`](referencias/mapeamento-de-campos.md)).
 4. **Supressões e contatos** carregados.
@@ -54,7 +64,7 @@ export interface LegacyPayload {
   reply_to?: string | string[];
   scheduled_at?: string;
   headers?: Record<string, string>;
-  attachments?: { filename: string; content: string }[]; // conteúdo em base64
+  attachments?: { filename: string; content: string }[]; // o Meeng.dev não recebe anexos
   tags?: { name: string; value: string }[];
 }
 
@@ -65,6 +75,9 @@ export function paraMeeng(antigo: LegacyPayload): { corpo: Parameters<typeof mee
   const perdidos: string[] = [];
   if (antigo.tags?.length) {
     perdidos.push("tags"); // não há campo de tags: guarde-as no seu banco junto do emailId
+  }
+  if (antigo.attachments?.length) {
+    perdidos.push("attachments"); // o Meeng.dev não anexa: ponha o link do arquivo no corpo
   }
   return {
     corpo: {
@@ -78,7 +91,6 @@ export function paraMeeng(antigo: LegacyPayload): { corpo: Parameters<typeof mee
       replyTo: antigo.reply_to,
       scheduledAt: antigo.scheduled_at,
       headers: antigo.headers,
-      attachments: antigo.attachments,
     },
     perdidos,
   };
@@ -103,7 +115,8 @@ export async function enviarEmail(
   chave: string, // o id estável do envio (pedido-1042-confirmacao): serve de Idempotency-Key
   enviarPeloProvedorAtual: (payload: LegacyPayload) => Promise<string>,
 ): Promise<{ provedor: "meeng" | "atual"; id: string }> {
-  if (!vaiParaMeeng(chave)) {
+  // Envio com anexo fica no provedor atual até o sistema trocar o arquivo por link.
+  if (!vaiParaMeeng(chave) || antigo.attachments?.length) {
     return { provedor: "atual", id: await enviarPeloProvedorAtual(antigo) };
   }
   const { corpo } = paraMeeng(antigo);
@@ -145,10 +158,11 @@ type LegacyPayload struct {
 	Attachments []LegacyAttachment
 }
 
-// LegacyAttachment é um anexo, com o conteúdo em base64.
+// LegacyAttachment é um anexo do formato antigo. O Meeng.dev não recebe anexos.
 type LegacyAttachment struct{ Filename, Content string }
 
-// ToMeeng traduz o payload antigo para o do Meeng.dev.
+// ToMeeng traduz o payload antigo para o do Meeng.dev. Quem tem anexo não passa
+// por aqui: o e-mail leva o link do arquivo no corpo, ou fica no provedor atual.
 func ToMeeng(old LegacyPayload) meeng.EmailsSendParams {
 	params := meeng.EmailsSendParams{
 		From:    old.From,
@@ -172,9 +186,6 @@ func ToMeeng(old LegacyPayload) meeng.EmailsSendParams {
 	}
 	if old.ScheduledAt != "" {
 		params.ScheduledAt = &old.ScheduledAt
-	}
-	for _, a := range old.Attachments {
-		params.Attachments = append(params.Attachments, meeng.EmailsSendAttachment{Filename: a.Filename, Content: a.Content})
 	}
 	return params
 }
@@ -204,4 +215,4 @@ func main() {
 
 ## Ao terminar
 
-Entregue ao dono, em português: onde o envio passou a ir pelo Meeng.dev e em que porcentagem, o que ficou do provedor antigo e até quando, as taxas de devolução e de reclamação observadas, o que foi testado (envio real, anexo, agendado, repetido com a mesma chave, webhook novo) e o que falta (chegar a 100%, apagar as chaves antigas, descadastrar o webhook antigo).
+Entregue ao dono, em português: onde o envio passou a ir pelo Meeng.dev e em que porcentagem, o que ficou do provedor antigo e até quando, as taxas de devolução e de reclamação observadas, o que foi testado (envio real, link de arquivo no corpo, agendado, repetido com a mesma chave, webhook novo) e o que falta (chegar a 100%, apagar as chaves antigas, descadastrar o webhook antigo).

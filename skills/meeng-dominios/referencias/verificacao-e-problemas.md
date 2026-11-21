@@ -38,6 +38,7 @@ Olhe `dnsRecords` e ache o primeiro registro com `status` diferente de `SUCCESS`
 | Sintoma | Causa provável | Correção |
 |---|---|---|
 | MX continua `PENDING` | nome errado, ou o painel acrescentou o domínio duas vezes | veja o nome com `dig MX mail.seudominio +short`; corrija o campo Nome |
+| `CNAME` do retorno `FAILED` | o CNAME aponta para outro domínio, ou sobrou MX e TXT no mesmo nome | o valor tem de ser o domínio de retorno da API; apague o MX e o TXT do nome do CNAME |
 | MX `FAILED` | o MX aponta para outro servidor, ou a prioridade está errada | o valor tem de ser o da API e a prioridade `10`; apague MX que sobraram no mesmo nome |
 | SPF `FAILED` | dois registros SPF no mesmo nome, ou falta o `include:` | deixe um só registro `v=spf1`, com o `include:` da API, antes do `~all` |
 | SPF `FAILED` e o valor parece certo | aspas coladas dentro do valor, ou espaço no fim | recrie o registro e cole só o texto |

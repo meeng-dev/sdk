@@ -1,4 +1,4 @@
-# Lote, agendamento e anexos
+# Lote, agendamento e links de arquivos
 
 ## Lote: até 100 e-mails numa chamada
 
@@ -115,23 +115,21 @@ if (cancelado.error) {
 }
 ```
 
-## Anexos
+## Arquivos: mande um link, não um anexo
 
-`attachments` é uma lista de `{ "filename": "...", "content": "..." }` com o conteúdo em **base64**.
+O Meeng.dev **não anexa, não guarda e não repassa arquivos** ([decisão do produto](../SKILL.md#regras-que-valem-sempre)). Os SDKs não têm o campo `attachments`; quem envia hospeda o arquivo (no armazenamento da própria aplicação) e põe o link no corpo do e-mail.
 
-- No máximo **10** anexos por e-mail (mais que isso é recusado na validação).
-- `filename` e `content` não podem ser vazios. O tipo do arquivo é deduzido da extensão do nome (`.pdf`, `.png`); não existe campo de tipo, nem imagem embutida por `Content-ID`, nem anexo por link.
-- A API não confere se o base64 é válido nem o tamanho de cada anexo. Os servidores de destino recusam mensagens grandes, então mantenha o e-mail inteiro pequeno (poucos megabytes) e, para arquivo grande, mande um link para o arquivo no seu armazenamento.
+- A API recusa `attachments` com itens: `400`, `ZodError`, com a mensagem `Attachments are not supported. Include links to your files in the email body.` Uma lista vazia passa, e o campo ausente também. O relay SMTP faz o mesmo (`550 5.7.1`), inclusive para imagem embutida por `cid:`: para uma imagem no corpo, use uma URL `https`.
+- Para um documento sensível (fatura, contrato, laudo), o link tem de **expirar** ou exigir login; um link público fica válido para quem receber o e-mail encaminhado. Gere o link assinado no seu sistema na hora do envio.
+- O link precisa continuar vivo enquanto a pessoa puder abrir o e-mail. Decida o prazo (30 dias, por exemplo) e diga-o no texto: "o link vale até 20/12".
 
 ```go
 package main
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log"
-	"os"
 
 	meeng "github.com/meeng-dev/sdk/go"
 )
@@ -139,21 +137,17 @@ import (
 func main() {
 	client := meeng.New("")
 
-	pdf, err := os.ReadFile("fatura-1042.pdf")
-	if err != nil {
-		log.Fatal(err)
-	}
 	subject := "Sua fatura"
-	text := "A fatura segue em anexo."
+	html := `<p>Sua fatura de novembro está pronta.</p>` +
+		`<p><a href="https://exemplo.com.br/faturas/1042?assinatura=abc123">Baixar a fatura (PDF)</a>, disponível até 20/12.</p>`
+	text := "Sua fatura de novembro está pronta: https://exemplo.com.br/faturas/1042?assinatura=abc123 (disponível até 20/12)."
 
 	sent, err := client.Emails.Send(context.Background(), meeng.EmailsSendParams{
 		From:    "financeiro@envio.exemplo.com.br",
 		To:      meeng.StringList{"cliente@example.com"},
 		Subject: &subject,
+		HTML:    &html,
 		Text:    &text,
-		Attachments: []meeng.EmailsSendAttachment{
-			{Filename: "fatura-1042.pdf", Content: base64.StdEncoding.EncodeToString(pdf)},
-		},
 	}, meeng.WithIdempotencyKey("fatura-1042-envio"))
 	if err != nil {
 		log.Fatal(err)
@@ -165,22 +159,19 @@ func main() {
 Em Python:
 
 ```python
-import base64
-from pathlib import Path
-
 from meeng import Meeng
 
 meeng = Meeng()
 
-conteudo = base64.b64encode(Path("fatura-1042.pdf").read_bytes()).decode("ascii")
+link = "https://exemplo.com.br/faturas/1042?assinatura=abc123"
 
 data, _ = meeng.emails.send(
     {
         "from": "financeiro@envio.exemplo.com.br",
         "to": "cliente@example.com",
         "subject": "Sua fatura",
-        "text": "A fatura segue em anexo.",
-        "attachments": [{"filename": "fatura-1042.pdf", "content": conteudo}],
+        "html": f'<p>Sua fatura está pronta.</p><p><a href="{link}">Baixar a fatura (PDF)</a>, disponível até 20/12.</p>',
+        "text": f"Sua fatura está pronta: {link} (disponível até 20/12).",
     },
     options={"idempotency_key": "fatura-1042-envio"},
 )

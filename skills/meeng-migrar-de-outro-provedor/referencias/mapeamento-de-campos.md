@@ -14,8 +14,7 @@ O que muda ao passar a chamada de envio para o Meeng.dev, sem citar marcas: leia
 | `html`, `text` | `html`, `text` | igual. É obrigatório um dos dois |
 | `scheduled_at` | **`scheduledAt`** | em ISO 8601 com fuso. Não aceita frases como "daqui a 1 hora" no envio |
 | `headers` | `headers` | igual: pares de texto. Alguns cabeçalhos reservados (`from`, `to`, `date`, `message-id`, `content-type`...) são descartados em silêncio |
-| `attachments` com `filename` e `content` em base64 | `attachments` com `filename` e `content` | igual. No máximo 10 por e-mail |
-| `attachments` com um **endereço** do arquivo (`path`) | **não existe** | baixe o arquivo no seu servidor, converta para base64 e mande em `content` |
+| `attachments` (em base64 ou por endereço) | **não existe** | o Meeng.dev não anexa nem guarda arquivos: hospede o arquivo e ponha o **link** no corpo (`html` ou `text`). Mandar `attachments` com itens dá `400` (`ZodError`) |
 | `tags` | **não existe** | guarde as tags no seu banco, junto do `emailId`, ou mande um cabeçalho `X-` seu para achá-las depois |
 | `template` do provedor antigo | `templateId` e `variables` | o template precisa ser recriado no painel do Meeng.dev, e as variáveis são `{{nome}}` |
 | a chave de idempotência | cabeçalho `Idempotency-Key` | o mesmo nome de cabeçalho; de 1 a 256 caracteres; vale 24 horas |
@@ -98,8 +97,9 @@ def para_meeng(antigo: dict[str, Any]) -> EmailsSendParams:
         corpo["scheduledAt"] = antigo["scheduled_at"]
     if antigo.get("headers") is not None:
         corpo["headers"] = antigo["headers"]
-    if antigo.get("attachments") is not None:
-        corpo["attachments"] = antigo["attachments"]
+    if antigo.get("attachments"):
+        # O Meeng.dev não recebe anexos: troque o arquivo por um link no corpo.
+        raise ValueError("e-mail com anexo: ponha o link do arquivo no corpo")
     return corpo
 
 

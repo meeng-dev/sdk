@@ -1,6 +1,6 @@
 ---
 name: meeng-enviar-email
-description: Ensina a enviar e-mail pelo Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, com os SDKs oficiais (TypeScript, Go, Python, PHP, Ruby, Java, C#, Elixir, Dart, Rust e Swift) ou a API REST em https://meeng.dev/api/v1. Use quando o pedido for enviar e-mail transacional (confirmação de pedido, recibo, código de acesso, recuperação de senha, aviso), enviar vários e-mails de uma vez (lote), agendar ou cancelar um envio, anexar arquivo, usar template com variáveis, evitar envio duplicado com Idempotency-Key, ler o status de um e-mail, ou tratar erro 4xx e limite de requisições (429) de uma chave mg_. Cobre envio simples, lote, agendamento, anexos, idempotência, erros e limites.
+description: Ensina a enviar e-mail pelo Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, com os SDKs oficiais (TypeScript, Go, Python, PHP, Ruby, Java, C#, Elixir, Dart, Rust e Swift) ou a API REST em https://meeng.dev/api/v1. Use quando o pedido for enviar e-mail transacional (confirmação de pedido, recibo, código de acesso, recuperação de senha, aviso), enviar vários e-mails de uma vez (lote), agendar ou cancelar um envio, mandar arquivo por link (o Meeng.dev não envia anexos), usar template com variáveis, evitar envio duplicado com Idempotency-Key, ler o status de um e-mail, ou tratar erro 4xx e limite de requisições (429) de uma chave mg_. Cobre envio simples, lote, agendamento, anexos, idempotência, erros e limites.
 ---
 
 # Enviar e-mail pelo Meeng.dev
@@ -32,13 +32,14 @@ Não use para outro provedor de e-mail. Para algo que não está nesta skill, a 
 7. O limite padrão é de **2 requisições por segundo por organização**. Para muitos e-mails use o lote (até 100 por chamada). Em `429`, espere o tempo do cabeçalho `Retry-After` e tente de novo; nunca em laço sem pausa.
 8. Uma recusa `4xx` diz o motivo em `error.message`: leia e corrija o pedido, não tente de novo às cegas.
 9. Nunca simule entrega nem trate `200` como "chegou". Teste com endereços reais do dono.
+10. **Sem anexos.** O Meeng.dev não anexa nem guarda arquivos: o e-mail leva o link do arquivo no corpo (um link que expira, se o documento é sensível). `attachments` com itens dá `400`; os SDKs nem têm o campo.
 
 ## Roteiro essencial
 
 1. **Instalar o SDK da linguagem** (nomes por registro em [`referencias/linguagens.md`](referencias/linguagens.md)) e criar o cliente a partir do ambiente.
 2. **Confirmar o domínio** do `from` (`meeng-dominios`).
 3. **Enviar um e-mail de teste** para o próprio dono, com o exemplo abaixo.
-4. **Escolher o formato**: envio simples ([`referencias/envio.md`](referencias/envio.md)), lote, agendado ou com anexo ([`referencias/lote-agendamento-anexos.md`](referencias/lote-agendamento-anexos.md)).
+4. **Escolher o formato**: envio simples ([`referencias/envio.md`](referencias/envio.md)), lote, agendado ou com link de arquivo ([`referencias/lote-agendamento-e-arquivos.md`](referencias/lote-agendamento-e-arquivos.md)).
 5. **Proteger contra repetição** com `Idempotency-Key` e tratar os erros ([`referencias/idempotencia-e-erros.md`](referencias/idempotencia-e-erros.md)).
 6. **Acompanhar a entrega** por webhook (`meeng-webhooks`) em vez de consultar e-mail por e-mail.
 
@@ -143,7 +144,7 @@ echo $sent['emailId'];
 | Quando você precisa de | Abra |
 |---|---|
 | Todos os campos do envio, template com variáveis, cabeçalhos, responder a um e-mail, ler o status | [`referencias/envio.md`](referencias/envio.md) |
-| Lote de até 100, agendar, reagendar, cancelar, anexos | [`referencias/lote-agendamento-anexos.md`](referencias/lote-agendamento-anexos.md) |
+| Lote de até 100, agendar, reagendar, cancelar, arquivos por link (sem anexos) | [`referencias/lote-agendamento-e-arquivos.md`](referencias/lote-agendamento-e-arquivos.md) |
 | `Idempotency-Key`, formato de erro, tabela de erros, limite de requisições, limite do plano | [`referencias/idempotencia-e-erros.md`](referencias/idempotencia-e-erros.md) |
 | Instalar o SDK, nome do pacote por registro, o mesmo envio nas 11 linguagens | [`referencias/linguagens.md`](referencias/linguagens.md) |
 

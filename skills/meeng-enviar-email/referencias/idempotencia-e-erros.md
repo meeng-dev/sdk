@@ -163,7 +163,7 @@ O uso e o limite aparecem no painel, em Configurações › Planos (`https://mee
 | O quê | Limite |
 |---|---|
 | E-mails por chamada de lote | 100 |
-| Anexos por e-mail | 10 |
+| Anexos por e-mail | 0: use links no corpo |
 | Tamanho de `Idempotency-Key` | 1 a 256 caracteres; vale 24 horas |
 | Itens por página em `GET /v1/emails` | 1 a 50 |
 | Requisições por segundo | 2 por organização, padrão |

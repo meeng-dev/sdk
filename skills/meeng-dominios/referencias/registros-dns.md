@@ -28,6 +28,21 @@ Serve para o Meeng.dev receber as mensagens de erro dos servidores de destino (e
 - Como o registro fica no subdomínio `mail`, no caso normal não há conflito com o SPF do domínio principal.
 - Um SPF pode ter no máximo 10 consultas de DNS (cada `include:` conta). Se o domínio já usa muitos serviços, prefira um subdomínio só para o Meeng.dev.
 
+## Retorno por CNAME: um registro no lugar do MX e do SPF
+
+Em domínios que usam o domínio de retorno do Meeng.dev, a API **não devolve** o MX e o TXT de SPF do subdomínio `mail` das seções 1 e 2: devolve **um só `CNAME`** nesse mesmo nome, apontando para o domínio de retorno da plataforma, e o MX e o SPF ficam lá. Os outros registros (DKIM e DMARC) não mudam.
+
+| Campo | Valor |
+|---|---|
+| Tipo | `CNAME` |
+| Nome | o mesmo que teria o MX (`mail.envio` no exemplo) |
+| Valor | o domínio de retorno que a API informa |
+| Prioridade | não tem (`priority` vem vazio) |
+
+- **Leia o `type` de cada item de `dnsRecords` e publique o que a API devolveu**, em vez de contar com MX e SPF: um domínio mais antigo continua com os dois, um domínio novo pode vir com o CNAME.
+- Num nome que tem um `CNAME`, o DNS não aceita outros registros: apague o MX e o TXT antigos do subdomínio `mail` antes de criar o CNAME.
+- A verificação lê o CNAME. Um CNAME que aponta para outro lugar que não o domínio de retorno marca o retorno como `FAILED`.
+
 ## 3. DKIM: a assinatura do e-mail
 
 | Campo | Valor |

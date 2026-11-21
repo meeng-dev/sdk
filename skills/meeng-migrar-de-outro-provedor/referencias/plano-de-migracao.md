@@ -7,7 +7,7 @@ Seis fases. Cada uma tem um critério de saída: só passe para a seguinte quand
 Descubra tudo o que envia e recebe e-mail no sistema, antes de escrever uma linha:
 
 - **Onde se chama o provedor atual.** Procure no código pelo endereço do provedor, pelo nome do pacote do SDK e pela variável de ambiente da chave (`grep -rn` nos três). Inclua filas, tarefas agendadas, scripts de manutenção, e-mails que o próprio framework manda (recuperação de senha, convites).
-- **O que cada envio é**: transacional (recibo, código), de lote, com anexo, agendado, com modelo, em campanha. Cada um tem um caminho no Meeng.dev ([`mapeamento-de-campos.md`](mapeamento-de-campos.md)).
+- **O que cada envio é**: transacional (recibo, código), de lote, com arquivo (vira link), agendado, com modelo, em campanha. Cada um tem um caminho no Meeng.dev ([`mapeamento-de-campos.md`](mapeamento-de-campos.md)).
 - **De quais endereços** (`From`) e de quais domínios o sistema envia.
 - **Volume**: e-mails por dia e por mês, e o pico por segundo. O limite padrão do Meeng.dev é de 2 requisições por segundo por organização; um pico maior pede lote ou aumento do limite.
 - **Webhooks recebidos**: endereços, eventos e o que o sistema faz com cada um.
@@ -37,7 +37,7 @@ Descubra tudo o que envia e recebe e-mail no sistema, antes de escrever uma linh
 
 1. **Escreva o adaptador** de envio (`SKILL.md`, com TypeScript e Go) e ponha a chave de configuração (a porcentagem) em variável de ambiente, começando em **0**.
 2. **Troque os receptores de webhook**: escreva o receptor do Meeng.dev com o SDK (`meeng-webhooks`), com idempotência por `(provedor, id)`. Crie o webhook no painel apontando para ele.
-3. **Teste em homologação** (ou em produção com 0%): um envio real para o dono, um repetido com a mesma chave (deve voltar o mesmo `emailId`), um com anexo, um agendado, um para um endereço suprimido, um para um endereço inexistente (deve gerar `email.bounced`).
+3. **Teste em homologação** (ou em produção com 0%): um envio real para o dono, um repetido com a mesma chave (deve voltar o mesmo `emailId`), um com link de arquivo no corpo, um agendado, um para um endereço suprimido, um para um endereço inexistente (deve gerar `email.bounced`).
 4. Confira que o webhook novo recebeu `email.delivered`, `email.bounced` e `email.suppressed` nesses testes.
 
 **Critério de saída:** todos os testes acima passam, e o receptor novo grava os eventos.
@@ -86,7 +86,7 @@ Em cada degrau, olhe:
 | o receptor novo rejeita todos os avisos | `SIGNATURE_MISMATCH`: corpo não cru, ou segredo trocado | `meeng-webhooks`, "Erros de assinatura" |
 | `403` ao enviar | o domínio do `From` não está verificado, ou a chave é restrita a outro domínio | `meeng-dominios` |
 | `429` em horários de pico | passou de 2 requisições por segundo | lote, ou pedir aumento do limite |
-| o anexo some | o provedor antigo aceitava o endereço do arquivo | baixe e converta para base64 (`mapeamento-de-campos.md`) |
+| o anexo some | o Meeng.dev não anexa arquivos | hospede o arquivo e ponha o link no corpo (`mapeamento-de-campos.md`) |
 | cliente recebe e-mail que já tinha pedido para não receber | contatos que saíram foram importados como inscritos | importe quem saiu com `subscribed: false` |
 
 ## Conferência final
@@ -94,7 +94,7 @@ Em cada degrau, olhe:
 - [ ] domínio em `SUCCESS`, com SPF, DKIM e DMARC passando
 - [ ] chave de API própria deste sistema, restrita ao domínio, fora do repositório
 - [ ] supressões carregadas antes do primeiro envio
-- [ ] adaptador testado (simples, lote, anexo, agendado, repetido, suprimido, inexistente)
+- [ ] adaptador testado (simples, lote, link de arquivo, agendado, repetido, suprimido, inexistente)
 - [ ] receptor de webhook novo com idempotência e conferência de assinatura
 - [ ] virada gradual completa, com taxas dentro dos limites
 - [ ] provedor antigo desligado, chaves revogadas, DNS limpo

@@ -26,6 +26,7 @@ Ao criar um domínio, a API devolve `dnsRecords`: o que publicar no DNS, na orde
 | DKIM: assinatura do e-mail | `TXT` | `meeng._domainkey` | `p=...` (a chave pública) |
 | DMARC: política (recomendado) | `TXT` | `_dmarc` | `v=DMARC1; p=none;` |
 
+- Em domínios que usam o **retorno por CNAME**, os dois primeiros registros (MX e SPF) vêm como **um só `CNAME`** no nome `mail`, apontando para o domínio de retorno do Meeng.dev ([`referencias/registros-dns.md`](referencias/registros-dns.md)). Publique o que a API devolver, pelo `type` de cada item.
 - O **nome** é relativo ao domínio cadastrado: para `exemplo.com.br` o MX é `envio.exemplo.com.br`. Se o cadastro foi de um subdomínio (`envio.exemplo.com.br`), os nomes ganham o sufixo (`mail.envio`, `meeng._domainkey.envio`); copie o que a API devolveu, nunca monte à mão.
 - Copie o **valor** exatamente como a API devolveu. A chave DKIM é longa; alguns painéis de DNS pedem para dividi-la em pedaços de até 255 caracteres.
 - `ttl` vem como `Auto`: use o padrão do seu provedor de DNS (3600 segundos serve).
