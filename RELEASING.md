@@ -171,3 +171,11 @@ Localmente, na pasta correspondente: `gem build meeng-sdk.gemspec`,
 `cargo package --allow-dirty`, `mix hex.build`, `dart pub publish --dry-run`,
 `dotnet pack src/Meeng/Meeng.csproj -c Release` e
 `mvn -Prelease -Dgpg.skip=true package`.
+
+## Notes from the first release (0.1.0, 21/11/2026)
+
+- npm: o registro recusou `0.0.0-stage` na CLI com 403, mas a versão entrou mesmo assim; a `0.1.0` saiu à mão (sem proveniência) e só então o publicador confiável foi criado. Toda publicação e todo publicador pedem a chave de segurança do npm.
+- RubyGems: um publicador pendente exige `owner: <id da conta>` na troca do token OIDC, e `rubygems/configure-rubygems-credentials` v2.1.0 não tem esse campo. A primeira versão saiu à mão (`gem push` com uma chave temporária e verificação por chave de segurança); depois se apagou o pendente e se criou o publicador confiável normal na gem (ambiente `release`).
+- Hex: chave com permissão de publicar só existe com autenticação em dois fatores ligada; a publicação fica "staged" e precisa de "Approve publication" no painel (pede o código do autenticador).
+- Maven Central: o job para de esperar em 30 minutos; se o portal ainda estiver em "PUBLISHING", o deployment segue sozinho e o POM aparece depois no repositório.
+- crates.io: primeira versão com um token temporário (escopos `publish-new` e `publish-update`, padrão `meeng-sdk`), revogado em seguida.
