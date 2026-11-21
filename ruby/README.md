@@ -2,9 +2,7 @@
 
 SDK do Meeng.dev para Ruby 3.1 ou mais novo: e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Não depende de nenhuma gem.
 
-Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão 1.0.0); não edite à mão.
-
-> A gem ainda não foi publicada: o nome `meeng-sdk` é uma proposta aguardando confirmação.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev (versão 1.0.0); não edite à mão.
 
 ## Começando
 

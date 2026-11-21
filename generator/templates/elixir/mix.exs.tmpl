@@ -14,7 +14,7 @@ defmodule Meeng.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: [],
       description:
-        "Meeng.dev SDK for Elixir: emails, domains, contacts, contact books, campaigns, analytics and webhooks.",
+        "SDK do Meeng.dev para Elixir: e-mails, domínios, contatos, listas de contatos, campanhas, análises e webhooks.",
       package: package(),
       source_url: @source_url,
       homepage_url: "https://meeng.dev"

@@ -2,9 +2,7 @@
 
 SDK do Meeng.dev para Swift 6 (macOS 12, iOS 15, tvOS 15, watchOS 8 e visionOS 1 ou mais novos): e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Usa `async`/`await`, `Codable` e `URLSession`, sem dependências. A verificação de webhooks usa o CryptoKit, então só existe nas plataformas da Apple.
 
-Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão 1.0.0); não edite à mão.
-
-> O pacote ainda não foi publicado: o nome (`github.com/meeng-dev/sdk`, produto `Meeng`) é uma proposta aguardando confirmação.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev (versão 1.0.0); não edite à mão.
 
 ## Começando
 

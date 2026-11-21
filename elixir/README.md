@@ -2,9 +2,7 @@
 
 SDK do Meeng.dev para Elixir 1.18 ou mais novo: e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Sem dependências além da biblioteca padrão (`:httpc` e o módulo `JSON`).
 
-Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão 1.0.0); não edite à mão.
-
-> O pacote ainda não foi publicado: o nome `meeng_sdk` (Hex) é uma proposta aguardando confirmação.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev (versão 1.0.0); não edite à mão.
 
 ## Começando
 

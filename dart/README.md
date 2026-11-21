@@ -2,9 +2,7 @@
 
 SDK do Meeng.dev para Dart 3.8 ou mais novo e Flutter: e-mails, domínios, contatos, listas de contatos, campanhas, analytics e webhooks. Depende só de `http` e `crypto`, ambos do dart.dev.
 
-Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev do Meeng.dev (versão 1.0.0); não edite à mão.
-
-> O pacote ainda não foi publicado (`publish_to: none`): o nome `meeng_sdk` (pub.dev) é uma proposta aguardando confirmação.
+Gerado pelo `sdk/generator` a partir do contrato da API do Meeng.dev (versão 1.0.0); não edite à mão.
 
 ## Começando
 

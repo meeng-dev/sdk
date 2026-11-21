@@ -76,9 +76,9 @@ O `cmd/sdkgen` roda `dart format` sobre o Dart gerado, com versão de linguagem 
 
 ## Names
 
-Os nomes públicos são **propostas** até o Paulo confirmar ([[GAP-public-names]]; regra global `public-names-ask-first`). O padrão é o do GitHub, `<organização>/<repositório>`: organização `meeng-dev`, pacote `sdk`.
+Os nomes públicos foram **confirmados pelo Paulo** (regra global `public-names-ask-first`). O padrão é o do GitHub, `<organização>/<repositório>`: organização `meeng-dev`, pacote `sdk`. Em todo registro que oferece organização, o pacote pertence à organização `meeng-dev`.
 
-| Registro | Nome proposto |
+| Registro | Nome |
 |---|---|
 | Go | `github.com/meeng-dev/sdk/go` |
 | npm | `@meeng-dev/sdk` |
@@ -89,8 +89,8 @@ Os nomes públicos são **propostas** até o Paulo confirmar ([[GAP-public-names
 | Hex, pub.dev | `meeng_sdk` |
 | Swift (SwiftPM) | `https://github.com/meeng-dev/sdk`, produto `Meeng` |
 
-Nenhum pacote foi publicado, e cada um está marcado para não sair por engano: `"private": true` no npm, o classificador `Private :: Do Not Upload` no PyPI, `publish = false` no Cargo, `publish_to: none` no pub.dev, `allowed_push_host` inválido no RubyGems e `IsPackable` falso no NuGet. Quem publicar tira a marca junto com a confirmação do nome. Nunca renomeie nem acrescente um pacote sem a confirmação do Paulo.
+Nunca renomeie nem acrescente um pacote sem a confirmação do Paulo. Os textos que a pessoa lê nos pacotes (descrição, resumo, README) são em português do Brasil e nunca citam outro produto de e-mail.
 
 ## Release
 
-Uma versão para todas as linguagens. Ainda não há release: a `VERSION` é `0.1.0`, o primeiro conjunto. Quando houver autorização: suba o `VERSION`, rode `./regen.sh` e `./check.sh`, faça o commit no `develop` e avance o `main` depois da CI; tag `vX.Y.Z` e `go/vX.Y.Z` no mesmo commit. O fluxo de publicação por registro (confiança por OIDC onde houver) será escrito quando os nomes forem confirmados.
+Uma versão para todas as linguagens. Suba o `VERSION`, rode `./regen.sh` e `./check.sh`, faça o commit no `develop` e avance o `main` depois da CI; tag `vX.Y.Z` e `go/vX.Y.Z` no mesmo commit, empurradas juntas. A tag `v` roda `.github/workflows/release.yml`, que publica npm, PyPI, RubyGems, crates.io, Hex, pub.dev, NuGet e Maven Central (publicação confiável por OIDC onde o registro tem; segredos no Maven Central e o nome da conta no NuGet; cada job pula uma versão que o registro já tem); a tag `go/` é a versão do módulo Go, e o Swift e o Packagist leem a tag `v` pelo `Package.swift` e pelo `composer.json` da raiz, que são escritos à mão e devem acompanhar `swift/Package.swift` e `php/composer.json`. A configuração única de cada registro está em `RELEASING.md`. Publicar exige autorização do Paulo.

@@ -6,15 +6,13 @@ Gem::Specification.new do |spec|
   spec.name = "meeng-sdk"
   spec.version = "0.1.0"
   spec.authors = ["meeng"]
-  spec.summary = "Meeng.dev SDK for Ruby: emails, domains, contacts, contact books, campaigns, analytics and webhooks."
+  spec.summary = "SDK do Meeng.dev para Ruby: e-mails, domínios, contatos, listas de contatos, campanhas, análises e webhooks."
   spec.homepage = "https://meeng.dev"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1"
   spec.files = Dir["lib/**/*.rb"] + ["README.md"]
   spec.require_paths = ["lib"]
   spec.metadata = {
-    # Not published until the names are confirmed: gem push refuses this host.
-    "allowed_push_host" => "https://rubygems.invalid",
     "homepage_uri" => "https://meeng.dev",
     "source_code_uri" => "https://github.com/meeng-dev/sdk",
     "rubygems_mfa_required" => "true"

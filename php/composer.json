@@ -1,6 +1,6 @@
 {
     "name": "meeng-dev/sdk",
-    "description": "Meeng.dev SDK for PHP: emails, domains, contacts, contact books, campaigns, analytics and webhooks.",
+    "description": "SDK do Meeng.dev para PHP: e-mails, domínios, contatos, listas de contatos, campanhas, análises e webhooks.",
     "type": "library",
     "license": "MIT",
     "homepage": "https://meeng.dev",
