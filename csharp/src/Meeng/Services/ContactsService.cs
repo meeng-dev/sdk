@@ -143,16 +143,16 @@ public sealed record ContactsCreateParams
 /// <summary>The filters of contacts.list.</summary>
 public sealed record ContactsListQuery
 {
-    /// <summary>Comma separated e-mail addresses; an exact match.</summary>
+    /// <summary>Endereços de e-mail separados por vírgula; correspondência exata.</summary>
     public string? Emails { get; init; }
 
-    /// <summary>The page, from 1.</summary>
+    /// <summary>A página, a partir de 1.</summary>
     public int? Page { get; init; }
 
-    /// <summary>Contacts to a page; 5000 when it is not given.</summary>
+    /// <summary>Contatos por página; 5000 quando não é informado.</summary>
     public int? Limit { get; init; }
 
-    /// <summary>Comma separated contact ids.</summary>
+    /// <summary>Ids de contatos separados por vírgula.</summary>
     public string? Ids { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()

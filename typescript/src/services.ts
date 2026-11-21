@@ -120,13 +120,13 @@ export class DomainsService {
 
 /** The filters of contacts.list. */
 export interface ContactsListQuery {
-  /** Comma separated e-mail addresses; an exact match. */
+  /** Endereços de e-mail separados por vírgula; correspondência exata. */
   emails?: string;
-  /** The page, from 1. */
+  /** A página, a partir de 1. */
   page?: number;
-  /** Contacts to a page; 5000 when it is not given. */
+  /** Contatos por página; 5000 quando não é informado. */
   limit?: number;
-  /** Comma separated contact ids. */
+  /** Ids de contatos separados por vírgula. */
   ids?: string;
 }
 
@@ -241,11 +241,11 @@ export class ContactBooksService {
 
 /** The filters of campaigns.list. */
 export interface CampaignsListQuery {
-  /** The page, from 1; 30 campaigns to a page. */
+  /** A página, a partir de 1; 30 campanhas por página. */
   page?: number;
-  /** Only campaigns in this status. */
+  /** Só campanhas neste status. */
   status?: string;
-  /** Part of the name or of the subject. */
+  /** Parte do nome ou do assunto. */
   search?: string;
 }
 
@@ -314,15 +314,15 @@ export class CampaignsService {
 
 /** The filters of analytics.emailTimeSeries. */
 export interface AnalyticsEmailTimeSeriesQuery {
-  /** How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today. */
+  /** Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje. */
   days?: string;
-  /** Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. */
+  /** Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro. */
   domainId?: string;
 }
 
 /** The filters of analytics.reputationMetrics. */
 export interface AnalyticsReputationMetricsQuery {
-  /** Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. */
+  /** Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro. */
   domainId?: string;
 }
 

@@ -18,7 +18,7 @@ final class EmailsService
     /**
      * Sends an email, now or at scheduledAt.
      *
-     * @param array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, mixed>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, mixed>, 'attachments'?: list<array{'filename': string, 'content': string}>, 'scheduledAt'?: string, 'inReplyToId'?: string|null} $payload
+     * @param array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, mixed>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, mixed>, 'scheduledAt'?: string, 'inReplyToId'?: string|null} $payload
      * @param string|null $idempotencyKey makes the send safe to retry: the same key with the same body answers the first result again
      * @return array{'emailId': string}
      */
@@ -31,7 +31,7 @@ final class EmailsService
     /**
      * Sends up to 100 emails in one request.
      *
-     * @param list<array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, mixed>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, mixed>, 'attachments'?: list<array{'filename': string, 'content': string}>, 'scheduledAt'?: string, 'inReplyToId'?: string|null}> $payload
+     * @param list<array{'to': string|list<string>, 'from': string, 'subject'?: string, 'templateId'?: string, 'variables'?: array<string, mixed>, 'replyTo'?: string|list<string>, 'cc'?: string|list<string>, 'bcc'?: string|list<string>, 'text'?: string|null, 'html'?: string|null, 'headers'?: array<string, mixed>, 'scheduledAt'?: string, 'inReplyToId'?: string|null}> $payload
      * @param string|null $idempotencyKey makes the send safe to retry: the same key with the same body answers the first result again
      * @return array{'data': list<array{'emailId': string}>}
      */

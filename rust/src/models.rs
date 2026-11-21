@@ -1321,28 +1321,6 @@ impl DomainsCreateParams {
     }
 }
 
-/// One item of attachments in EmailsBatchParams.
-///
-/// [`EmailsBatchAttachment::new`] takes the required fields; each optional one is set by
-/// the method of its name.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct EmailsBatchAttachment {
-    pub filename: String,
-    /// The file, in base64.
-    pub content: String,
-}
-
-impl EmailsBatchAttachment {
-    /// A body with its required fields.
-    pub fn new(filename: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            filename: filename.into(),
-            content: content.into(),
-        }
-    }
-}
-
 /// One item of the list emails.batch takes.
 ///
 /// [`EmailsBatchParams::new`] takes the required fields; each optional one is set by
@@ -1353,13 +1331,13 @@ pub struct EmailsBatchParams {
     #[serde(deserialize_with = "crate::json::string_list")]
     pub to: Vec<String>,
     pub from: String,
-    /// Optional when templateId is provided.
+    /// Opcional quando templateId é informado.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
-    /// ID of a template from the dashboard.
+    /// ID de um modelo criado no painel.
     #[serde(rename = "templateId", default, skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
-    /// The values of the template's variables, as text.
+    /// Os valores das variáveis do modelo, em texto.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
@@ -1372,11 +1350,9 @@ pub struct EmailsBatchParams {
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
-    /// Custom headers to include with the e-mail, name to value.
+    /// Cabeçalhos personalizados do e-mail, do nome ao valor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub headers: Option<std::collections::HashMap<String, serde_json::Value>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<Vec<EmailsBatchAttachment>>,
     #[serde(rename = "scheduledAt", default, skip_serializing_if = "Option::is_none")]
     pub scheduled_at: Option<String>,
     #[serde(rename = "inReplyToId", default, skip_serializing_if = "Option::is_none")]
@@ -1398,25 +1374,24 @@ impl EmailsBatchParams {
             text: None,
             html: None,
             headers: None,
-            attachments: None,
             scheduled_at: None,
             in_reply_to_id: None,
         }
     }
 
-    /// Optional when templateId is provided.
+    /// Opcional quando templateId é informado.
     pub fn subject(mut self, subject: impl Into<String>) -> Self {
         self.subject = Some(subject.into());
         self
     }
 
-    /// ID of a template from the dashboard.
+    /// ID de um modelo criado no painel.
     pub fn template_id(mut self, template_id: impl Into<String>) -> Self {
         self.template_id = Some(template_id.into());
         self
     }
 
-    /// The values of the template's variables, as text.
+    /// Os valores das variáveis do modelo, em texto.
     pub fn variables(mut self, variables: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.variables = Some(variables);
         self
@@ -1452,15 +1427,9 @@ impl EmailsBatchParams {
         self
     }
 
-    /// Custom headers to include with the e-mail, name to value.
+    /// Cabeçalhos personalizados do e-mail, do nome ao valor.
     pub fn headers(mut self, headers: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.headers = Some(headers);
-        self
-    }
-
-    /// Sets `attachments`.
-    pub fn attachments(mut self, attachments: Vec<EmailsBatchAttachment>) -> Self {
-        self.attachments = Some(attachments);
         self
     }
 
@@ -1477,28 +1446,6 @@ impl EmailsBatchParams {
     }
 }
 
-/// One item of attachments in EmailsSendParams.
-///
-/// [`EmailsSendAttachment::new`] takes the required fields; each optional one is set by
-/// the method of its name.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct EmailsSendAttachment {
-    pub filename: String,
-    /// The file, in base64.
-    pub content: String,
-}
-
-impl EmailsSendAttachment {
-    /// A body with its required fields.
-    pub fn new(filename: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            filename: filename.into(),
-            content: content.into(),
-        }
-    }
-}
-
 /// The body of emails.send.
 ///
 /// [`EmailsSendParams::new`] takes the required fields; each optional one is set by
@@ -1509,13 +1456,13 @@ pub struct EmailsSendParams {
     #[serde(deserialize_with = "crate::json::string_list")]
     pub to: Vec<String>,
     pub from: String,
-    /// Optional when templateId is provided.
+    /// Opcional quando templateId é informado.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
-    /// ID of a template from the dashboard.
+    /// ID de um modelo criado no painel.
     #[serde(rename = "templateId", default, skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
-    /// The values of the template's variables, as text.
+    /// Os valores das variáveis do modelo, em texto.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variables: Option<std::collections::HashMap<String, serde_json::Value>>,
     #[serde(rename = "replyTo", default, skip_serializing_if = "Option::is_none", deserialize_with = "crate::json::optional_string_list")]
@@ -1528,11 +1475,9 @@ pub struct EmailsSendParams {
     pub text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
-    /// Custom headers to include with the e-mail, name to value.
+    /// Cabeçalhos personalizados do e-mail, do nome ao valor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub headers: Option<std::collections::HashMap<String, serde_json::Value>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<Vec<EmailsSendAttachment>>,
     #[serde(rename = "scheduledAt", default, skip_serializing_if = "Option::is_none")]
     pub scheduled_at: Option<String>,
     #[serde(rename = "inReplyToId", default, skip_serializing_if = "Option::is_none")]
@@ -1554,25 +1499,24 @@ impl EmailsSendParams {
             text: None,
             html: None,
             headers: None,
-            attachments: None,
             scheduled_at: None,
             in_reply_to_id: None,
         }
     }
 
-    /// Optional when templateId is provided.
+    /// Opcional quando templateId é informado.
     pub fn subject(mut self, subject: impl Into<String>) -> Self {
         self.subject = Some(subject.into());
         self
     }
 
-    /// ID of a template from the dashboard.
+    /// ID de um modelo criado no painel.
     pub fn template_id(mut self, template_id: impl Into<String>) -> Self {
         self.template_id = Some(template_id.into());
         self
     }
 
-    /// The values of the template's variables, as text.
+    /// Os valores das variáveis do modelo, em texto.
     pub fn variables(mut self, variables: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.variables = Some(variables);
         self
@@ -1608,15 +1552,9 @@ impl EmailsSendParams {
         self
     }
 
-    /// Custom headers to include with the e-mail, name to value.
+    /// Cabeçalhos personalizados do e-mail, do nome ao valor.
     pub fn headers(mut self, headers: std::collections::HashMap<String, serde_json::Value>) -> Self {
         self.headers = Some(headers);
-        self
-    }
-
-    /// Sets `attachments`.
-    pub fn attachments(mut self, attachments: Vec<EmailsSendAttachment>) -> Self {
-        self.attachments = Some(attachments);
         self
     }
 

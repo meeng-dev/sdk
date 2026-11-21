@@ -223,13 +223,13 @@ impl<'a> DomainsService<'a> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ContactsListQuery {
-    /// Comma separated e-mail addresses; an exact match.
+    /// Endereços de e-mail separados por vírgula; correspondência exata.
     pub emails: Option<String>,
-    /// The page, from 1.
+    /// A página, a partir de 1.
     pub page: Option<u32>,
-    /// Contacts to a page; 5000 when it is not given.
+    /// Contatos por página; 5000 quando não é informado.
     pub limit: Option<u32>,
-    /// Comma separated contact ids.
+    /// Ids de contatos separados por vírgula.
     pub ids: Option<String>,
 }
 
@@ -239,25 +239,25 @@ impl ContactsListQuery {
         Self::default()
     }
 
-    /// Comma separated e-mail addresses; an exact match.
+    /// Endereços de e-mail separados por vírgula; correspondência exata.
     pub fn emails(mut self, emails: impl Into<String>) -> Self {
         self.emails = Some(emails.into());
         self
     }
 
-    /// The page, from 1.
+    /// A página, a partir de 1.
     pub fn page(mut self, page: u32) -> Self {
         self.page = Some(page);
         self
     }
 
-    /// Contacts to a page; 5000 when it is not given.
+    /// Contatos por página; 5000 quando não é informado.
     pub fn limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }
 
-    /// Comma separated contact ids.
+    /// Ids de contatos separados por vírgula.
     pub fn ids(mut self, ids: impl Into<String>) -> Self {
         self.ids = Some(ids.into());
         self
@@ -398,11 +398,11 @@ impl<'a> ContactBooksService<'a> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CampaignsListQuery {
-    /// The page, from 1; 30 campaigns to a page.
+    /// A página, a partir de 1; 30 campanhas por página.
     pub page: Option<u32>,
-    /// Only campaigns in this status.
+    /// Só campanhas neste status.
     pub status: Option<String>,
-    /// Part of the name or of the subject.
+    /// Parte do nome ou do assunto.
     pub search: Option<String>,
 }
 
@@ -412,19 +412,19 @@ impl CampaignsListQuery {
         Self::default()
     }
 
-    /// The page, from 1; 30 campaigns to a page.
+    /// A página, a partir de 1; 30 campanhas por página.
     pub fn page(mut self, page: u32) -> Self {
         self.page = Some(page);
         self
     }
 
-    /// Only campaigns in this status.
+    /// Só campanhas neste status.
     pub fn status(mut self, status: impl Into<String>) -> Self {
         self.status = Some(status.into());
         self
     }
 
-    /// Part of the name or of the subject.
+    /// Parte do nome ou do assunto.
     pub fn search(mut self, search: impl Into<String>) -> Self {
         self.search = Some(search.into());
         self
@@ -508,9 +508,9 @@ impl<'a> CampaignsService<'a> {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct AnalyticsEmailTimeSeriesQuery {
-    /// How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
+    /// Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.
     pub days: Option<String>,
-    /// Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    /// Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     pub domain_id: Option<String>,
 }
 
@@ -520,13 +520,13 @@ impl AnalyticsEmailTimeSeriesQuery {
         Self::default()
     }
 
-    /// How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
+    /// Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.
     pub fn days(mut self, days: impl Into<String>) -> Self {
         self.days = Some(days.into());
         self
     }
 
-    /// Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    /// Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     pub fn domain_id(mut self, domain_id: impl Into<String>) -> Self {
         self.domain_id = Some(domain_id.into());
         self
@@ -548,7 +548,7 @@ impl AnalyticsEmailTimeSeriesQuery {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct AnalyticsReputationMetricsQuery {
-    /// Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    /// Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     pub domain_id: Option<String>,
 }
 
@@ -558,7 +558,7 @@ impl AnalyticsReputationMetricsQuery {
         Self::default()
     }
 
-    /// Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    /// Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     pub fn domain_id(mut self, domain_id: impl Into<String>) -> Self {
         self.domain_id = Some(domain_id.into());
         self

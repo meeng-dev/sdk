@@ -62,6 +62,9 @@ type Model struct {
 	Fields      []*Field
 	// Input says the model is sent, not read.
 	Input bool
+	// Refused are the fields the contract lists and the API takes only empty
+	// (attachments, ADR-0008); no SDK has them.
+	Refused []string
 }
 
 // Field is one property of a model.
@@ -228,9 +231,18 @@ type schema struct {
 	Required   []string   `json:"required"`
 	Properties properties `json:"properties"`
 	Items      *schema    `json:"items"`
+	// MaxItems is the longest a list may be; 0 with no items says a field the
+	// API does not take (attachments, ADR-0008).
+	MaxItems *int `json:"maxItems"`
 	// AdditionalProperties is a schema, or a boolean for a closed or open object.
 	AdditionalProperties json.RawMessage `json:"additionalProperties"`
 	AnyOf                []*schema       `json:"anyOf"`
+}
+
+// refused says the schema is a list the API takes only empty: a field it does
+// not support, which the contract keeps in the body so a caller is told why.
+func (s *schema) refused() bool {
+	return s.Ref == "" && s.kind() == "array" && s.Items == nil && s.MaxItems != nil && *s.MaxItems == 0
 }
 
 // isNull says the schema is the JSON null: {"type": "null"}.
@@ -735,6 +747,12 @@ func (l *loader) modelOf(name string, s *schema, input bool) (*Model, error) {
 		if err := checkIdentifier("field of "+name, wire); err != nil {
 			return nil, err
 		}
+		if input && property.refused() {
+			// The API refuses this field with a 400 when it holds anything, so no
+			// SDK offers it: a caller cannot send what the type does not have.
+			model.Refused = append(model.Refused, wire)
+			continue
+		}
 		property, err := l.nest(name, wire, property, input)
 		if err != nil {
 			return nil, err
@@ -751,7 +769,7 @@ func (l *loader) modelOf(name string, s *schema, input bool) (*Model, error) {
 // nest turns an object a schema writes inline -- a property that is an object
 // with properties of its own, or an array of such objects -- into a model of
 // its own, named after the model it sits in and the property: the attachments
-// of EmailsSendParams are EmailsSendAttachment, and the dnsRecords of Domain
+// of a body would be its Attachment, and the dnsRecords of Domain
 // its DomainDnsRecord. The property is read as a reference to that model.
 func (l *loader) nest(parent, wire string, property *schema, input bool) (*schema, error) {
 	base := strings.TrimSuffix(strings.TrimSuffix(parent, "Params"), "Response")

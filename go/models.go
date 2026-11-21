@@ -566,13 +566,6 @@ type EmailSuppressedSuppression struct {
 	Source string `json:"source,omitempty"`
 }
 
-// One item of attachments in EmailsBatchParams.
-type EmailsBatchAttachment struct {
-	Filename string `json:"filename"`
-	// The file, in base64.
-	Content string `json:"content"`
-}
-
 // One item of data in EmailsBatchResponse.
 type EmailsBatchItem struct {
 	EmailID string `json:"emailId"`
@@ -582,22 +575,21 @@ type EmailsBatchItem struct {
 type EmailsBatchParams struct {
 	To   StringList `json:"to"`
 	From string     `json:"from"`
-	// Optional when templateId is provided.
+	// Opcional quando templateId é informado.
 	Subject *string `json:"subject,omitempty"`
-	// ID of a template from the dashboard.
+	// ID de um modelo criado no painel.
 	TemplateID *string `json:"templateId,omitempty"`
-	// The values of the template's variables, as text.
+	// Os valores das variáveis do modelo, em texto.
 	Variables map[string]any `json:"variables,omitempty"`
 	ReplyTo   StringList     `json:"replyTo,omitempty"`
 	Cc        StringList     `json:"cc,omitempty"`
 	Bcc       StringList     `json:"bcc,omitempty"`
 	Text      *string        `json:"text,omitempty"`
 	HTML      *string        `json:"html,omitempty"`
-	// Custom headers to include with the e-mail, name to value.
-	Headers     map[string]any          `json:"headers,omitempty"`
-	Attachments []EmailsBatchAttachment `json:"attachments,omitempty"`
-	ScheduledAt *string                 `json:"scheduledAt,omitempty"`
-	InReplyToID *string                 `json:"inReplyToId,omitempty"`
+	// Cabeçalhos personalizados do e-mail, do nome ao valor.
+	Headers     map[string]any `json:"headers,omitempty"`
+	ScheduledAt *string        `json:"scheduledAt,omitempty"`
+	InReplyToID *string        `json:"inReplyToId,omitempty"`
 }
 
 // EmailsBatchResponse is a resource of meeng's API.
@@ -634,33 +626,25 @@ type EmailsListResponse struct {
 	Count int64            `json:"count"`
 }
 
-// One item of attachments in EmailsSendParams.
-type EmailsSendAttachment struct {
-	Filename string `json:"filename"`
-	// The file, in base64.
-	Content string `json:"content"`
-}
-
 // The body of emails.send.
 type EmailsSendParams struct {
 	To   StringList `json:"to"`
 	From string     `json:"from"`
-	// Optional when templateId is provided.
+	// Opcional quando templateId é informado.
 	Subject *string `json:"subject,omitempty"`
-	// ID of a template from the dashboard.
+	// ID de um modelo criado no painel.
 	TemplateID *string `json:"templateId,omitempty"`
-	// The values of the template's variables, as text.
+	// Os valores das variáveis do modelo, em texto.
 	Variables map[string]any `json:"variables,omitempty"`
 	ReplyTo   StringList     `json:"replyTo,omitempty"`
 	Cc        StringList     `json:"cc,omitempty"`
 	Bcc       StringList     `json:"bcc,omitempty"`
 	Text      *string        `json:"text,omitempty"`
 	HTML      *string        `json:"html,omitempty"`
-	// Custom headers to include with the e-mail, name to value.
-	Headers     map[string]any         `json:"headers,omitempty"`
-	Attachments []EmailsSendAttachment `json:"attachments,omitempty"`
-	ScheduledAt *string                `json:"scheduledAt,omitempty"`
-	InReplyToID *string                `json:"inReplyToId,omitempty"`
+	// Cabeçalhos personalizados do e-mail, do nome ao valor.
+	Headers     map[string]any `json:"headers,omitempty"`
+	ScheduledAt *string        `json:"scheduledAt,omitempty"`
+	InReplyToID *string        `json:"inReplyToId,omitempty"`
 }
 
 // EmailsSendResponse is a resource of meeng's API.

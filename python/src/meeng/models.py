@@ -516,12 +516,6 @@ EmailSuppressedPayload = TypedDict("EmailSuppressedPayload", {
     "suppression": EmailSuppressedSuppression,
 })
 
-# One item of attachments in EmailsBatchParams.
-EmailsBatchAttachment = TypedDict("EmailsBatchAttachment", {
-    "filename": str,
-    "content": str,
-})
-
 # One item of data in EmailsBatchResponse.
 EmailsBatchItem = TypedDict("EmailsBatchItem", {
     "emailId": str,
@@ -540,7 +534,6 @@ EmailsBatchParams = TypedDict("EmailsBatchParams", {
     "text": NotRequired[str | None],
     "html": NotRequired[str | None],
     "headers": NotRequired[dict[str, Any]],
-    "attachments": NotRequired[list[EmailsBatchAttachment]],
     "scheduledAt": NotRequired[str],
     "inReplyToId": NotRequired[str | None],
 })
@@ -576,12 +569,6 @@ EmailsListResponse = TypedDict("EmailsListResponse", {
     "count": int,
 })
 
-# One item of attachments in EmailsSendParams.
-EmailsSendAttachment = TypedDict("EmailsSendAttachment", {
-    "filename": str,
-    "content": str,
-})
-
 # The body of emails.send.
 EmailsSendParams = TypedDict("EmailsSendParams", {
     "to": str | list[str],
@@ -595,7 +582,6 @@ EmailsSendParams = TypedDict("EmailsSendParams", {
     "text": NotRequired[str | None],
     "html": NotRequired[str | None],
     "headers": NotRequired[dict[str, Any]],
-    "attachments": NotRequired[list[EmailsSendAttachment]],
     "scheduledAt": NotRequired[str],
     "inReplyToId": NotRequired[str | None],
 })

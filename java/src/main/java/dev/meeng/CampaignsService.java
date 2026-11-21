@@ -362,17 +362,17 @@ public final class CampaignsService {
             return new Builder();
         }
 
-        /** @return The page, from 1; 30 campaigns to a page. (null when not filtered) */
+        /** @return A página, a partir de 1; 30 campanhas por página. (null when not filtered) */
         public Integer getPage() {
             return page;
         }
 
-        /** @return Only campaigns in this status. (null when not filtered) */
+        /** @return Só campanhas neste status. (null when not filtered) */
         public String getStatus() {
             return status;
         }
 
-        /** @return Part of the name or of the subject. (null when not filtered) */
+        /** @return Parte do nome ou do assunto. (null when not filtered) */
         public String getSearch() {
             return search;
         }
@@ -395,7 +395,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param page The page, from 1; 30 campaigns to a page.
+             * @param page A página, a partir de 1; 30 campanhas por página.
              * @return this builder
              */
             public Builder page(Integer page) {
@@ -404,7 +404,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param status Only campaigns in this status.
+             * @param status Só campanhas neste status.
              * @return this builder
              */
             public Builder status(String status) {
@@ -413,7 +413,7 @@ public final class CampaignsService {
             }
 
             /**
-             * @param search Part of the name or of the subject.
+             * @param search Parte do nome ou do assunto.
              * @return this builder
              */
             public Builder search(String search) {

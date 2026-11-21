@@ -52,7 +52,6 @@ public final class EmailsService {
         private final String text;
         private final String html;
         private final Map<String, Object> headers;
-        private final List<EmailsSendAttachment> attachments;
         private final String scheduledAt;
         private final String inReplyToId;
 
@@ -68,7 +67,6 @@ public final class EmailsService {
             this.text = builder.text;
             this.html = builder.html;
             this.headers = builder.headers;
-            this.attachments = builder.attachments;
             this.scheduledAt = builder.scheduledAt;
             this.inReplyToId = builder.inReplyToId;
         }
@@ -88,17 +86,17 @@ public final class EmailsService {
             return from;
         }
 
-        /** @return Optional when templateId is provided. (null when left out) */
+        /** @return Opcional quando templateId é informado. (null when left out) */
         public String getSubject() {
             return subject;
         }
 
-        /** @return ID of a template from the dashboard. (null when left out) */
+        /** @return ID de um modelo criado no painel. (null when left out) */
         public String getTemplateId() {
             return templateId;
         }
 
-        /** @return The values of the template's variables, as text. (null when left out) */
+        /** @return Os valores das variáveis do modelo, em texto. (null when left out) */
         public Map<String, Object> getVariables() {
             return variables;
         }
@@ -128,14 +126,9 @@ public final class EmailsService {
             return html;
         }
 
-        /** @return Custom headers to include with the e-mail, name to value. (null when left out) */
+        /** @return Cabeçalhos personalizados do e-mail, do nome ao valor. (null when left out) */
         public Map<String, Object> getHeaders() {
             return headers;
-        }
-
-        /** @return the {@code attachments} sent (null when left out) */
-        public List<EmailsSendAttachment> getAttachments() {
-            return attachments;
         }
 
         /** @return the {@code scheduledAt} sent (null when left out) */
@@ -179,9 +172,6 @@ public final class EmailsService {
             if (headers != null) {
                 body.put("headers", headers);
             }
-            if (attachments != null) {
-                body.put("attachments", Json.toJsonList(attachments, EmailsSendAttachment::toJson));
-            }
             if (scheduledAt != null) {
                 body.put("scheduledAt", scheduledAt);
             }
@@ -204,7 +194,6 @@ public final class EmailsService {
             private String text;
             private String html;
             private Map<String, Object> headers;
-            private List<EmailsSendAttachment> attachments;
             private String scheduledAt;
             private String inReplyToId;
 
@@ -230,7 +219,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param subject Optional when templateId is provided.
+             * @param subject Opcional quando templateId é informado.
              * @return this builder
              */
             public Builder subject(String subject) {
@@ -239,7 +228,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param templateId ID of a template from the dashboard.
+             * @param templateId ID de um modelo criado no painel.
              * @return this builder
              */
             public Builder templateId(String templateId) {
@@ -248,7 +237,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param variables The values of the template's variables, as text.
+             * @param variables Os valores das variáveis do modelo, em texto.
              * @return this builder
              */
             public Builder variables(Map<String, Object> variables) {
@@ -302,20 +291,11 @@ public final class EmailsService {
             }
 
             /**
-             * @param headers Custom headers to include with the e-mail, name to value.
+             * @param headers Cabeçalhos personalizados do e-mail, do nome ao valor.
              * @return this builder
              */
             public Builder headers(Map<String, Object> headers) {
                 this.headers = headers;
-                return this;
-            }
-
-            /**
-             * @param attachments the {@code attachments} to send
-             * @return this builder
-             */
-            public Builder attachments(List<EmailsSendAttachment> attachments) {
-                this.attachments = attachments;
                 return this;
             }
 
@@ -349,82 +329,6 @@ public final class EmailsService {
                     throw new IllegalStateException("meeng: SendParams needs from");
                 }
                 return new SendParams(this);
-            }
-        }
-    }
-
-
-    /** One item of attachments in EmailsSendParams. */
-    public static final class EmailsSendAttachment {
-
-        private final String filename;
-        private final String content;
-
-        private EmailsSendAttachment(Builder builder) {
-            this.filename = builder.filename;
-            this.content = builder.content;
-        }
-
-        /** @return a builder of the request */
-        public static Builder builder() {
-            return new Builder();
-        }
-
-        /** @return the {@code filename} sent */
-        public String getFilename() {
-            return filename;
-        }
-
-        /** @return The file, in base64. */
-        public String getContent() {
-            return content;
-        }
-
-        Map<String, Object> toJson() {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("filename", filename);
-            body.put("content", content);
-            return body;
-        }
-
-        /** Builds {@link EmailsSendAttachment}; the fields left unset are left out of the request. */
-        public static final class Builder {
-            private String filename;
-            private String content;
-
-            private Builder() {
-            }
-
-            /**
-             * @param filename the {@code filename} to send (required)
-             * @return this builder
-             */
-            public Builder filename(String filename) {
-                this.filename = filename;
-                return this;
-            }
-
-            /**
-             * @param content The file, in base64. (required)
-             * @return this builder
-             */
-            public Builder content(String content) {
-                this.content = content;
-                return this;
-            }
-
-            /**
-             * @return the request
-             * @throws IllegalStateException when a required field is unset
-             */
-            public EmailsSendAttachment build() {
-                if (filename == null) {
-                    throw new IllegalStateException("meeng: EmailsSendAttachment needs filename");
-                }
-                if (content == null) {
-                    throw new IllegalStateException("meeng: EmailsSendAttachment needs content");
-                }
-                return new EmailsSendAttachment(this);
             }
         }
     }
@@ -466,7 +370,6 @@ public final class EmailsService {
         private final String text;
         private final String html;
         private final Map<String, Object> headers;
-        private final List<EmailsBatchAttachment> attachments;
         private final String scheduledAt;
         private final String inReplyToId;
 
@@ -482,7 +385,6 @@ public final class EmailsService {
             this.text = builder.text;
             this.html = builder.html;
             this.headers = builder.headers;
-            this.attachments = builder.attachments;
             this.scheduledAt = builder.scheduledAt;
             this.inReplyToId = builder.inReplyToId;
         }
@@ -502,17 +404,17 @@ public final class EmailsService {
             return from;
         }
 
-        /** @return Optional when templateId is provided. (null when left out) */
+        /** @return Opcional quando templateId é informado. (null when left out) */
         public String getSubject() {
             return subject;
         }
 
-        /** @return ID of a template from the dashboard. (null when left out) */
+        /** @return ID de um modelo criado no painel. (null when left out) */
         public String getTemplateId() {
             return templateId;
         }
 
-        /** @return The values of the template's variables, as text. (null when left out) */
+        /** @return Os valores das variáveis do modelo, em texto. (null when left out) */
         public Map<String, Object> getVariables() {
             return variables;
         }
@@ -542,14 +444,9 @@ public final class EmailsService {
             return html;
         }
 
-        /** @return Custom headers to include with the e-mail, name to value. (null when left out) */
+        /** @return Cabeçalhos personalizados do e-mail, do nome ao valor. (null when left out) */
         public Map<String, Object> getHeaders() {
             return headers;
-        }
-
-        /** @return the {@code attachments} sent (null when left out) */
-        public List<EmailsBatchAttachment> getAttachments() {
-            return attachments;
         }
 
         /** @return the {@code scheduledAt} sent (null when left out) */
@@ -593,9 +490,6 @@ public final class EmailsService {
             if (headers != null) {
                 body.put("headers", headers);
             }
-            if (attachments != null) {
-                body.put("attachments", Json.toJsonList(attachments, EmailsBatchAttachment::toJson));
-            }
             if (scheduledAt != null) {
                 body.put("scheduledAt", scheduledAt);
             }
@@ -618,7 +512,6 @@ public final class EmailsService {
             private String text;
             private String html;
             private Map<String, Object> headers;
-            private List<EmailsBatchAttachment> attachments;
             private String scheduledAt;
             private String inReplyToId;
 
@@ -644,7 +537,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param subject Optional when templateId is provided.
+             * @param subject Opcional quando templateId é informado.
              * @return this builder
              */
             public Builder subject(String subject) {
@@ -653,7 +546,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param templateId ID of a template from the dashboard.
+             * @param templateId ID de um modelo criado no painel.
              * @return this builder
              */
             public Builder templateId(String templateId) {
@@ -662,7 +555,7 @@ public final class EmailsService {
             }
 
             /**
-             * @param variables The values of the template's variables, as text.
+             * @param variables Os valores das variáveis do modelo, em texto.
              * @return this builder
              */
             public Builder variables(Map<String, Object> variables) {
@@ -716,20 +609,11 @@ public final class EmailsService {
             }
 
             /**
-             * @param headers Custom headers to include with the e-mail, name to value.
+             * @param headers Cabeçalhos personalizados do e-mail, do nome ao valor.
              * @return this builder
              */
             public Builder headers(Map<String, Object> headers) {
                 this.headers = headers;
-                return this;
-            }
-
-            /**
-             * @param attachments the {@code attachments} to send
-             * @return this builder
-             */
-            public Builder attachments(List<EmailsBatchAttachment> attachments) {
-                this.attachments = attachments;
                 return this;
             }
 
@@ -763,82 +647,6 @@ public final class EmailsService {
                     throw new IllegalStateException("meeng: BatchParams needs from");
                 }
                 return new BatchParams(this);
-            }
-        }
-    }
-
-
-    /** One item of attachments in EmailsBatchParams. */
-    public static final class EmailsBatchAttachment {
-
-        private final String filename;
-        private final String content;
-
-        private EmailsBatchAttachment(Builder builder) {
-            this.filename = builder.filename;
-            this.content = builder.content;
-        }
-
-        /** @return a builder of the request */
-        public static Builder builder() {
-            return new Builder();
-        }
-
-        /** @return the {@code filename} sent */
-        public String getFilename() {
-            return filename;
-        }
-
-        /** @return The file, in base64. */
-        public String getContent() {
-            return content;
-        }
-
-        Map<String, Object> toJson() {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("filename", filename);
-            body.put("content", content);
-            return body;
-        }
-
-        /** Builds {@link EmailsBatchAttachment}; the fields left unset are left out of the request. */
-        public static final class Builder {
-            private String filename;
-            private String content;
-
-            private Builder() {
-            }
-
-            /**
-             * @param filename the {@code filename} to send (required)
-             * @return this builder
-             */
-            public Builder filename(String filename) {
-                this.filename = filename;
-                return this;
-            }
-
-            /**
-             * @param content The file, in base64. (required)
-             * @return this builder
-             */
-            public Builder content(String content) {
-                this.content = content;
-                return this;
-            }
-
-            /**
-             * @return the request
-             * @throws IllegalStateException when a required field is unset
-             */
-            public EmailsBatchAttachment build() {
-                if (filename == null) {
-                    throw new IllegalStateException("meeng: EmailsBatchAttachment needs filename");
-                }
-                if (content == null) {
-                    throw new IllegalStateException("meeng: EmailsBatchAttachment needs content");
-                }
-                return new EmailsBatchAttachment(this);
             }
         }
     }

@@ -153,13 +153,13 @@ public sealed record CampaignsCreateParams
 /// <summary>The filters of campaigns.list.</summary>
 public sealed record CampaignsListQuery
 {
-    /// <summary>The page, from 1; 30 campaigns to a page.</summary>
+    /// <summary>A página, a partir de 1; 30 campanhas por página.</summary>
     public int? Page { get; init; }
 
-    /// <summary>Only campaigns in this status.</summary>
+    /// <summary>Só campanhas neste status.</summary>
     public string? Status { get; init; }
 
-    /// <summary>Part of the name or of the subject.</summary>
+    /// <summary>Parte do nome ou do assunto.</summary>
     public string? Search { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()

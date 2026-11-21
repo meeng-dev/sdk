@@ -116,10 +116,10 @@ public struct ContactsService: Sendable {
     /// Lists the contacts of a contact book, optionally by email or id.
     ///
     /// - Parameters:
-    ///   - emails: Comma separated e-mail addresses; an exact match.
-    ///   - page: The page, from 1.
-    ///   - limit: Contacts to a page; 5000 when it is not given.
-    ///   - ids: Comma separated contact ids.
+    ///   - emails: Endereços de e-mail separados por vírgula; correspondência exata.
+    ///   - page: A página, a partir de 1.
+    ///   - limit: Contatos por página; 5000 quando não é informado.
+    ///   - ids: Ids de contatos separados por vírgula.
     public func list(_ contactBookID: String, emails: String? = nil, page: Int? = nil, limit: Int? = nil, ids: String? = nil) async throws -> [Contact] {
         var query: [(String, String?)] = []
         query.append(("emails", emails))
@@ -228,9 +228,9 @@ public struct CampaignsService: Sendable {
     /// Lists campaigns, optionally by status or a search text.
     ///
     /// - Parameters:
-    ///   - page: The page, from 1; 30 campaigns to a page.
-    ///   - status: Only campaigns in this status.
-    ///   - search: Part of the name or of the subject.
+    ///   - page: A página, a partir de 1; 30 campanhas por página.
+    ///   - status: Só campanhas neste status.
+    ///   - search: Parte do nome ou do assunto.
     public func list(page: Int? = nil, status: String? = nil, search: String? = nil) async throws -> CampaignsListResponse {
         var query: [(String, String?)] = []
         query.append(("page", page.map(String.init)))
@@ -284,8 +284,8 @@ public struct AnalyticsService: Sendable {
     /// Counts emails by day over the last 7 or 30 days.
     ///
     /// - Parameters:
-    ///   - days: How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
-    ///   - domainID: Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    ///   - days: Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.
+    ///   - domainID: Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     public func emailTimeSeries(days: String? = nil, domainID: String? = nil) async throws -> AnalyticsEmailTimeSeriesResponse {
         var query: [(String, String?)] = []
         query.append(("days", days))
@@ -298,7 +298,7 @@ public struct AnalyticsService: Sendable {
     /// Reads the bounce and complaint rates of the sending reputation.
     ///
     /// - Parameters:
-    ///   - domainID: Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    ///   - domainID: Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     public func reputationMetrics(domainID: String? = nil) async throws -> AnalyticsReputationMetricsResponse {
         var query: [(String, String?)] = []
         query.append(("domainId", domainID))

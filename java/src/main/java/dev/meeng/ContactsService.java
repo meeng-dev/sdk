@@ -204,22 +204,22 @@ public final class ContactsService {
             return new Builder();
         }
 
-        /** @return Comma separated e-mail addresses; an exact match. (null when not filtered) */
+        /** @return Endereços de e-mail separados por vírgula; correspondência exata. (null when not filtered) */
         public String getEmails() {
             return emails;
         }
 
-        /** @return The page, from 1. (null when not filtered) */
+        /** @return A página, a partir de 1. (null when not filtered) */
         public Integer getPage() {
             return page;
         }
 
-        /** @return Contacts to a page; 5000 when it is not given. (null when not filtered) */
+        /** @return Contatos por página; 5000 quando não é informado. (null when not filtered) */
         public Integer getLimit() {
             return limit;
         }
 
-        /** @return Comma separated contact ids. (null when not filtered) */
+        /** @return Ids de contatos separados por vírgula. (null when not filtered) */
         public String getIds() {
             return ids;
         }
@@ -244,7 +244,7 @@ public final class ContactsService {
             }
 
             /**
-             * @param emails Comma separated e-mail addresses; an exact match.
+             * @param emails Endereços de e-mail separados por vírgula; correspondência exata.
              * @return this builder
              */
             public Builder emails(String emails) {
@@ -253,7 +253,7 @@ public final class ContactsService {
             }
 
             /**
-             * @param page The page, from 1.
+             * @param page A página, a partir de 1.
              * @return this builder
              */
             public Builder page(Integer page) {
@@ -262,7 +262,7 @@ public final class ContactsService {
             }
 
             /**
-             * @param limit Contacts to a page; 5000 when it is not given.
+             * @param limit Contatos por página; 5000 quando não é informado.
              * @return this builder
              */
             public Builder limit(Integer limit) {
@@ -271,7 +271,7 @@ public final class ContactsService {
             }
 
             /**
-             * @param ids Comma separated contact ids.
+             * @param ids Ids de contatos separados por vírgula.
              * @return this builder
              */
             public Builder ids(String ids) {

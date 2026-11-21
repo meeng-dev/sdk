@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "meeng.dev API",
-    "description": "The meeng.dev e-mail API: send e-mails, manage domains, contacts, campaigns, templates, suppressions, webhooks and analytics. Authenticate with `Authorization: Bearer mg_\u003cclientId\u003e_\u003ctoken\u003e`.",
+    "title": "API do Meeng.dev",
+    "description": "API de e-mail do Meeng.dev: envie e-mails, gerencie domínios, listas de contatos, campanhas, modelos, supressões, webhooks e análises. Autentique cada chamada com `Authorization: Bearer mg_\u003cclientId\u003e_\u003ctoken\u003e`, usando uma chave criada no painel.",
     "version": "1.0.0"
   },
   "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
@@ -15,16 +15,16 @@
     "/api/v1/analytics/email-time-series": {
       "get": {
         "tags": [
-          "Analytics"
+          "Análises"
         ],
-        "summary": "Get email analytics time series",
-        "description": "Time series of the e-mail the team sent, transactional and marketing together, with each day's counters. A day with nothing is all zeros. The day is the UTC one, labeled as \"Nov 20\".",
+        "summary": "Série temporal de e-mails",
+        "description": "Série temporal dos e-mails que a equipe enviou, transacionais e de campanha juntos, com os contadores de cada dia. Um dia sem envio vem zerado. O dia é o de Brasília (America/Sao_Paulo), da meia-noite à meia-noite, com o rótulo \"Nov 20\" em `date`. Os instantes que a API troca continuam em UTC.",
         "operationId": "api.analytics.timeseries",
         "parameters": [
           {
             "name": "days",
             "in": "query",
-            "description": "How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.",
+            "description": "Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.",
             "schema": {
               "type": "string",
               "enum": [
@@ -37,7 +37,7 @@
           {
             "name": "domainId",
             "in": "query",
-            "description": "Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.",
+            "description": "Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.",
             "schema": {
               "type": "string"
             },
@@ -46,7 +46,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve email analytics time series",
+            "description": "Série temporal dos e-mails",
             "content": {
               "application/json": {
                 "schema": {
@@ -56,7 +56,7 @@
             }
           },
           "400": {
-            "description": "days is not 7 or 30.",
+            "description": "days não é 7 nem 30.",
             "content": {
               "application/json": {
                 "schema": {
@@ -66,7 +66,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -76,7 +76,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -86,7 +86,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -96,7 +96,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -117,16 +117,16 @@
     "/api/v1/analytics/reputation-metrics": {
       "get": {
         "tags": [
-          "Analytics"
+          "Análises"
         ],
-        "summary": "Get reputation metrics",
-        "description": "What was delivered, hard-bounced and complained about since the beginning, and the two rates in percent, not rounded: hardBounced over delivered, and complained over delivered, zero when nothing was delivered.",
+        "summary": "Consultar a reputação",
+        "description": "O que foi entregue, devolvido de forma definitiva e denunciado como spam desde o início, e as duas taxas em porcentagem, sem arredondar: devolvidos sobre entregues e denunciados sobre entregues, zero quando nada foi entregue.",
         "operationId": "api.analytics.reputation",
         "parameters": [
           {
             "name": "domainId",
             "in": "query",
-            "description": "Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.",
+            "description": "Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.",
             "schema": {
               "type": "string"
             },
@@ -135,7 +135,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve reputation metrics",
+            "description": "Métricas de reputação",
             "content": {
               "application/json": {
                 "schema": {
@@ -145,7 +145,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -155,7 +155,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -165,7 +165,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -175,7 +175,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -196,16 +196,16 @@
     "/api/v1/campaigns": {
       "get": {
         "tags": [
-          "Campaigns"
+          "Campanhas"
         ],
-        "summary": "List campaigns",
-        "description": "Campaigns newest first, 30 to a page. A key restricted to one domain sees the campaigns that send from it.",
+        "summary": "Listar campanhas",
+        "description": "Campanhas da mais nova à mais antiga, 30 por página. Uma chave restrita a um domínio vê as campanhas que enviam por ele.",
         "operationId": "api.campaigns.index",
         "parameters": [
           {
             "name": "page",
             "in": "query",
-            "description": "The page, from 1; 30 campaigns to a page.",
+            "description": "A página, a partir de 1; 30 campanhas por página.",
             "schema": {
               "type": "string"
             }
@@ -213,7 +213,7 @@
           {
             "name": "status",
             "in": "query",
-            "description": "Only campaigns in this status.",
+            "description": "Só campanhas neste status.",
             "schema": {
               "type": "string",
               "enum": [
@@ -228,7 +228,7 @@
           {
             "name": "search",
             "in": "query",
-            "description": "Part of the name or of the subject.",
+            "description": "Parte do nome ou do assunto.",
             "schema": {
               "type": "string"
             }
@@ -236,7 +236,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve campaigns",
+            "description": "Campanhas",
             "content": {
               "application/json": {
                 "schema": {
@@ -246,7 +246,7 @@
             }
           },
           "400": {
-            "description": "The status is not one of the five, or the page is not a number.",
+            "description": "O status não é um dos cinco, ou a página não é um número.",
             "content": {
               "application/json": {
                 "schema": {
@@ -256,7 +256,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -266,7 +266,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -276,7 +276,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -286,7 +286,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -305,10 +305,10 @@
       },
       "post": {
         "tags": [
-          "Campaigns"
+          "Campanhas"
         ],
-        "summary": "Create a campaign",
-        "description": "Makes a draft campaign for a contact book. Either content (the editor's document) or html is required, and the message must carry the unsubscribe link, {{meeng_unsubscribe_url}}. With sendNow, or with scheduledAt (ISO 8601, or words such as 'tomorrow 9am'), it is scheduled at once; when the scheduling is refused the draft stays made and the answer is the refusal.",
+        "summary": "Criar uma campanha",
+        "description": "Cria uma campanha em rascunho para uma lista de contatos. É obrigatório informar content (o documento do editor) ou html, e a mensagem precisa trazer o link de descadastro, {{meeng_unsubscribe_url}}. Com sendNow, ou com scheduledAt (ISO 8601, ou expressões como 'tomorrow 9am'), a campanha é agendada na hora; se o agendamento for recusado, o rascunho continua criado e a resposta é a recusa.",
         "operationId": "api.campaigns.store",
         "requestBody": {
           "content": {
@@ -387,7 +387,7 @@
         },
         "responses": {
           "200": {
-            "description": "Create a campaign",
+            "description": "Criar uma campanha",
             "content": {
               "application/json": {
                 "schema": {
@@ -397,7 +397,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid, the book or the sender is wrong, or the unsubscribe link is missing (BAD_REQUEST).",
+            "description": "O corpo não é válido, a lista ou o remetente está errado, ou falta o link de descadastro (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -407,7 +407,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -417,7 +417,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -427,7 +427,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -437,7 +437,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -458,16 +458,16 @@
     "/api/v1/campaigns/{campaignId}": {
       "get": {
         "tags": [
-          "Campaigns"
+          "Campanhas"
         ],
-        "summary": "Retrieve a campaign",
-        "description": "One campaign of the team, with its counters.",
+        "summary": "Consultar uma campanha",
+        "description": "Uma campanha da equipe, com os contadores dela.",
         "operationId": "api.campaigns.show",
         "parameters": [
           {
             "name": "campaignId",
             "in": "path",
-            "description": "The ID of the campaign.",
+            "description": "O ID da campanha.",
             "required": true,
             "schema": {
               "type": "string"
@@ -476,7 +476,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve the campaign",
+            "description": "A campanha",
             "content": {
               "application/json": {
                 "schema": {
@@ -486,7 +486,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -496,7 +496,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -506,7 +506,7 @@
             }
           },
           "404": {
-            "description": "Campaign not found (NOT_FOUND).",
+            "description": "Campanha não encontrada (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -516,7 +516,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -526,7 +526,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -545,16 +545,16 @@
       },
       "delete": {
         "tags": [
-          "Campaigns"
+          "Campanhas"
         ],
-        "summary": "Delete a campaign",
-        "description": "Deletes the campaign, even one that is running. The e-mails it already made stay. The answer is the whole row that was deleted.",
+        "summary": "Excluir uma campanha",
+        "description": "Exclui a campanha, mesmo uma em andamento. Os e-mails que ela já gerou permanecem. A resposta é a linha inteira que foi excluída.",
         "operationId": "api.campaigns.destroy",
         "parameters": [
           {
             "name": "campaignId",
             "in": "path",
-            "description": "The ID of the campaign.",
+            "description": "O ID da campanha.",
             "required": true,
             "schema": {
               "type": "string"
@@ -563,7 +563,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Campaign deleted",
+            "description": "Campanha excluída",
             "content": {
               "application/json": {
                 "schema": {
@@ -573,7 +573,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -583,7 +583,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -593,7 +593,7 @@
             }
           },
           "404": {
-            "description": "Campaign not found (NOT_FOUND).",
+            "description": "Campanha não encontrada (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -603,7 +603,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -613,7 +613,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -634,16 +634,16 @@
     "/api/v1/campaigns/{campaignId}/pause": {
       "post": {
         "tags": [
-          "Campaigns"
+          "Campanhas"
         ],
-        "summary": "Pause a campaign",
-        "description": "Stops the campaign between batches. It does not look at the status it is in.",
+        "summary": "Pausar uma campanha",
+        "description": "Para a campanha entre os lotes. Não olha em que status ela está.",
         "operationId": "api.campaigns.pause",
         "parameters": [
           {
             "name": "campaignId",
             "in": "path",
-            "description": "The ID of the campaign.",
+            "description": "O ID da campanha.",
             "required": true,
             "schema": {
               "type": "string"
@@ -652,7 +652,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Pause the campaign",
+            "description": "Campanha pausada",
             "content": {
               "application/json": {
                 "schema": {
@@ -662,7 +662,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -672,7 +672,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -682,7 +682,7 @@
             }
           },
           "404": {
-            "description": "Campaign not found (NOT_FOUND).",
+            "description": "Campanha não encontrada (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -692,7 +692,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -702,7 +702,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -723,16 +723,16 @@
     "/api/v1/campaigns/{campaignId}/resume": {
       "post": {
         "tags": [
-          "Campaigns"
+          "Campanhas"
         ],
-        "summary": "Resume a campaign",
-        "description": "Lets a paused campaign go on: scheduled when its date is still ahead, running otherwise.",
+        "summary": "Retomar uma campanha",
+        "description": "Deixa uma campanha pausada seguir: agendada quando a data ainda está à frente, em andamento no caso contrário.",
         "operationId": "api.campaigns.resume",
         "parameters": [
           {
             "name": "campaignId",
             "in": "path",
-            "description": "The ID of the campaign.",
+            "description": "O ID da campanha.",
             "required": true,
             "schema": {
               "type": "string"
@@ -741,7 +741,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Resume the campaign",
+            "description": "Campanha retomada",
             "content": {
               "application/json": {
                 "schema": {
@@ -751,7 +751,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -761,7 +761,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -771,7 +771,7 @@
             }
           },
           "404": {
-            "description": "Campaign not found (NOT_FOUND).",
+            "description": "Campanha não encontrada (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -781,7 +781,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -791,7 +791,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -812,16 +812,16 @@
     "/api/v1/campaigns/{campaignId}/schedule": {
       "post": {
         "tags": [
-          "Campaigns"
+          "Campanhas"
         ],
-        "summary": "Schedule a campaign",
-        "description": "Puts the campaign in line: now when scheduledAt is not given, or at the date (ISO 8601, or words such as 'tomorrow 9am'). It is refused when the campaign has no book, no content, no unsubscribe link or no subscribed contact.",
+        "summary": "Agendar uma campanha",
+        "description": "Coloca a campanha na fila: agora, quando scheduledAt não é informado, ou na data indicada (ISO 8601, ou expressões como 'tomorrow 9am'). É recusado quando a campanha não tem lista, conteúdo, link de descadastro ou contato inscrito.",
         "operationId": "api.campaigns.schedule",
         "parameters": [
           {
             "name": "campaignId",
             "in": "path",
-            "description": "The ID of the campaign.",
+            "description": "O ID da campanha.",
             "required": true,
             "schema": {
               "type": "string"
@@ -851,7 +851,7 @@
         },
         "responses": {
           "200": {
-            "description": "Schedule the campaign",
+            "description": "Campanha agendada",
             "content": {
               "application/json": {
                 "schema": {
@@ -861,7 +861,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid, or the campaign cannot be scheduled (BAD_REQUEST).",
+            "description": "O corpo não é válido, ou a campanha não pode ser agendada (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -871,7 +871,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -881,7 +881,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -891,7 +891,7 @@
             }
           },
           "404": {
-            "description": "Campaign not found (NOT_FOUND).",
+            "description": "Campanha não encontrada (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -901,7 +901,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -911,7 +911,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -932,14 +932,14 @@
     "/api/v1/contactBooks": {
       "get": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "List contact books",
-        "description": "Every contact book of the team, each with the number of contacts it holds, in no particular order.",
+        "summary": "Listar listas de contatos",
+        "description": "Todas as listas de contatos da equipe, cada uma com o número de contatos que guarda, sem ordem definida.",
         "operationId": "api.contactbooks.index",
         "responses": {
           "200": {
-            "description": "Retrieve contact books",
+            "description": "Listas de contatos",
             "content": {
               "application/json": {
                 "schema": {
@@ -949,7 +949,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -959,7 +959,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -969,7 +969,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -979,7 +979,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -998,10 +998,10 @@
       },
       "post": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Create a contact book",
-        "description": "Makes a contact book with double opt-in on and the default confirmation e-mail, then applies what the body says. A confirmation e-mail has to contain the {{doubleOptInUrl}} placeholder. On the free plan the team has one book; past it the answer is 403 FORBIDDEN with the message CONTACT_BOOK.",
+        "summary": "Criar uma lista de contatos",
+        "description": "Cria uma lista de contatos com confirmação em dois passos ligada e o e-mail de confirmação padrão, e aplica o que o corpo disser. O e-mail de confirmação precisa conter o marcador {{doubleOptInUrl}}. No plano gratuito a equipe tem uma lista; além dela a resposta é 403 FORBIDDEN com a mensagem CONTACT_BOOK.",
         "operationId": "api.contactbooks.store",
         "requestBody": {
           "content": {
@@ -1054,7 +1054,7 @@
         },
         "responses": {
           "200": {
-            "description": "Create a new contact book",
+            "description": "Lista de contatos criada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1064,7 +1064,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid, or the sender or the confirmation content is refused (BAD_REQUEST).",
+            "description": "O corpo não é válido, ou o remetente ou o conteúdo da confirmação foi recusado (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1074,7 +1074,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1084,7 +1084,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1094,7 +1094,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1104,7 +1104,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1125,16 +1125,16 @@
     "/api/v1/contactBooks/{contactBookId}": {
       "get": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Retrieve a contact book",
-        "description": "One contact book with its contact count.",
+        "summary": "Consultar uma lista de contatos",
+        "description": "Uma lista de contatos, com o número de contatos.",
         "operationId": "api.contactbooks.show",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1143,7 +1143,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve the contact book",
+            "description": "A lista de contatos",
             "content": {
               "application/json": {
                 "schema": {
@@ -1153,7 +1153,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1163,7 +1163,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1173,7 +1173,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1183,7 +1183,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1193,7 +1193,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1212,16 +1212,16 @@
       },
       "delete": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Delete a contact book",
-        "description": "Deletes the book and its contacts. Campaigns that pointed at it keep existing with no book.",
+        "summary": "Excluir uma lista de contatos",
+        "description": "Exclui a lista e os contatos dela. As campanhas que apontavam para ela continuam existindo, sem lista.",
         "operationId": "api.contactbooks.destroy",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1230,7 +1230,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Contact book deleted successfully",
+            "description": "Lista de contatos excluída",
             "content": {
               "application/json": {
                 "schema": {
@@ -1240,7 +1240,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1250,7 +1250,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1260,7 +1260,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found for this team (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada nesta equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1270,7 +1270,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1280,7 +1280,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1299,16 +1299,16 @@
       },
       "patch": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Update a contact book",
-        "description": "Changes the fields the body carries and leaves the others as they are.",
+        "summary": "Atualizar uma lista de contatos",
+        "description": "Muda os campos que o corpo traz e deixa os outros como estão.",
         "operationId": "api.contactbooks.update",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1363,7 +1363,7 @@
         },
         "responses": {
           "200": {
-            "description": "Update the contact book",
+            "description": "Lista de contatos atualizada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1373,7 +1373,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid (BAD_REQUEST).",
+            "description": "O corpo não é válido (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1383,7 +1383,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1393,7 +1393,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1403,7 +1403,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found for this team (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada nesta equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1413,7 +1413,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1423,7 +1423,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1444,16 +1444,16 @@
     "/api/v1/contactBooks/{contactBookId}/contacts": {
       "get": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "List the contacts of a contact book",
-        "description": "The contacts of the book, in id order, as an array with no total.",
+        "summary": "Listar os contatos de uma lista",
+        "description": "Os contatos da lista, em ordem de id, como um array sem total.",
         "operationId": "api.contacts.index",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1462,7 +1462,7 @@
           {
             "name": "emails",
             "in": "query",
-            "description": "Comma separated e-mail addresses; an exact match.",
+            "description": "Endereços de e-mail separados por vírgula; correspondência exata.",
             "schema": {
               "type": "string"
             }
@@ -1470,7 +1470,7 @@
           {
             "name": "page",
             "in": "query",
-            "description": "The page, from 1.",
+            "description": "A página, a partir de 1.",
             "schema": {
               "type": "integer"
             }
@@ -1478,7 +1478,7 @@
           {
             "name": "limit",
             "in": "query",
-            "description": "Contacts to a page; 5000 when it is not given.",
+            "description": "Contatos por página; 5000 quando não é informado.",
             "schema": {
               "type": "integer"
             }
@@ -1486,7 +1486,7 @@
           {
             "name": "ids",
             "in": "query",
-            "description": "Comma separated contact ids.",
+            "description": "Ids de contatos separados por vírgula.",
             "schema": {
               "type": "string"
             }
@@ -1494,7 +1494,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve multiple contacts",
+            "description": "Contatos da lista",
             "content": {
               "application/json": {
                 "schema": {
@@ -1504,7 +1504,7 @@
             }
           },
           "400": {
-            "description": "A number in the query is not a number.",
+            "description": "Um número da consulta não é um número.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1514,7 +1514,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1524,7 +1524,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1534,7 +1534,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found for this team (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada nesta equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1544,7 +1544,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1554,7 +1554,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1573,16 +1573,16 @@
       },
       "post": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Add a contact to a contact book",
-        "description": "Creates the contact, or updates the one with that e-mail. A contact that left stays out (only PATCH subscribes it again). When the book has double opt-in on, a new contact is pending, not subscribed, until it confirms the e-mail that is sent to it.",
+        "summary": "Adicionar um contato a uma lista",
+        "description": "Cria o contato, ou atualiza o que tem esse e-mail. Um contato que saiu continua fora (só o PATCH o inscreve de novo). Quando a lista tem confirmação em dois passos, um contato novo fica pendente, sem inscrição, até confirmar o e-mail que recebe.",
         "operationId": "api.contacts.store",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1624,7 +1624,7 @@
         },
         "responses": {
           "200": {
-            "description": "Create a new contact",
+            "description": "Contato criado",
             "content": {
               "application/json": {
                 "schema": {
@@ -1634,7 +1634,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid (BAD_REQUEST).",
+            "description": "O corpo não é válido (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1644,7 +1644,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1654,7 +1654,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1664,7 +1664,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found for this team (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada nesta equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1674,7 +1674,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1684,7 +1684,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1705,16 +1705,16 @@
     "/api/v1/contactBooks/{contactBookId}/contacts/bulk": {
       "post": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Add contacts to a contact book in bulk",
-        "description": "Takes up to 1000 contacts and adds them in the background, one by one, as POST of a contact does. The answer is how many were taken; a contact that cannot be added is not reported.",
+        "summary": "Adicionar contatos a uma lista em lote",
+        "description": "Recebe até 1000 contatos e os adiciona em segundo plano, um a um, como o POST de um contato faz. A resposta diz quantos foram recebidos; um contato que não pode ser adicionado não é informado.",
         "operationId": "api.contacts.bulk.store",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1760,7 +1760,7 @@
         },
         "responses": {
           "200": {
-            "description": "Contacts queued for processing",
+            "description": "Contatos na fila para processamento",
             "content": {
               "application/json": {
                 "schema": {
@@ -1770,7 +1770,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid, or has more than 1000 contacts.",
+            "description": "O corpo não é válido, ou tem mais de 1000 contatos.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1780,7 +1780,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1790,7 +1790,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1800,7 +1800,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found for this team (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada nesta equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1810,7 +1810,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1820,7 +1820,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1839,16 +1839,16 @@
       },
       "delete": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Delete contacts of a contact book in bulk",
-        "description": "Deletes the contacts of the book that the ids name, from 1 to 1000. Ids that are not in the book are ignored.",
+        "summary": "Excluir contatos de uma lista em lote",
+        "description": "Exclui os contatos da lista que os ids indicam, de 1 a 1000. Ids que não estão na lista são ignorados.",
         "operationId": "api.contacts.bulk.destroy",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1881,7 +1881,7 @@
         },
         "responses": {
           "200": {
-            "description": "Contacts deleted",
+            "description": "Contatos excluídos",
             "content": {
               "application/json": {
                 "schema": {
@@ -1891,7 +1891,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid, or has more than 1000 ids.",
+            "description": "O corpo não é válido, ou tem mais de 1000 ids.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1901,7 +1901,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1911,7 +1911,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1921,7 +1921,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found for this team (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada nesta equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1931,7 +1931,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1941,7 +1941,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1962,16 +1962,16 @@
     "/api/v1/contactBooks/{contactBookId}/contacts/{contactId}": {
       "get": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Retrieve a contact",
-        "description": "One contact of the book.",
+        "summary": "Consultar um contato",
+        "description": "Um contato da lista.",
         "operationId": "api.contacts.show",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1980,7 +1980,7 @@
           {
             "name": "contactId",
             "in": "path",
-            "description": "The ID of the contact.",
+            "description": "O ID do contato.",
             "required": true,
             "schema": {
               "type": "string"
@@ -1989,7 +1989,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve the contact",
+            "description": "O contato",
             "content": {
               "application/json": {
                 "schema": {
@@ -1999,7 +1999,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2009,7 +2009,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2019,7 +2019,7 @@
             }
           },
           "404": {
-            "description": "Contact not found (NOT_FOUND).",
+            "description": "Contato não encontrado (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2029,7 +2029,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2039,7 +2039,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2058,16 +2058,16 @@
       },
       "put": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Create or replace a contact",
-        "description": "Does what POST of a contact does. The contactId of the path is not read: the contact is found, or made, by its e-mail.",
+        "summary": "Criar ou substituir um contato",
+        "description": "Faz o que o POST de um contato faz. O contactId do caminho não é lido: o contato é encontrado, ou criado, pelo e-mail.",
         "operationId": "api.contacts.upsert",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2076,7 +2076,7 @@
           {
             "name": "contactId",
             "in": "path",
-            "description": "The ID of the contact.",
+            "description": "O ID do contato.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2118,7 +2118,7 @@
         },
         "responses": {
           "200": {
-            "description": "Upsert the contact",
+            "description": "Contato criado ou atualizado",
             "content": {
               "application/json": {
                 "schema": {
@@ -2128,7 +2128,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid (BAD_REQUEST).",
+            "description": "O corpo não é válido (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2138,7 +2138,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2148,7 +2148,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2158,7 +2158,7 @@
             }
           },
           "404": {
-            "description": "Contact book not found for this team (NOT_FOUND).",
+            "description": "Lista de contatos não encontrada nesta equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2168,7 +2168,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2178,7 +2178,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2197,16 +2197,16 @@
       },
       "delete": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Delete a contact",
-        "description": "Deletes the contact from the book.",
+        "summary": "Excluir um contato",
+        "description": "Exclui o contato da lista.",
         "operationId": "api.contacts.destroy",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2215,7 +2215,7 @@
           {
             "name": "contactId",
             "in": "path",
-            "description": "The ID of the contact.",
+            "description": "O ID do contato.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2224,7 +2224,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Contact deleted",
+            "description": "Contato excluído",
             "content": {
               "application/json": {
                 "schema": {
@@ -2234,7 +2234,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2244,7 +2244,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2254,7 +2254,7 @@
             }
           },
           "404": {
-            "description": "Contact not found (NOT_FOUND).",
+            "description": "Contato não encontrado (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2264,7 +2264,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2274,7 +2274,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2293,16 +2293,16 @@
       },
       "patch": {
         "tags": [
-          "Contacts"
+          "Contatos"
         ],
-        "summary": "Update a contact",
-        "description": "Changes the fields the body carries. Properties are merged over the old ones. This is the call that subscribes a contact again, with subscribed true.",
+        "summary": "Atualizar um contato",
+        "description": "Muda os campos que o corpo traz. As propriedades são mescladas sobre as antigas. É a chamada que inscreve um contato de novo, com subscribed true.",
         "operationId": "api.contacts.update",
         "parameters": [
           {
             "name": "contactBookId",
             "in": "path",
-            "description": "The ID of the contact book.",
+            "description": "O ID da lista de contatos.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2311,7 +2311,7 @@
           {
             "name": "contactId",
             "in": "path",
-            "description": "The ID of the contact.",
+            "description": "O ID do contato.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2347,7 +2347,7 @@
         },
         "responses": {
           "200": {
-            "description": "Update the contact",
+            "description": "Contato atualizado",
             "content": {
               "application/json": {
                 "schema": {
@@ -2357,7 +2357,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid (BAD_REQUEST).",
+            "description": "O corpo não é válido (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2367,7 +2367,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2377,7 +2377,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2387,7 +2387,7 @@
             }
           },
           "404": {
-            "description": "Contact not found (NOT_FOUND).",
+            "description": "Contato não encontrado (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2397,7 +2397,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2407,7 +2407,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2428,14 +2428,14 @@
     "/api/v1/domains": {
       "get": {
         "tags": [
-          "Domains"
+          "Domínios"
         ],
-        "summary": "List the domains",
-        "description": "The domains of the team the key belongs to, newest first, each with the DNS records it must publish. A key restricted to one domain sees that domain alone.",
+        "summary": "Listar os domínios",
+        "description": "Os domínios da equipe dona da chave, do mais novo ao mais antigo, cada um com os registros DNS que precisa publicar. Uma chave restrita a um domínio vê só esse domínio.",
         "operationId": "api.domains.index",
         "responses": {
           "200": {
-            "description": "Retrieve domains accessible by the API key",
+            "description": "Domínios que a chave de API alcança",
             "content": {
               "application/json": {
                 "schema": {
@@ -2445,7 +2445,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2455,7 +2455,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2465,7 +2465,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2475,7 +2475,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2494,10 +2494,10 @@
       },
       "post": {
         "tags": [
-          "Domains"
+          "Domínios"
         ],
-        "summary": "Create a domain",
-        "description": "Makes the domain, its DKIM key and the records to publish. A key restricted to one domain cannot create another (403).",
+        "summary": "Criar um domínio",
+        "description": "Cria o domínio, a chave DKIM dele e os registros a publicar. Uma chave restrita a um domínio não cria outro (403).",
         "operationId": "api.domains.store",
         "requestBody": {
           "content": {
@@ -2524,7 +2524,7 @@
         },
         "responses": {
           "200": {
-            "description": "Create a new domain",
+            "description": "Domínio criado",
             "content": {
               "application/json": {
                 "schema": {
@@ -2534,7 +2534,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid: name and region are required text.",
+            "description": "O corpo não é válido: name e region são obrigatórios e devem ser texto.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2544,7 +2544,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2554,7 +2554,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2564,7 +2564,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2574,7 +2574,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2595,16 +2595,16 @@
     "/api/v1/domains/{id}": {
       "get": {
         "tags": [
-          "Domains"
+          "Domínios"
         ],
-        "summary": "Retrieve a domain",
-        "description": "One domain of the team. While it is verifying, the read checks its DNS first.",
+        "summary": "Consultar um domínio",
+        "description": "Um domínio da equipe. Enquanto está em verificação, a consulta confere o DNS antes de responder.",
         "operationId": "api.domains.show",
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "The ID of the domain.",
+            "description": "O ID do domínio.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2614,7 +2614,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve the domain",
+            "description": "O domínio",
             "content": {
               "application/json": {
                 "schema": {
@@ -2624,7 +2624,7 @@
             }
           },
           "400": {
-            "description": "The id is not a number.",
+            "description": "O id não é um número.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2634,7 +2634,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2644,7 +2644,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2654,7 +2654,7 @@
             }
           },
           "404": {
-            "description": "A key restricted to another domain (NOT_FOUND).",
+            "description": "A chave é restrita a outro domínio (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2664,7 +2664,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2674,7 +2674,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2693,16 +2693,16 @@
       },
       "delete": {
         "tags": [
-          "Domains"
+          "Domínios"
         ],
-        "summary": "Delete a domain",
-        "description": "Deletes the domain and the API keys restricted to it.",
+        "summary": "Excluir um domínio",
+        "description": "Exclui o domínio e as chaves de API restritas a ele.",
         "operationId": "api.domains.destroy",
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "The ID of the domain.",
+            "description": "O ID do domínio.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2712,7 +2712,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Domain deleted successfully",
+            "description": "Domínio excluído",
             "content": {
               "application/json": {
                 "schema": {
@@ -2722,7 +2722,7 @@
             }
           },
           "400": {
-            "description": "The id is not a number.",
+            "description": "O id não é um número.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2732,7 +2732,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2742,7 +2742,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2752,7 +2752,7 @@
             }
           },
           "404": {
-            "description": "Domain not found (NOT_FOUND).",
+            "description": "Domínio não encontrado (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2762,7 +2762,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2772,7 +2772,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2793,16 +2793,16 @@
     "/api/v1/domains/{id}/verify": {
       "put": {
         "tags": [
-          "Domains"
+          "Domínios"
         ],
-        "summary": "Verify a domain",
-        "description": "Starts the verification of the domain's DNS records.",
+        "summary": "Verificar um domínio",
+        "description": "Inicia a verificação dos registros DNS do domínio.",
         "operationId": "api.domains.verify",
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "The ID of the domain.",
+            "description": "O ID do domínio.",
             "required": true,
             "schema": {
               "type": "string"
@@ -2812,7 +2812,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Verify domain",
+            "description": "Verificação iniciada",
             "content": {
               "application/json": {
                 "schema": {
@@ -2831,7 +2831,7 @@
             }
           },
           "400": {
-            "description": "The id is not a number.",
+            "description": "O id não é um número.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2841,7 +2841,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2851,7 +2851,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2861,7 +2861,7 @@
             }
           },
           "404": {
-            "description": "Domain not found, or the key is restricted to another one.",
+            "description": "Domínio não encontrado, ou a chave é restrita a outro.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2871,7 +2871,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2881,7 +2881,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2902,10 +2902,10 @@
     "/api/v1/emails": {
       "get": {
         "tags": [
-          "Emails"
+          "E-mails"
         ],
-        "summary": "List e-mails",
-        "description": "The team's e-mails, newest first, a page of at most 50 and the total of the same filter. A key restricted to a domain lists that domain's e-mails and ignores domainId. With both dates only endDate counts, as in the reference.",
+        "summary": "Listar e-mails",
+        "description": "Os e-mails da equipe, do mais novo ao mais antigo, em páginas de até 50, com o total do mesmo filtro. Uma chave restrita a um domínio lista os e-mails desse domínio e ignora domainId. Com as duas datas, só endDate vale.",
         "operationId": "api.emails.index",
         "parameters": [
           {
@@ -2965,7 +2965,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve a list of e-mails",
+            "description": "Lista de e-mails",
             "content": {
               "application/json": {
                 "schema": {
@@ -2975,7 +2975,7 @@
             }
           },
           "400": {
-            "description": "A date is not an ISO 8601 date-time in UTC.",
+            "description": "Uma data não está no formato ISO 8601 em UTC.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2985,7 +2985,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2995,7 +2995,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3005,7 +3005,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3015,7 +3015,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3034,16 +3034,16 @@
       },
       "post": {
         "tags": [
-          "Emails"
+          "E-mails"
         ],
-        "summary": "Send an e-mail",
-        "description": "Accepts an e-mail and queues it. The sender's domain must be one of the team's and verified. A template (templateId and variables) replaces subject and html. When every recipient of `to` is on the suppression list the e-mail is recorded as SUPPRESSED and the answer is still 200.",
+        "summary": "Enviar um e-mail",
+        "description": "Aceita um e-mail e o coloca na fila. O domínio do remetente precisa ser da equipe e estar verificado. Um modelo (templateId e variables) substitui subject e html. Quando todos os destinatários de `to` estão na lista de supressão, o e-mail é registrado como SUPPRESSED e a resposta continua 200.",
         "operationId": "api.emails.store",
         "parameters": [
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "description": "Pass the optional Idempotency-Key header to make the request safe to retry. The key can be up to 256 characters. The server stores the canonical request body and behaves as follows: the same key with the same body returns the original ids with 200 OK without sending again; the same key with a different body returns 409 NOT_UNIQUE; the same key while another request is still running returns 409 NOT_UNIQUE, retry after a short delay. Entries expire after 24 hours.",
+            "description": "Informe o cabeçalho opcional Idempotency-Key para poder repetir a requisição com segurança. A chave pode ter até 256 caracteres. O servidor guarda o corpo canônico da requisição e se comporta assim: a mesma chave com o mesmo corpo devolve os ids originais com 200 OK, sem enviar de novo; a mesma chave com um corpo diferente devolve 409 NOT_UNIQUE; a mesma chave enquanto outra requisição ainda está em andamento devolve 409 NOT_UNIQUE, tente de novo depois de um instante. As entradas expiram em 24 horas.",
             "schema": {
               "type": "string",
               "minLength": 1,
@@ -3075,16 +3075,16 @@
                   },
                   "subject": {
                     "type": "string",
-                    "description": "Optional when templateId is provided.",
+                    "description": "Opcional quando templateId é informado.",
                     "minLength": 1
                   },
                   "templateId": {
                     "type": "string",
-                    "description": "ID of a template from the dashboard."
+                    "description": "ID de um modelo criado no painel."
                   },
                   "variables": {
                     "type": "object",
-                    "description": "The values of the template's variables, as text.",
+                    "description": "Os valores das variáveis do modelo, em texto.",
                     "properties": {}
                   },
                   "replyTo": {
@@ -3142,31 +3142,13 @@
                   },
                   "headers": {
                     "type": "object",
-                    "description": "Custom headers to include with the e-mail, name to value.",
+                    "description": "Cabeçalhos personalizados do e-mail, do nome ao valor.",
                     "properties": {}
                   },
                   "attachments": {
                     "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "filename": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "content": {
-                          "type": "string",
-                          "description": "The file, in base64.",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "filename",
-                        "content"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "maxItems": 10
+                    "description": "Não aceito: o Meeng.dev não anexa, guarda nem repassa arquivos. Não envie a lista, ou envie uma vazia, e ponha links para os seus arquivos no corpo do e-mail. Uma lista com itens é recusada com 400 (ZodError).",
+                    "maxItems": 0
                   },
                   "scheduledAt": {
                     "type": "string",
@@ -3191,7 +3173,7 @@
         },
         "responses": {
           "200": {
-            "description": "The e-mail was accepted",
+            "description": "E-mail aceito",
             "content": {
               "application/json": {
                 "schema": {
@@ -3201,7 +3183,7 @@
             }
           },
           "400": {
-            "description": "The body or a parameter is not valid (ZodError), or the request is refused (BAD_REQUEST).",
+            "description": "O corpo ou um parâmetro não é válido (ZodError), ou a requisição foi recusada (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3211,7 +3193,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3221,7 +3203,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3231,7 +3213,7 @@
             }
           },
           "404": {
-            "description": "The e-mail or the template is not the team's (NOT_FOUND).",
+            "description": "O e-mail ou o modelo não é da equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3241,7 +3223,7 @@
             }
           },
           "409": {
-            "description": "The Idempotency-Key is taken by another body or by a request still running (NOT_UNIQUE).",
+            "description": "A Idempotency-Key já foi usada com outro corpo, ou está em uso por uma requisição em andamento (NOT_UNIQUE).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3251,7 +3233,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3261,7 +3243,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3282,16 +3264,16 @@
     "/api/v1/emails/batch": {
       "post": {
         "tags": [
-          "Emails"
+          "E-mails"
         ],
-        "summary": "Send up to 100 e-mails in one call",
-        "description": "Every e-mail is validated before any is written, and all are written together: either all are accepted, in the order they came, or none is.",
+        "summary": "Enviar até 100 e-mails em uma chamada",
+        "description": "Todos os e-mails são validados antes de qualquer um ser gravado, e todos são gravados juntos: ou todos são aceitos, na ordem em que vieram, ou nenhum é.",
         "operationId": "api.emails.batch",
         "parameters": [
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "description": "Pass the optional Idempotency-Key header to make the request safe to retry. The key can be up to 256 characters. The server stores the canonical request body and behaves as follows: the same key with the same body returns the original ids with 200 OK without sending again; the same key with a different body returns 409 NOT_UNIQUE; the same key while another request is still running returns 409 NOT_UNIQUE, retry after a short delay. Entries expire after 24 hours.",
+            "description": "Informe o cabeçalho opcional Idempotency-Key para poder repetir a requisição com segurança. A chave pode ter até 256 caracteres. O servidor guarda o corpo canônico da requisição e se comporta assim: a mesma chave com o mesmo corpo devolve os ids originais com 200 OK, sem enviar de novo; a mesma chave com um corpo diferente devolve 409 NOT_UNIQUE; a mesma chave enquanto outra requisição ainda está em andamento devolve 409 NOT_UNIQUE, tente de novo depois de um instante. As entradas expiram em 24 horas.",
             "schema": {
               "type": "string",
               "minLength": 1,
@@ -3325,16 +3307,16 @@
                     },
                     "subject": {
                       "type": "string",
-                      "description": "Optional when templateId is provided.",
+                      "description": "Opcional quando templateId é informado.",
                       "minLength": 1
                     },
                     "templateId": {
                       "type": "string",
-                      "description": "ID of a template from the dashboard."
+                      "description": "ID de um modelo criado no painel."
                     },
                     "variables": {
                       "type": "object",
-                      "description": "The values of the template's variables, as text.",
+                      "description": "Os valores das variáveis do modelo, em texto.",
                       "properties": {}
                     },
                     "replyTo": {
@@ -3392,31 +3374,13 @@
                     },
                     "headers": {
                       "type": "object",
-                      "description": "Custom headers to include with the e-mail, name to value.",
+                      "description": "Cabeçalhos personalizados do e-mail, do nome ao valor.",
                       "properties": {}
                     },
                     "attachments": {
                       "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "filename": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "content": {
-                            "type": "string",
-                            "description": "The file, in base64.",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "filename",
-                          "content"
-                        ],
-                        "additionalProperties": false
-                      },
-                      "maxItems": 10
+                      "description": "Não aceito: o Meeng.dev não anexa, guarda nem repassa arquivos. Não envie a lista, ou envie uma vazia, e ponha links para os seus arquivos no corpo do e-mail. Uma lista com itens é recusada com 400 (ZodError).",
+                      "maxItems": 0
                     },
                     "scheduledAt": {
                       "type": "string",
@@ -3443,7 +3407,7 @@
         },
         "responses": {
           "200": {
-            "description": "List of the ids of the accepted e-mails",
+            "description": "Lista dos ids dos e-mails aceitos",
             "content": {
               "application/json": {
                 "schema": {
@@ -3453,7 +3417,7 @@
             }
           },
           "400": {
-            "description": "The body or a parameter is not valid (ZodError), or the request is refused (BAD_REQUEST).",
+            "description": "O corpo ou um parâmetro não é válido (ZodError), ou a requisição foi recusada (BAD_REQUEST).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3463,7 +3427,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3473,7 +3437,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3483,7 +3447,7 @@
             }
           },
           "404": {
-            "description": "The e-mail or the template is not the team's (NOT_FOUND).",
+            "description": "O e-mail ou o modelo não é da equipe (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3493,7 +3457,7 @@
             }
           },
           "409": {
-            "description": "The Idempotency-Key is taken by another body or by a request still running (NOT_UNIQUE).",
+            "description": "A Idempotency-Key já foi usada com outro corpo, ou está em uso por uma requisição em andamento (NOT_UNIQUE).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3503,7 +3467,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3513,7 +3477,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3534,16 +3498,16 @@
     "/api/v1/emails/{emailId}": {
       "get": {
         "tags": [
-          "Emails"
+          "E-mails"
         ],
-        "summary": "Retrieve an e-mail",
-        "description": "One e-mail of the team with its events.",
+        "summary": "Consultar um e-mail",
+        "description": "Um e-mail da equipe, com os eventos dele.",
         "operationId": "api.emails.show",
         "parameters": [
           {
             "name": "emailId",
             "in": "path",
-            "description": "The ID of the e-mail.",
+            "description": "O ID do e-mail.",
             "required": true,
             "schema": {
               "type": "string"
@@ -3553,7 +3517,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Retrieve the e-mail",
+            "description": "O e-mail",
             "content": {
               "application/json": {
                 "schema": {
@@ -3563,7 +3527,7 @@
             }
           },
           "400": {
-            "description": "The id has fewer than three characters.",
+            "description": "O id tem menos de três caracteres.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3573,7 +3537,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3583,7 +3547,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3593,7 +3557,7 @@
             }
           },
           "404": {
-            "description": "The e-mail is not the team's, or not of the key's domain (NOT_FOUND).",
+            "description": "O e-mail não é da equipe, ou não é do domínio da chave (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3603,7 +3567,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3613,7 +3577,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3632,16 +3596,16 @@
       },
       "patch": {
         "tags": [
-          "Emails"
+          "E-mails"
         ],
-        "summary": "Reschedule an e-mail",
-        "description": "Moves a scheduled e-mail to another time, an ISO 8601 date-time in UTC. Only an e-mail still SCHEDULED can be moved (400 \"Email already processed\").",
+        "summary": "Reagendar um e-mail",
+        "description": "Move um e-mail agendado para outro horário, em ISO 8601 e UTC. Só um e-mail ainda SCHEDULED pode ser movido (senão, 400 \"Email already processed\").",
         "operationId": "api.emails.update",
         "parameters": [
           {
             "name": "emailId",
             "in": "path",
-            "description": "The ID of the e-mail.",
+            "description": "O ID do e-mail.",
             "required": true,
             "schema": {
               "type": "string"
@@ -3671,7 +3635,7 @@
         },
         "responses": {
           "200": {
-            "description": "The e-mail was rescheduled",
+            "description": "E-mail reagendado",
             "content": {
               "application/json": {
                 "schema": {
@@ -3681,7 +3645,7 @@
             }
           },
           "400": {
-            "description": "The body is not valid, or the e-mail was already processed.",
+            "description": "O corpo não é válido, ou o e-mail já foi processado.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3691,7 +3655,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3701,7 +3665,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3711,7 +3675,7 @@
             }
           },
           "404": {
-            "description": "The e-mail is not the team's, or not of the key's domain (NOT_FOUND).",
+            "description": "O e-mail não é da equipe, ou não é do domínio da chave (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3721,7 +3685,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3731,7 +3695,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3752,16 +3716,16 @@
     "/api/v1/emails/{emailId}/cancel": {
       "post": {
         "tags": [
-          "Emails"
+          "E-mails"
         ],
-        "summary": "Cancel a scheduled e-mail",
-        "description": "Cancels an e-mail that is still SCHEDULED (400 \"Email already processed\" otherwise).",
+        "summary": "Cancelar um e-mail agendado",
+        "description": "Cancela um e-mail que ainda está SCHEDULED (senão, 400 \"Email already processed\").",
         "operationId": "api.emails.cancel",
         "parameters": [
           {
             "name": "emailId",
             "in": "path",
-            "description": "The ID of the e-mail.",
+            "description": "O ID do e-mail.",
             "required": true,
             "schema": {
               "type": "string"
@@ -3771,7 +3735,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The e-mail was cancelled",
+            "description": "E-mail cancelado",
             "content": {
               "application/json": {
                 "schema": {
@@ -3781,7 +3745,7 @@
             }
           },
           "400": {
-            "description": "The id is not valid, or the e-mail was already processed.",
+            "description": "O id não é válido, ou o e-mail já foi processado.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3791,7 +3755,7 @@
             }
           },
           "401": {
-            "description": "No Authorization header provided (UNAUTHORIZED).",
+            "description": "Cabeçalho Authorization ausente (UNAUTHORIZED).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3801,7 +3765,7 @@
             }
           },
           "403": {
-            "description": "Invalid API token (FORBIDDEN).",
+            "description": "Chave de API inválida (FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3811,7 +3775,7 @@
             }
           },
           "404": {
-            "description": "The e-mail is not the team's, or not of the key's domain (NOT_FOUND).",
+            "description": "O e-mail não é da equipe, ou não é do domínio da chave (NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3821,7 +3785,7 @@
             }
           },
           "429": {
-            "description": "Over the team's requests per second (RATE_LIMITED); wait for Retry-After.",
+            "description": "Limite de requisições por segundo da equipe excedido (RATE_LIMITED); aguarde o tempo de Retry-After.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3831,7 +3795,7 @@
             }
           },
           "500": {
-            "description": "Something unexpected happened (INTERNAL_SERVER_ERROR).",
+            "description": "Algo inesperado aconteceu (INTERNAL_SERVER_ERROR).",
             "content": {
               "application/json": {
                 "schema": {
@@ -5012,30 +4976,30 @@
       "Bearer": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "API key of the team, mg_\u003cclientId\u003e_\u003ctoken\u003e, made in Developer settings."
+        "bearerFormat": "Chave de API da equipe, no formato mg_\u003cclientId\u003e_\u003ctoken\u003e, criada em Configurações, Chaves de API."
       }
     }
   },
   "tags": [
     {
-      "name": "Domains",
-      "description": "The sending domains of the team, their DNS records and their verification."
+      "name": "Domínios",
+      "description": "Os domínios de envio da equipe, os registros DNS deles e a verificação."
     },
     {
-      "name": "Emails",
-      "description": "Send, schedule, list, update and cancel e-mail."
+      "name": "E-mails",
+      "description": "Enviar, agendar, listar, atualizar e cancelar e-mails."
     },
     {
-      "name": "Contacts",
-      "description": "Contact books and the contacts in them."
+      "name": "Contatos",
+      "description": "As listas de contatos e os contatos dentro delas."
     },
     {
-      "name": "Campaigns",
-      "description": "Create, schedule, pause and resume campaigns."
+      "name": "Campanhas",
+      "description": "Criar, agendar, pausar e retomar campanhas."
     },
     {
-      "name": "Analytics",
-      "description": "Time series and reputation metrics."
+      "name": "Análises",
+      "description": "Séries temporais e métricas de reputação."
     }
   ]
 }

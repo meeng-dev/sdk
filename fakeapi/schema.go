@@ -126,6 +126,15 @@ func (s *schemas) validate(node any, value any, path []any, out *[]issue) {
 			}
 		}
 	case []any:
+		if limit, ok := m["maxItems"].(float64); ok && float64(len(v)) > limit {
+			message := fmt.Sprintf("Array must contain at most %d element(s)", int(limit))
+			if limit == 0 && len(path) > 0 && path[len(path)-1] == "attachments" {
+				// What the API says about a file (ADR-0008).
+				message = "Attachments are not supported. Include links to your files in the email body."
+			}
+			*out = append(*out, issue{Code: "custom", Path: append([]any(nil), path...), Message: message})
+			return
+		}
 		if items, ok := m["items"]; ok {
 			for i, each := range v {
 				s.validate(items, each, append(append([]any(nil), path...), i), out)

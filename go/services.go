@@ -191,13 +191,13 @@ func (s *ContactsService) Create(ctx context.Context, contactBookId string, para
 
 // ContactsListQuery are the filters of contacts.list; a zero field is left out.
 type ContactsListQuery struct {
-	// Comma separated e-mail addresses; an exact match.
+	// Endereços de e-mail separados por vírgula; correspondência exata.
 	Emails string
-	// The page, from 1.
+	// A página, a partir de 1.
 	Page int
-	// Contacts to a page; 5000 when it is not given.
+	// Contatos por página; 5000 quando não é informado.
 	Limit int
-	// Comma separated contact ids.
+	// Ids de contatos separados por vírgula.
 	Ids string
 }
 
@@ -359,11 +359,11 @@ func (s *CampaignsService) Create(ctx context.Context, params CampaignsCreatePar
 
 // CampaignsListQuery are the filters of campaigns.list; a zero field is left out.
 type CampaignsListQuery struct {
-	// The page, from 1; 30 campaigns to a page.
+	// A página, a partir de 1; 30 campanhas por página.
 	Page int
-	// Only campaigns in this status.
+	// Só campanhas neste status.
 	Status string
-	// Part of the name or of the subject.
+	// Parte do nome ou do assunto.
 	Search string
 }
 
@@ -449,9 +449,9 @@ type AnalyticsService struct{ client *Client }
 
 // AnalyticsEmailTimeSeriesQuery are the filters of analytics.emailTimeSeries; a zero field is left out.
 type AnalyticsEmailTimeSeriesQuery struct {
-	// How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
+	// Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.
 	Days string
-	// Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+	// Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
 	DomainID string
 }
 
@@ -481,7 +481,7 @@ func (s *AnalyticsService) EmailTimeSeries(ctx context.Context, query *Analytics
 
 // AnalyticsReputationMetricsQuery are the filters of analytics.reputationMetrics; a zero field is left out.
 type AnalyticsReputationMetricsQuery struct {
-	// Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+	// Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
 	DomainID string
 }
 

@@ -43,10 +43,10 @@ public sealed class AnalyticsService
 /// <summary>The filters of analytics.emailTimeSeries.</summary>
 public sealed record AnalyticsEmailTimeSeriesQuery
 {
-    /// <summary>How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.</summary>
+    /// <summary>Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.</summary>
     public string? Days { get; init; }
 
-    /// <summary>Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.</summary>
+    /// <summary>Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.</summary>
     public string? DomainId { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()
@@ -59,7 +59,7 @@ public sealed record AnalyticsEmailTimeSeriesQuery
 /// <summary>The filters of analytics.reputationMetrics.</summary>
 public sealed record AnalyticsReputationMetricsQuery
 {
-    /// <summary>Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.</summary>
+    /// <summary>Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.</summary>
     public string? DomainId { get; init; }
 
     internal IEnumerable<KeyValuePair<string, string?>> Pairs()

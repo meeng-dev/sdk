@@ -118,6 +118,7 @@ func TestABodyThatBreaksTheContractIsRefusedWithTheIssues(t *testing.T) {
 		"a wrong type":                       `{"from":"a@x.com","to":5}`,
 		"a bad date":                         `{"from":"a@x.com","to":"b@x.com","scheduledAt":"tomorrow"}`,
 		"not JSON":                           `{"from":`,
+		"an attachment (ADR-0008)":           `{"from":"a@x.com","to":"b@x.com","subject":"Hi","text":"x","attachments":[{"filename":"a.pdf","content":"QQ=="}]}`,
 	}
 	for name, body := range cases {
 		status, _, object, _ := call(t, srv.URL, "POST", "/api/v1/emails", body)
@@ -128,6 +129,19 @@ func TestABodyThatBreaksTheContractIsRefusedWithTheIssues(t *testing.T) {
 	}
 	if status, _, object, _ := call(t, srv.URL, "POST", "/api/v1/emails", `{"from":"a@x.com","to":["b@x.com"],"subject":"Hi","headers":{"X-A":"1"}}`); status != 200 || object["emailId"] == nil {
 		t.Errorf("a valid send: %d %v", status, object)
+	}
+}
+
+func TestAnEmptyListOfAttachmentsPassesAndAFullOneSaysUseLinks(t *testing.T) {
+	_, srv := fake(t)
+	if status, _, object, _ := call(t, srv.URL, "POST", "/api/v1/emails", `{"from":"a@x.com","to":["b@x.com"],"subject":"Hi","text":"x","attachments":[]}`); status != 200 || object["emailId"] == nil {
+		t.Errorf("an empty list: %d %v", status, object)
+	}
+	status, _, object, _ := call(t, srv.URL, "POST", "/api/v1/emails", `{"from":"a@x.com","to":["b@x.com"],"subject":"Hi","text":"x","attachments":[{"filename":"a.pdf","content":"QQ=="}]}`)
+	e, _ := object["error"].(map[string]any)
+	issues, _ := e["issues"].([]any)
+	if status != 400 || len(issues) != 1 || !strings.Contains(issues[0].(map[string]any)["message"].(string), "links") {
+		t.Errorf("a file: %d %v", status, object)
 	}
 }
 

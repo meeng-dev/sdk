@@ -1772,32 +1772,6 @@ public struct DomainsCreateParams: Encodable, Sendable, Hashable {
     }
 }
 
-/// One item of attachments in EmailsBatchParams.
-///
-/// The initializer takes the required fields first; an optional field left
-/// nil is not sent.
-public struct EmailsBatchAttachment: Encodable, Sendable, Hashable {
-    public var filename: String
-    /// The file, in base64.
-    public var content: String
-
-    public init(filename: String, content: String) {
-        self.filename = filename
-        self.content = content
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case filename
-        case content
-    }
-
-    public func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(filename, forKey: .filename)
-        try container.encode(content, forKey: .content)
-    }
-}
-
 /// One item of the list emails.batch takes.
 ///
 /// The initializer takes the required fields first; an optional field left
@@ -1805,24 +1779,23 @@ public struct EmailsBatchAttachment: Encodable, Sendable, Hashable {
 public struct EmailsBatchParams: Encodable, Sendable, Hashable {
     public var to: StringList
     public var from: String
-    /// Optional when templateId is provided.
+    /// Opcional quando templateId é informado.
     public var subject: String?
-    /// ID of a template from the dashboard.
+    /// ID de um modelo criado no painel.
     public var templateID: String?
-    /// The values of the template's variables, as text.
+    /// Os valores das variáveis do modelo, em texto.
     public var variables: [String: JSONValue]?
     public var replyTo: StringList?
     public var cc: StringList?
     public var bcc: StringList?
     public var text: String?
     public var html: String?
-    /// Custom headers to include with the e-mail, name to value.
+    /// Cabeçalhos personalizados do e-mail, do nome ao valor.
     public var headers: [String: JSONValue]?
-    public var attachments: [EmailsBatchAttachment]?
     public var scheduledAt: String?
     public var inReplyToID: String?
 
-    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: JSONValue]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: JSONValue]? = nil, attachments: [EmailsBatchAttachment]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
+    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: JSONValue]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: JSONValue]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
         self.to = to
         self.from = from
         self.subject = subject
@@ -1834,7 +1807,6 @@ public struct EmailsBatchParams: Encodable, Sendable, Hashable {
         self.text = text
         self.html = html
         self.headers = headers
-        self.attachments = attachments
         self.scheduledAt = scheduledAt
         self.inReplyToID = inReplyToID
     }
@@ -1851,7 +1823,6 @@ public struct EmailsBatchParams: Encodable, Sendable, Hashable {
         case text
         case html
         case headers
-        case attachments
         case scheduledAt
         case inReplyToID = "inReplyToId"
     }
@@ -1869,35 +1840,8 @@ public struct EmailsBatchParams: Encodable, Sendable, Hashable {
         try container.encodeIfPresent(text, forKey: .text)
         try container.encodeIfPresent(html, forKey: .html)
         try container.encodeIfPresent(headers, forKey: .headers)
-        try container.encodeIfPresent(attachments, forKey: .attachments)
         try container.encodeIfPresent(scheduledAt, forKey: .scheduledAt)
         try container.encodeIfPresent(inReplyToID, forKey: .inReplyToID)
-    }
-}
-
-/// One item of attachments in EmailsSendParams.
-///
-/// The initializer takes the required fields first; an optional field left
-/// nil is not sent.
-public struct EmailsSendAttachment: Encodable, Sendable, Hashable {
-    public var filename: String
-    /// The file, in base64.
-    public var content: String
-
-    public init(filename: String, content: String) {
-        self.filename = filename
-        self.content = content
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case filename
-        case content
-    }
-
-    public func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(filename, forKey: .filename)
-        try container.encode(content, forKey: .content)
     }
 }
 
@@ -1908,24 +1852,23 @@ public struct EmailsSendAttachment: Encodable, Sendable, Hashable {
 public struct EmailsSendParams: Encodable, Sendable, Hashable {
     public var to: StringList
     public var from: String
-    /// Optional when templateId is provided.
+    /// Opcional quando templateId é informado.
     public var subject: String?
-    /// ID of a template from the dashboard.
+    /// ID de um modelo criado no painel.
     public var templateID: String?
-    /// The values of the template's variables, as text.
+    /// Os valores das variáveis do modelo, em texto.
     public var variables: [String: JSONValue]?
     public var replyTo: StringList?
     public var cc: StringList?
     public var bcc: StringList?
     public var text: String?
     public var html: String?
-    /// Custom headers to include with the e-mail, name to value.
+    /// Cabeçalhos personalizados do e-mail, do nome ao valor.
     public var headers: [String: JSONValue]?
-    public var attachments: [EmailsSendAttachment]?
     public var scheduledAt: String?
     public var inReplyToID: String?
 
-    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: JSONValue]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: JSONValue]? = nil, attachments: [EmailsSendAttachment]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
+    public init(to: StringList, from: String, subject: String? = nil, templateID: String? = nil, variables: [String: JSONValue]? = nil, replyTo: StringList? = nil, cc: StringList? = nil, bcc: StringList? = nil, text: String? = nil, html: String? = nil, headers: [String: JSONValue]? = nil, scheduledAt: String? = nil, inReplyToID: String? = nil) {
         self.to = to
         self.from = from
         self.subject = subject
@@ -1937,7 +1880,6 @@ public struct EmailsSendParams: Encodable, Sendable, Hashable {
         self.text = text
         self.html = html
         self.headers = headers
-        self.attachments = attachments
         self.scheduledAt = scheduledAt
         self.inReplyToID = inReplyToID
     }
@@ -1954,7 +1896,6 @@ public struct EmailsSendParams: Encodable, Sendable, Hashable {
         case text
         case html
         case headers
-        case attachments
         case scheduledAt
         case inReplyToID = "inReplyToId"
     }
@@ -1972,7 +1913,6 @@ public struct EmailsSendParams: Encodable, Sendable, Hashable {
         try container.encodeIfPresent(text, forKey: .text)
         try container.encodeIfPresent(html, forKey: .html)
         try container.encodeIfPresent(headers, forKey: .headers)
-        try container.encodeIfPresent(attachments, forKey: .attachments)
         try container.encodeIfPresent(scheduledAt, forKey: .scheduledAt)
         try container.encodeIfPresent(inReplyToID, forKey: .inReplyToID)
     }

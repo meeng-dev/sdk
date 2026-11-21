@@ -23,7 +23,6 @@ module Meeng
     #   +text+ (optional)
     #   +html+ (optional)
     #   +headers+ (optional)
-    #   +attachments+ (optional)
     #   +scheduledAt+ (optional)
     #   +inReplyToId+ (optional)
     # @param idempotency_key [String, nil] makes the send safe to retry: the same key with the same body answers the first result again
@@ -47,7 +46,6 @@ module Meeng
     #   +text+ (optional)
     #   +html+ (optional)
     #   +headers+ (optional)
-    #   +attachments+ (optional)
     #   +scheduledAt+ (optional)
     #   +inReplyToId+ (optional)
     # @param idempotency_key [String, nil] makes the send safe to retry: the same key with the same body answers the first result again
@@ -173,10 +171,10 @@ module Meeng
     # Lists the contacts of a contact book, optionally by email or id.
     #
     # @param contactBookId [String, Integer]
-    # @param emails [String, nil] Comma separated e-mail addresses; an exact match.
-    # @param page [Integer, nil] The page, from 1.
-    # @param limit [Integer, nil] Contacts to a page; 5000 when it is not given.
-    # @param ids [String, nil] Comma separated contact ids.
+    # @param emails [String, nil] Endereços de e-mail separados por vírgula; correspondência exata.
+    # @param page [Integer, nil] A página, a partir de 1.
+    # @param limit [Integer, nil] Contatos por página; 5000 quando não é informado.
+    # @param ids [String, nil] Ids de contatos separados por vírgula.
     # @return [Array<Hash>]
     def list(contactBookId, emails: nil, page: nil, limit: nil, ids: nil)
       query = {
@@ -352,9 +350,9 @@ module Meeng
 
     # Lists campaigns, optionally by status or a search text.
     #
-    # @param page [Integer, nil] The page, from 1; 30 campaigns to a page.
-    # @param status [String, nil] Only campaigns in this status.
-    # @param search [String, nil] Part of the name or of the subject.
+    # @param page [Integer, nil] A página, a partir de 1; 30 campanhas por página.
+    # @param status [String, nil] Só campanhas neste status.
+    # @param search [String, nil] Parte do nome ou do assunto.
     # @return [Hash]
     def list(page: nil, status: nil, search: nil)
       query = {
@@ -418,8 +416,8 @@ module Meeng
 
     # Counts emails by day over the last 7 or 30 days.
     #
-    # @param days [String, nil] How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
-    # @param domain_id [String, nil] Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    # @param days [String, nil] Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.
+    # @param domain_id [String, nil] Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     # @return [Hash]
     def email_time_series(days: nil, domain_id: nil)
       query = {
@@ -431,7 +429,7 @@ module Meeng
 
     # Reads the bounce and complaint rates of the sending reputation.
     #
-    # @param domain_id [String, nil] Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+    # @param domain_id [String, nil] Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
     # @return [Hash]
     def reputation_metrics(domain_id: nil)
       query = {

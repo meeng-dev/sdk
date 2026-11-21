@@ -25,7 +25,6 @@ defmodule Meeng.Emails do
   `text` (optional)
   `html` (optional)
   `headers` (optional)
-  `attachments` (optional)
   `scheduledAt` (optional)
   `inReplyToId` (optional)
 
@@ -58,7 +57,6 @@ defmodule Meeng.Emails do
   `text` (optional)
   `html` (optional)
   `headers` (optional)
-  `attachments` (optional)
   `scheduledAt` (optional)
   `inReplyToId` (optional)
 
@@ -224,10 +222,10 @@ defmodule Meeng.Contacts do
   The path parameters are strings or integers.
 
   Options, the filters, named in snake case:
-  `:emails`: Comma separated e-mail addresses; an exact match.
-  `:page`: The page, from 1.
-  `:limit`: Contacts to a page; 5000 when it is not given.
-  `:ids`: Comma separated contact ids.
+  `:emails`: Endereços de e-mail separados por vírgula; correspondência exata.
+  `:page`: A página, a partir de 1.
+  `:limit`: Contatos por página; 5000 quando não é informado.
+  `:ids`: Ids de contatos separados por vírgula.
   """
   @spec list(Client.t(), String.t() | integer(), keyword()) ::
           {:ok, [map()]} | {:error, Error.t()}
@@ -445,9 +443,9 @@ defmodule Meeng.Campaigns do
   Lists campaigns, optionally by status or a search text.
 
   Options, the filters, named in snake case:
-  `:page`: The page, from 1; 30 campaigns to a page.
-  `:status`: Only campaigns in this status.
-  `:search`: Part of the name or of the subject.
+  `:page`: A página, a partir de 1; 30 campanhas por página.
+  `:status`: Só campanhas neste status.
+  `:search`: Parte do nome ou do assunto.
   """
   @spec list(Client.t(), keyword()) ::
           {:ok, map()} | {:error, Error.t()}
@@ -534,8 +532,8 @@ defmodule Meeng.Analytics do
   Counts emails by day over the last 7 or 30 days.
 
   Options, the filters, named in snake case:
-  `:days`: How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
-  `:domain_id`: Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+  `:days`: Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.
+  `:domain_id`: Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
   """
   @spec email_time_series(Client.t(), keyword()) ::
           {:ok, map()} | {:error, Error.t()}
@@ -547,7 +545,7 @@ defmodule Meeng.Analytics do
   Reads the bounce and complaint rates of the sending reputation.
 
   Options, the filters, named in snake case:
-  `:domain_id`: Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+  `:domain_id`: Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
   """
   @spec reputation_metrics(Client.t(), keyword()) ::
           {:ok, map()} | {:error, Error.t()}

@@ -531,13 +531,6 @@ export interface EmailSuppressedSuppression {
   source?: string;
 }
 
-/** One item of attachments in EmailsBatchParams. */
-export interface EmailsBatchAttachment {
-  filename: string;
-  /** The file, in base64. */
-  content: string;
-}
-
 /** One item of data in EmailsBatchResponse. */
 export interface EmailsBatchItem {
   emailId: string;
@@ -547,20 +540,19 @@ export interface EmailsBatchItem {
 export interface EmailsBatchParams {
   to: string | string[];
   from: string;
-  /** Optional when templateId is provided. */
+  /** Opcional quando templateId é informado. */
   subject?: string;
-  /** ID of a template from the dashboard. */
+  /** ID de um modelo criado no painel. */
   templateId?: string;
-  /** The values of the template's variables, as text. */
+  /** Os valores das variáveis do modelo, em texto. */
   variables?: Record<string, unknown>;
   replyTo?: string | string[];
   cc?: string | string[];
   bcc?: string | string[];
   text?: string | null;
   html?: string | null;
-  /** Custom headers to include with the e-mail, name to value. */
+  /** Cabeçalhos personalizados do e-mail, do nome ao valor. */
   headers?: Record<string, unknown>;
-  attachments?: EmailsBatchAttachment[];
   scheduledAt?: string;
   inReplyToId?: string | null;
 }
@@ -599,31 +591,23 @@ export interface EmailsListResponse {
   count: number;
 }
 
-/** One item of attachments in EmailsSendParams. */
-export interface EmailsSendAttachment {
-  filename: string;
-  /** The file, in base64. */
-  content: string;
-}
-
 /** The body of emails.send. */
 export interface EmailsSendParams {
   to: string | string[];
   from: string;
-  /** Optional when templateId is provided. */
+  /** Opcional quando templateId é informado. */
   subject?: string;
-  /** ID of a template from the dashboard. */
+  /** ID de um modelo criado no painel. */
   templateId?: string;
-  /** The values of the template's variables, as text. */
+  /** Os valores das variáveis do modelo, em texto. */
   variables?: Record<string, unknown>;
   replyTo?: string | string[];
   cc?: string | string[];
   bcc?: string | string[];
   text?: string | null;
   html?: string | null;
-  /** Custom headers to include with the e-mail, name to value. */
+  /** Cabeçalhos personalizados do e-mail, do nome ao valor. */
   headers?: Record<string, unknown>;
-  attachments?: EmailsSendAttachment[];
   scheduledAt?: string;
   inReplyToId?: string | null;
 }

@@ -51,12 +51,12 @@ public final class AnalyticsService {
             return new Builder();
         }
 
-        /** @return How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today. (null when not filtered) */
+        /** @return Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje. (null when not filtered) */
         public String getDays() {
             return days;
         }
 
-        /** @return Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. (null when not filtered) */
+        /** @return Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro. (null when not filtered) */
         public String getDomainId() {
             return domainId;
         }
@@ -77,7 +77,7 @@ public final class AnalyticsService {
             }
 
             /**
-             * @param days How many days back to count: 7 or 30 (default 30). The answer has one entry for each of those days and one for today.
+             * @param days Quantos dias para trás contar: 7 ou 30 (padrão 30). A resposta traz uma entrada para cada um desses dias e uma para hoje.
              * @return this builder
              */
             public Builder days(String days) {
@@ -86,7 +86,7 @@ public final class AnalyticsService {
             }
 
             /**
-             * @param domainId Count only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+             * @param domainId Conta só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
              * @return this builder
              */
             public Builder domainId(String domainId) {
@@ -134,7 +134,7 @@ public final class AnalyticsService {
             return new Builder();
         }
 
-        /** @return Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this. (null when not filtered) */
+        /** @return Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro. (null when not filtered) */
         public String getDomainId() {
             return domainId;
         }
@@ -153,7 +153,7 @@ public final class AnalyticsService {
             }
 
             /**
-             * @param domainId Read only this domain, by its numeric id. A value that is not a number filters nothing. A key restricted to one domain reads that domain and ignores this.
+             * @param domainId Lê só este domínio, pelo id numérico. Um valor que não seja número não filtra nada. Uma chave restrita a um domínio lê esse domínio e ignora este parâmetro.
              * @return this builder
              */
             public Builder domainId(String domainId) {

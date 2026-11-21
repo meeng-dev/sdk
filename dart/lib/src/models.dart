@@ -2338,19 +2338,6 @@ final class EmailSuppressedSuppression {
   };
 }
 
-/// One item of attachments in EmailsBatchParams.
-final class EmailsBatchAttachment {
-  const EmailsBatchAttachment({required this.filename, required this.content});
-
-  final String filename;
-
-  /// The file, in base64.
-  final String content;
-
-  /// The JSON the API takes; a field left null is left out.
-  Map<String, Object?> toJson() => {'filename': filename, 'content': content};
-}
-
 /// One item of data in EmailsBatchResponse.
 final class EmailsBatchItem {
   const EmailsBatchItem({required this.emailId});
@@ -2380,7 +2367,6 @@ final class EmailsBatchParams {
     this.text,
     this.html,
     this.headers,
-    this.attachments,
     this.scheduledAt,
     this.inReplyToId,
   });
@@ -2389,13 +2375,13 @@ final class EmailsBatchParams {
 
   final String from;
 
-  /// Optional when templateId is provided.
+  /// Opcional quando templateId é informado.
   final String? subject;
 
-  /// ID of a template from the dashboard.
+  /// ID de um modelo criado no painel.
   final String? templateId;
 
-  /// The values of the template's variables, as text.
+  /// Os valores das variáveis do modelo, em texto.
   final Map<String, Object?>? variables;
 
   final List<String>? replyTo;
@@ -2408,10 +2394,8 @@ final class EmailsBatchParams {
 
   final String? html;
 
-  /// Custom headers to include with the e-mail, name to value.
+  /// Cabeçalhos personalizados do e-mail, do nome ao valor.
   final Map<String, Object?>? headers;
-
-  final List<EmailsBatchAttachment>? attachments;
 
   final String? scheduledAt;
 
@@ -2430,7 +2414,6 @@ final class EmailsBatchParams {
     'text': ?text,
     'html': ?html,
     'headers': ?headers,
-    'attachments': ?attachments?.map((item) => item.toJson()).toList(),
     'scheduledAt': ?scheduledAt,
     'inReplyToId': ?inReplyToId,
   };
@@ -2585,19 +2568,6 @@ final class EmailsListResponse {
   };
 }
 
-/// One item of attachments in EmailsSendParams.
-final class EmailsSendAttachment {
-  const EmailsSendAttachment({required this.filename, required this.content});
-
-  final String filename;
-
-  /// The file, in base64.
-  final String content;
-
-  /// The JSON the API takes; a field left null is left out.
-  Map<String, Object?> toJson() => {'filename': filename, 'content': content};
-}
-
 /// The body of emails.send.
 final class EmailsSendParams {
   const EmailsSendParams({
@@ -2612,7 +2582,6 @@ final class EmailsSendParams {
     this.text,
     this.html,
     this.headers,
-    this.attachments,
     this.scheduledAt,
     this.inReplyToId,
   });
@@ -2621,13 +2590,13 @@ final class EmailsSendParams {
 
   final String from;
 
-  /// Optional when templateId is provided.
+  /// Opcional quando templateId é informado.
   final String? subject;
 
-  /// ID of a template from the dashboard.
+  /// ID de um modelo criado no painel.
   final String? templateId;
 
-  /// The values of the template's variables, as text.
+  /// Os valores das variáveis do modelo, em texto.
   final Map<String, Object?>? variables;
 
   final List<String>? replyTo;
@@ -2640,10 +2609,8 @@ final class EmailsSendParams {
 
   final String? html;
 
-  /// Custom headers to include with the e-mail, name to value.
+  /// Cabeçalhos personalizados do e-mail, do nome ao valor.
   final Map<String, Object?>? headers;
-
-  final List<EmailsSendAttachment>? attachments;
 
   final String? scheduledAt;
 
@@ -2662,7 +2629,6 @@ final class EmailsSendParams {
     'text': ?text,
     'html': ?html,
     'headers': ?headers,
-    'attachments': ?attachments?.map((item) => item.toJson()).toList(),
     'scheduledAt': ?scheduledAt,
     'inReplyToId': ?inReplyToId,
   };

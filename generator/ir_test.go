@@ -316,3 +316,64 @@ func TestTheDeletedCampaignHasItsOwnModel(t *testing.T) {
 		t.Error("CampaignRow has no model")
 	}
 }
+
+// The API takes no attachments (ADR-0008) and the contract lists the field as a
+// list of at most zero items: no SDK has it, and the model says it left it out.
+func TestNoSendModelHasAnAttachmentsField(t *testing.T) {
+	ir := loadContract(t)
+	for _, name := range []string{"EmailsSendParams", "EmailsBatchParams"} {
+		model := ir.model(name)
+		if model == nil {
+			t.Fatalf("%s has no model", name)
+		}
+		for _, f := range model.Fields {
+			if f.Wire == "attachments" {
+				t.Errorf("%s offers attachments", name)
+			}
+		}
+		if len(model.Refused) != 1 || model.Refused[0] != "attachments" {
+			t.Errorf("%s did not record the field it left out: %v", name, model.Refused)
+		}
+	}
+	if model := ir.model("Email"); model != nil {
+		for _, f := range model.Fields {
+			if f.Wire == "attachments" {
+				t.Error("an e-mail read back carries attachments")
+			}
+		}
+	}
+}
+
+// A list with no items that is not the refused field is still a stop: only the
+// contract's own zero-length list is left out.
+func TestAnArrayWithNoItemsIsStillAStopUnlessTheAPIRefusesIt(t *testing.T) {
+	zero, one := 0, 1
+	if !(&schema{Type: "array", MaxItems: &zero}).refused() {
+		t.Error("a list of at most zero items is the refused field")
+	}
+	if (&schema{Type: "array", MaxItems: &one}).refused() || (&schema{Type: "array"}).refused() {
+		t.Error("only a list capped at zero is refused")
+	}
+}
+
+// A domain's records carry any type the platform publishes, a CNAME for the return
+// path included, and the priority only where the record has one.
+func TestADomainRecordTypeIsAFreeStringAndThePriorityIsOptional(t *testing.T) {
+	ir := loadContract(t)
+	model := ir.model("DomainDnsRecord")
+	if model == nil {
+		t.Fatal("DomainDnsRecord has no model")
+	}
+	for _, f := range model.Fields {
+		switch f.Wire {
+		case "type":
+			if len(f.Type.Enum) != 0 {
+				t.Errorf("the record type is an enum %v: a CNAME would be refused", f.Type.Enum)
+			}
+		case "priority", "recommended":
+			if f.Required {
+				t.Errorf("%s is required, and a CNAME record has none", f.Wire)
+			}
+		}
+	}
+}
