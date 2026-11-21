@@ -48,6 +48,9 @@ Como cada SDK entrega o erro:
 | 400 `BAD_REQUEST` | `Domain: x of from email is wrong` | o domínio não é da conta; cadastre-o (`meeng-dominios`) |
 | 400 `BAD_REQUEST` | `Domain: x is not verified` | publique o DNS e verifique (`meeng-dominios`) |
 | 403 `FORBIDDEN` | `API key does not have access to domain: x` | a chave é restrita a outro domínio |
+| 403 `FORBIDDEN` | `O plano Grátis envia só para os endereços da própria organização. ...` | o destinatário não é da organização e ela está no plano Grátis: assine o plano Pro ou envie a um endereço da equipe |
+| 403 `FORBIDDEN` | `O limite diário de envio foi atingido (N e-mails por dia). ...` ou `O limite mensal do plano Grátis foi atingido (N e-mails por mês). ...` | o limite do dia ou do mês acabou: espere o dia (a conta é no horário de Brasília) ou troque de plano |
+| 403 `FORBIDDEN` | (sem `message` útil) com uma chave "Só envio" | a chave "Só envio" só envia, remarca e cancela; leitura, domínios, contatos e o resto pedem uma chave de acesso total |
 | 404 `NOT_FOUND` | `Template not found` | `templateId` errado ou de outra organização |
 | 400 `BAD_REQUEST` | `Either text or html is required` | falta `text` ou `html` |
 | 400 `BAD_REQUEST` | `"inReplyTo" is invalid` | `inReplyToId` não é de um e-mail da organização |
@@ -151,12 +154,13 @@ func main() {
 
 ## Limites do plano
 
-O plano da organização limita quantos e-mails saem por dia e por mês, quantos domínios, listas de contatos e webhooks existem. Dois comportamentos para saber:
+O plano da organização limita quantos e-mails saem por dia e por mês, quantos domínios, listas de contatos e webhooks existem, e **para quem** o plano Grátis envia. Como cada um chega:
 
-- O limite de envio **não** é conferido na entrada: a API responde `200` e o e-mail é aceito. Se o limite estourou na hora de enviar, o e-mail termina em `FAILED`, com o motivo no evento (`Email sending limit reached`). Acompanhe os eventos `email.failed`.
-- Criar domínio, lista de contatos ou webhook além do plano dá `403` com o nome do limite como mensagem (`DOMAIN`, `CONTACT_BOOK`).
+- **Plano Grátis, destinatário de fora da equipe, ou o limite do dia ou do mês estourado: a API recusa na hora**, com `403 FORBIDDEN` e o motivo em português em `error.message`. Nada é aceito, então não há e-mail que falhe depois: trate o `403` no envio. O plano Grátis envia só para os endereços da própria organização.
+- Um bloqueio posto pela plataforma na organização, ou um limite diário que a plataforma escreveu à mão para a conta, **não** é recusado na entrada: a API responde `200` e o e-mail termina em `FAILED`, com o motivo no evento (`Email sending limit reached`). Acompanhe os eventos `email.failed`.
+- Criar domínio, lista de contatos ou webhook além do plano dá `403` com o nome do limite como mensagem (`DOMAIN`, `CONTACT_BOOK`). No plano Grátis a organização tem uma lista de contatos.
 
-O uso e o limite aparecem no painel, em Configurações › Planos (`https://meeng.dev/configuracoes/planos`).
+O uso e o limite aparecem no painel, em Configurações › Planos (`https://meeng.dev/configuracoes/planos`). Dúvida que o painel não resolve: `ajuda@meeng.dev`.
 
 ## Limites que não mudam
 

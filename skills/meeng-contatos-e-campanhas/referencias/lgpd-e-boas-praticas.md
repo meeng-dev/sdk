@@ -25,9 +25,11 @@ O **dono do sistema** que usa o Meeng.dev decide para quem enviar e com que obje
 
 A pessoa pode pedir confirmação de que você a trata, acesso, correção, eliminação e outros direitos (arts. 17 a 22). Para os contatos que estão no Meeng.dev:
 
-- **Acesso e correção:** `contacts.list` com `emails=...` e `contacts.update`.
-- **Eliminação:** `contacts.delete` apaga o contato da lista. Para o histórico de e-mails já enviados, peça a eliminação à equipe do Meeng.dev (`ajuda@meeng.dev`).
+- **Acesso e correção:** `contacts.list` com `emails=...` (ou `ids=...`) e `contacts.update`; para sincronizar contatos de outro sistema sem duplicar, `PUT` do contato (o contato é achado pelo e-mail).
+- **Eliminação:** `contacts.delete` apaga o contato da lista (e `contacts.bulkDelete`, até 1000 ids por chamada). Para o histórico de e-mails já enviados, peça a eliminação à equipe do Meeng.dev (`ajuda@meeng.dev`).
 - **Lista de supressão:** quem pediu para nunca mais receber (ou deu bounce duro) fica numa lista de supressão da conta: é o que garante que o pedido seja respeitado mesmo se o contato for importado de novo. A supressão da conta é separada da lista de contatos: apagar o contato não a limpa, e isso protege quem pediu para não receber.
+
+- **Levar os dados:** o dono da organização exporta os dados dela (contatos, listas, campanhas, e-mails e o resto) pelo painel, em Configurações; é um arquivo ZIP com CSVs, que fica disponível por sete dias. A API não exporta. Ao fechar a organização, o dono tem trinta dias para exportar antes de os dados serem apagados.
 
 Responda ao titular no prazo que a lei e a ANPD definem para cada direito, e guarde o registro do pedido e da resposta.
 

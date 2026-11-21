@@ -7,6 +7,8 @@
 3. Quando todos os registros obrigatórios estão certos, o domínio vai a `SUCCESS`, a verificação termina e o webhook `domain.verified` é enviado. Quando algo muda para pior ou melhor sem fechar, sai `domain.updated`.
 4. Se o domínio tem mais de **72 horas** e ainda faltam registros, o status vai a `FAILED` e a verificação para. Depois de corrigir o DNS, peça `PUT /v1/domains/{id}/verify` outra vez.
 
+5. Quando os registros foram publicados pelo **"Configurar automaticamente"** do painel, a verificação roda **na hora**, logo depois de aplicar, e o resultado fica no registro de atividades da equipe; não é preciso pedir `verify`. Um registro que já estava certo conta como já existente.
+
 Os campos da resposta que ajudam:
 
 | Campo | O que diz |

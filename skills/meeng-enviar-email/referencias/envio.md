@@ -107,13 +107,13 @@ Um `inReplyToId` que não é de um e-mail da organização dá `400` com `"inRep
 
 ## Ler o status de um e-mail
 
-`GET /api/v1/emails/{emailId}` devolve o e-mail e a lista `emailEvents`, um evento por mudança. `GET /api/v1/emails` lista do mais novo ao mais velho, com `page`, `limit` (de 1 a 50, padrão 50), `startDate`, `endDate` (UTC, terminando em `Z`) e `domainId`; a resposta é `{ data: [...], count }`, e `count` é o total do filtro.
+`GET /api/v1/emails/{emailId}` devolve o e-mail, com `to`, `cc`, `bcc`, `replyTo`, `scheduledAt` e `latestStatus` (a situação de agora), e a lista `emailEvents`, um evento por mudança. `GET /api/v1/emails` lista do mais novo ao mais velho, com `page`, `limit` (de 1 a 50, padrão 50; fora disso, `400` de validação, a API não ajusta o valor), `startDate`, `endDate` (UTC, terminando em `Z`) e `domainId`; a resposta é `{ data: [...], count }`, e `count` é o total do filtro.
 
 Os status, do primeiro ao último na ordem de precedência: `SCHEDULED`, `QUEUED`, `SENT`, `DELIVERY_DELAYED`, `BOUNCED`, `REJECTED`, `RENDERING_FAILURE`, `DELIVERED`, `OPENED`, `CLICKED`, `COMPLAINED`, `FAILED`, `CANCELLED`, `SUPPRESSED`.
 
 - `DELIVERED` só aparece quando o servidor do destinatário aceitou a mensagem (resposta 250). Nenhum e-mail é marcado como entregue sem isso.
 - `BOUNCED` é a devolução: o endereço não existe, a caixa está cheia ou o servidor recusou. Um bounce duro põe o endereço na lista de supressão da conta, e os próximos envios para ele ficam `SUPPRESSED`.
-- `FAILED` é uma falha do lado do envio (por exemplo o limite do plano); o `data` do evento diz o motivo.
+- `FAILED` é uma falha do lado do envio (por exemplo um bloqueio posto pela plataforma); o `data` do evento diz o motivo. O limite do plano Grátis não chega aqui: é recusado na hora, com `403`.
 
 ```go
 package main

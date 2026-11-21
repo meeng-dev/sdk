@@ -4,12 +4,12 @@ Skills para assistentes de código (Claude Code, Codex, Cursor e outros): cada p
 
 | Skill | Para quê |
 |---|---|
-| [`meeng-enviar-email`](meeng-enviar-email/SKILL.md) | enviar e-mail: simples, em lote, agendado e com modelo, com links no lugar de anexos; idempotência, erros e limites |
+| [`meeng-enviar-email`](meeng-enviar-email/SKILL.md) | enviar e-mail pela API (o caminho principal), por SDK ou pelo `MAIL_URL` de um app Arandu: simples, em lote, agendado e com modelo, com links no lugar de anexos; idempotência, erros e limites; a chave "Só envio" e o plano Grátis |
 | [`meeng-dominios`](meeng-dominios/SKILL.md) | cadastrar o domínio de envio, publicar o DNS (MX, SPF, DKIM, DMARC), verificar e resolver o que falta |
 | [`meeng-webhooks`](meeng-webhooks/SKILL.md) | receber os avisos (entregue, devolvido, aberto...), conferir a assinatura, tratar repetições |
 | [`meeng-contatos-e-campanhas`](meeng-contatos-e-campanhas/SKILL.md) | listas de contatos, dupla confirmação, descadastro, campanhas, LGPD |
-| [`meeng-smtp`](meeng-smtp/SKILL.md) | enviar por SMTP, para sistemas que não chamam API (vale quando o relay está ligado na conta) |
-| [`meeng-mcp`](meeng-mcp/SKILL.md) | conectar um assistente de IA ao servidor MCP do Meeng.dev |
+| [`meeng-smtp`](meeng-smtp/SKILL.md) | enviar por SMTP, só como reserva, para sistemas que não chamam API (`smtp.meeng.dev`, portas 587 e 465) |
+| [`meeng-mcp`](meeng-mcp/SKILL.md) | conectar um assistente de IA ao servidor MCP do Meeng.dev (`https://meeng.dev/mcp`, 44 ferramentas, 2 leituras, 3 roteiros) |
 | [`meeng-migrar-de-outro-provedor`](meeng-migrar-de-outro-provedor/SKILL.md) | trocar o envio de outro provedor para o Meeng.dev, aos poucos e com volta |
 
 ## Como instalar
@@ -22,8 +22,9 @@ cp -R skills/meeng-enviar-email ~/.claude/skills/
 
 ## O que as skills afirmam
 
-- **Estado dos pacotes.** Os SDKs ainda não foram publicados nos registros; as skills dizem isso e mandam conferir antes de escrever uma instalação.
-- **SMTP e MCP só valem ligados.** `meeng-smtp` pede que se confira a tela Configurações › SMTP, e `meeng-mcp` que se teste o endereço e se leia a lista real de ferramentas (`tools/list`) antes de prometer algo.
+- **Estado dos pacotes.** A versão `0.1.0` dos SDKs está publicada em npm (`@meeng-dev/sdk`), Go (`github.com/meeng-dev/sdk/go`), PyPI, RubyGems e crates.io (`meeng-sdk`), Hex e pub.dev (`meeng_sdk`), NuGet (`MeengDev.Sdk`) e Packagist (`meeng-dev/sdk`); o Swift lê a tag do repositório. O Java (Maven Central) ainda não saiu. As skills mandam conferir a versão no registro antes de escrever uma instalação.
+- **A API é o caminho principal de envio; o SMTP é a reserva.** `meeng-smtp` só vale para o programa que não chama API, e `meeng-mcp` manda testar o endereço e ler a lista real de ferramentas (`tools/list`) antes de prometer algo.
+- **Dois endereços, uma chave.** `https://meeng.dev/api/v1` é a API do Meeng.dev e `https://api.meeng.dev` responde no formato das bibliotecas de outros provedores (basta trocar o endereço base e a chave); um app Arandu usa `MAIL_URL=meeng://<chave>@meeng.dev`. As skills descrevem isso sem citar o nome de nenhum outro produto.
 - **Sem anexos.** O Meeng.dev não anexa nem guarda arquivos: as skills ensinam a pôr o link do arquivo no corpo, e nenhum exemplo usa `attachments`.
 - **A API é a fonte da verdade.** Em caso de dúvida, o contrato é `https://meeng.dev/api/v1/doc`; as skills mandam o assistente nunca inventar campo, rota ou evento.
 

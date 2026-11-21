@@ -15,6 +15,10 @@ Use quando o trabalho é guardar contatos no Meeng.dev e mandar e-mail para eles
 
 Não use para comprar ou raspar listas de contatos: o Meeng.dev é só para quem recebeu o consentimento da pessoa. Para algo que não está aqui, a fonte da verdade é o contrato `https://meeng.dev/api/v1/doc`. Nunca invente campo ou rota.
 
+## Por um assistente de IA (MCP)
+
+Quem usa um assistente conectado ao servidor MCP (`meeng-mcp`) com uma chave de acesso total tem as mesmas operações como ferramentas: `create_contact_book`, `get_contact_book`, `update_contact_book`, `create_contact`, `upsert_contact`, `bulk_create_contacts`, `bulk_delete_contacts`, `create_campaign` (rascunho), `schedule_campaign` e `delete_campaign`, entre outras. Enviar uma campanha, apagar contatos, lista ou campanha pedem `confirm=true`, só depois de a pessoa aprovar. A chave "Só envio" não usa nenhuma delas.
+
 ## Os três objetos
 
 - **Lista de contatos** (`contactBooks`): um grupo de pessoas com o mesmo assunto (clientes, boletim, lista de espera). Tem nome, variáveis de personalização e as regras da confirmação de inscrição.

@@ -1,6 +1,6 @@
 ---
 name: meeng-dominios
-description: Ensina a cadastrar, publicar o DNS, verificar e manter o domínio de envio no Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, pelo painel, pelos SDKs oficiais ou pela API REST em https://meeng.dev/api/v1. Use quando o pedido for adicionar um domínio para enviar e-mail, descobrir quais registros DNS (MX, SPF, DKIM e DMARC) publicar, conferir por que o domínio não verifica (PENDING, FAILED, TEMPORARY_FAILURE), configurar DMARC, escolher entre domínio e subdomínio de envio, restringir uma chave de API a um domínio, remover um domínio, ou resolver o erro "Domain is not verified" no envio. Cobre criação, registros DNS, verificação, DMARC e remoção.
+description: Ensina a cadastrar, publicar o DNS, verificar e manter o domínio de envio no Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, pelo painel, pelos SDKs oficiais ou pela API REST em https://meeng.dev/api/v1. Use quando o pedido for adicionar um domínio para enviar e-mail, descobrir quais registros DNS (o CNAME do retorno, DKIM e DMARC; SPF e MX nos domínios mais antigos) publicar, usar o "Configurar automaticamente" do painel (Cloudflare ou provedor compatível, que substitui os registros que conflitam), conferir por que o domínio não verifica (PENDING, FAILED, TEMPORARY_FAILURE), configurar DMARC, escolher entre domínio e subdomínio de envio, restringir uma chave de API a um domínio, remover um domínio, ou resolver o erro "Domain is not verified" no envio. Cobre criação, registros DNS, configuração automática, verificação, DMARC e remoção.
 ---
 
 # Domínios de envio no Meeng.dev
@@ -15,24 +15,41 @@ Use quando o trabalho é deixar um domínio pronto para enviar, ou descobrir por
 
 Não use para o e-mail de **recebimento** do domínio (caixa de entrada da empresa): os registros do Meeng.dev ficam num subdomínio de retorno (`mail`) e não mexem no MX do domínio principal. Para algo que não está aqui, a fonte da verdade é o contrato `https://meeng.dev/api/v1/doc`. Nunca invente campo ou status.
 
-## Os quatro registros
+## Os registros
 
-Ao criar um domínio, a API devolve `dnsRecords`: o que publicar no DNS, na ordem do painel.
+Ao criar um domínio, a API devolve `dnsRecords`: o que publicar no DNS, na ordem do painel. Num domínio novo são **três**:
 
 | Para quê | Tipo | Nome (relativo ao domínio) | Valor |
 |---|---|---|---|
-| Retorno de devoluções (bounces) | `MX`, prioridade `10` | `mail` | o servidor de entrada do Meeng.dev |
-| SPF: quem pode enviar | `TXT` | `mail` | `v=spf1 include:... ~all` |
+| Retorno de devoluções (bounces) e SPF | `CNAME` | `mail` | `return.meeng.dev`, o domínio de retorno do Meeng.dev (o MX e o SPF do retorno ficam lá) |
 | DKIM: assinatura do e-mail | `TXT` | `meeng._domainkey` | `p=...` (a chave pública) |
 | DMARC: política (recomendado) | `TXT` | `_dmarc` | `v=DMARC1; p=none;` |
 
-- Em domínios que usam o **retorno por CNAME**, os dois primeiros registros (MX e SPF) vêm como **um só `CNAME`** no nome `mail`, apontando para o domínio de retorno do Meeng.dev ([`referencias/registros-dns.md`](referencias/registros-dns.md)). Publique o que a API devolver, pelo `type` de cada item.
-- O **nome** é relativo ao domínio cadastrado: para `exemplo.com.br` o MX é `envio.exemplo.com.br`. Se o cadastro foi de um subdomínio (`envio.exemplo.com.br`), os nomes ganham o sufixo (`mail.envio`, `meeng._domainkey.envio`); copie o que a API devolveu, nunca monte à mão.
+Dois grupos **opcionais** aparecem à parte e não decidem o status do domínio: o **rastreio** de abertura e clique (um `CNAME` no subdomínio próprio do domínio, só depois de ele estar verificado) e o **recebimento** (um `MX`). Só publique os que o dono ligou.
+
+- O CNAME de retorno ocupa o lugar do **MX e do SPF** de um subdomínio de retorno por MX: um domínio mais antigo continua com os dois. Publique o que a API devolver, pelo `type` de cada item ([`referencias/registros-dns.md`](referencias/registros-dns.md)).
+- O **nome** é relativo ao domínio cadastrado: para `exemplo.com.br` o registro de retorno é `mail.exemplo.com.br`. Se o cadastro foi de um subdomínio (`envio.exemplo.com.br`), os nomes ganham o sufixo (`mail.envio`, `meeng._domainkey.envio`); copie o que a API devolveu, nunca monte à mão.
 - Copie o **valor** exatamente como a API devolveu. A chave DKIM é longa; alguns painéis de DNS pedem para dividi-la em pedaços de até 255 caracteres.
 - `ttl` vem como `Auto`: use o padrão do seu provedor de DNS (3600 segundos serve).
 - O DMARC é marcado `recommended`: o domínio funciona sem ele, mas os provedores de caixa de entrada cada vez mais o exigem. Veja [`referencias/dmarc.md`](referencias/dmarc.md).
 
 Detalhes por tipo de registro, e como preencher o painel dos provedores de DNS mais comuns, em [`referencias/registros-dns.md`](referencias/registros-dns.md).
+
+## Configurar automaticamente (no painel)
+
+Na página do domínio, em Domínios (`https://meeng.dev/painel/dominios`), o botão **"Configurar automaticamente"** publica o CNAME de retorno e a chave DKIM no DNS do dono, sem copiar e colar. A pessoa escolhe como autorizar: **Cloudflare** com um token (permissões Zona > Leitura e DNS > Edição, só na zona do domínio) ou com a própria conta, ou o **provedor** que o Domain Connect achou (GoDaddy, IONOS e outros). Nenhuma senha passa pelo Meeng.dev e o token não é guardado.
+
+Antes de aplicar, a tela mostra o **plano**, registro por registro, com o que há hoje no DNS:
+
+| Já existe | O que acontece |
+|---|---|
+| mesmo nome e mesmo valor | nada (`Já existe`) |
+| mesmo nome e tipo, outro valor | troca no lugar (`Atualizar`) |
+| um registro que não pode dividir o nome (um CNAME onde vai o TXT da chave; TXT e MX onde vai o CNAME de retorno) | **substitui**: apaga o que está nesse nome e cria o do Meeng.dev, mostrado antes de confirmar; se a criação falhar, devolve o que apagou |
+| registros de **outro serviço de envio** em outros nomes do mesmo subdomínio | ficam como estão; a tela os lista e avisa que o envio por aquele serviço continua até a pessoa os remover |
+| MX, SPF ou DMARC da **raiz da zona** com outro valor | **conflito**: fica como está, e a pessoa decide à mão |
+
+Só os nomes que o Meeng.dev publica são tocados; nenhum outro. Depois de confirmar, a verificação roda na hora e o resultado vai para o registro de atividades da equipe. O agente **não aperta** esse botão nem recebe o token da Cloudflare: ele diz que a opção existe e a pessoa a usa; sem ela, vale o caminho manual desta skill. Esse botão é do painel: nem a API nem o servidor MCP configuram o DNS.
 
 ## Regras que valem sempre
 
@@ -48,7 +65,7 @@ Detalhes por tipo de registro, e como preencher o painel dos provedores de DNS m
 ## Roteiro essencial
 
 1. **Cadastrar o domínio**: `POST /v1/domains` com `name` e `region` (use `us-east-1`, a região padrão que o painel mostra).
-2. **Mostrar os registros** (`dnsRecords`) ao dono, um por linha: tipo, nome, valor, prioridade.
+2. **Mostrar os registros** (`dnsRecords`) ao dono, um por linha: tipo, nome, valor, prioridade; e dizer que a página do domínio, no painel, tem o botão "Configurar automaticamente" para quem não quer copiar e colar.
 3. **Esperar a publicação**: o DNS leva de minutos a algumas horas para valer.
 4. **Pedir a verificação**: `PUT /v1/domains/{id}/verify`.
 5. **Conferir**: `GET /v1/domains/{id}` até o `status` virar `SUCCESS`. Enquanto o domínio está sendo verificado, cada `GET` refaz a checagem do DNS; além disso, uma varredura confere os domínios pendentes a cada 5 minutos.

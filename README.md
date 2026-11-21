@@ -2,9 +2,9 @@
 
 Os SDKs da API do [Meeng.dev](https://meeng.dev), o e-mail para desenvolvedores, num monorepo: um contrato, um gerador em Go e um pacote por linguagem. A API fica em `https://meeng.dev/api`; crie uma chave em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves).
 
-> Nenhum pacote foi publicado. Os nomes abaixo são propostas, aguardando a confirmação do Paulo, e cada pacote está marcado para não sair por engano.
+> A versão `0.1.0` está publicada (21/11/2026) em npm, Go, PyPI, RubyGems, crates.io, Hex, pub.dev, NuGet e Packagist; o Swift lê a tag `v0.1.0` do repositório. O Java (Maven Central) ainda não saiu.
 
-| Linguagem | Pasta | Pacote proposto |
+| Linguagem | Pasta | Pacote |
 |---|---|---|
 | Go | [`go/`](go) | `github.com/meeng-dev/sdk/go` |
 | TypeScript / JavaScript | [`typescript/`](typescript) | `@meeng-dev/sdk` (npm) |

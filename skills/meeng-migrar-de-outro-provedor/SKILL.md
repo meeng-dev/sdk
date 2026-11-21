@@ -1,6 +1,6 @@
 ---
 name: meeng-migrar-de-outro-provedor
-description: Ensina a trocar o envio de e-mail de um sistema que usa outro provedor para o Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, mantendo o formato do payload de envio, sem derrubar entregas e sem perder reputação. Use quando o pedido for migrar o envio de e-mail para o Meeng.dev, trocar a chamada de envio do provedor atual, mapear campos (destinatário, assunto, corpo, links no lugar de anexos, agendamento, tags), mover domínio e DNS, migrar webhooks e a assinatura, importar contatos e supressões, esquentar o volume aos poucos, ou planejar a virada com plano de volta. Cobre inventário, adaptador de envio, domínio, webhooks, contatos, virada gradual e reversão.
+description: Ensina a trocar o envio de e-mail de um sistema que usa outro provedor para o Meeng.dev, a plataforma brasileira de e-mail para desenvolvedores, mantendo o formato do payload de envio, sem derrubar entregas e sem perder reputação. Use quando o pedido for migrar o envio de e-mail para o Meeng.dev (às vezes só trocando o endereço base e a chave), trocar a chamada de envio do provedor atual, mapear campos (destinatário, assunto, corpo, links no lugar de anexos, agendamento, tags), mover domínio e DNS, migrar webhooks e a assinatura, importar contatos e supressões, esquentar o volume aos poucos, ou planejar a virada com plano de volta. Cobre inventário, adaptador de envio, domínio, webhooks, contatos, virada gradual e reversão.
 ---
 
 # Migrar o envio de e-mail para o Meeng.dev
@@ -30,12 +30,19 @@ Não use para migrar caixas de entrada (e-mail recebido de pessoas): isto é só
 
 ## A troca mais curta: só o endereço e a chave
 
-Alguns sistemas já falam o formato de API que o Meeng.dev usa: os mesmos caminhos (`/v1/emails`, `/v1/domains`, `/v1/contacts`...), os mesmos campos e a mesma chave no cabeçalho `Authorization: Bearer`. Se o SDK ou o cliente HTTP do sistema deixa configurar o **endereço base** e a **chave**, a troca de código é só isto, sem adaptador:
+O Meeng.dev responde em **dois endereços, com a mesma chave**, e assim muitos sistemas trocam de provedor sem adaptador:
 
-- endereço base: `https://meeng.dev/api` (o SDK do Meeng.dev recebe `https://meeng.dev` e acrescenta `/api`);
-- chave: uma chave nova do Meeng.dev, em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves), no formato `mg_<id>_<segredo>`, guardada em variável de ambiente.
+| Endereço | O formato | Quem já pode usar |
+|---|---|---|
+| `https://api.meeng.dev` | o das bibliotecas oficiais de envio de e-mail de outros provedores (Node, Python, Go, PHP e outras): caminhos sem prefixo (`/emails`, `/emails/batch`, `/domains`, `/contacts`, `/broadcasts`), corpo em `snake_case`, erros `{"statusCode","name","message"}` | o sistema que usa uma dessas bibliotecas e deixa configurar o **endereço base** (em geral por uma variável de ambiente que termina em `_BASE_URL`, ou uma opção do cliente) |
+| `https://meeng.dev/api` | o da API do Meeng.dev, `/v1/emails`, `/v1/domains`, `/v1/contacts`... com `camelCase` e `Authorization: Bearer` | o sistema que já fala esse formato, e o próprio SDK do Meeng.dev (que recebe `https://meeng.dev` e acrescenta `/api`) |
 
-Mesmo assim, o resto do roteiro vale (domínio, supressões, esquenta e plano de volta), e os envios com anexo precisam trocar o arquivo por link. Para um sistema que fala outro formato, siga com o adaptador abaixo.
+Nos dois casos a troca de código é só isto, sem adaptador:
+
+- endereço base: `https://api.meeng.dev` para o primeiro formato, ou `https://meeng.dev/api` para o segundo;
+- chave: uma chave nova do Meeng.dev, em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves), no formato `mg_<id>_<segredo>`, guardada em variável de ambiente (para um serviço que só envia, a chave "Só envio").
+
+O mesmo vale para um app Arandu: `MAIL_URL=meeng://<chave>@meeng.dev` (framework v0.72.0 ou mais novo). Mesmo assim, o resto do roteiro vale (domínio, supressões, esquenta e plano de volta), e os envios com anexo precisam trocar o arquivo por link; `tags` e `topic_id` do primeiro formato são aceitos e ignorados. Para um sistema que fala outro formato, siga com o adaptador abaixo. O código novo usa o SDK do Meeng.dev ([`meeng-enviar-email`](../meeng-enviar-email/SKILL.md)).
 
 ## Roteiro essencial
 

@@ -4,6 +4,68 @@ A regra é a mesma em toda linguagem: **ler o corpo cru**, conferir a assinatura
 
 O segredo vem de uma variável de ambiente (`MEENG_WEBHOOK_SECRET`), nunca do código.
 
+## TypeScript e JavaScript
+
+O verificador aceita os `Headers` do `fetch` e o objeto de cabeçalhos do Node, e o corpo como texto ou bytes. Em **Express**, o corpo cru exige `express.raw`, na rota do webhook, antes de qualquer `express.json()`:
+
+```ts nocheck
+import express from "express";
+import { Meeng } from "@meeng-dev/sdk";
+
+const app = express();
+const webhooks = new Meeng().webhooks(process.env.MEENG_WEBHOOK_SECRET ?? "");
+
+app.post("/webhooks/meeng", express.raw({ type: "application/json" }), (req, res) => {
+  try {
+    const evento = webhooks.constructEvent(req.body, { headers: req.headers }); // req.body é um Buffer
+    console.log(evento.type, evento.id);
+    res.sendStatus(200);
+  } catch {
+    res.sendStatus(401);
+  }
+});
+```
+
+Em Next.js (App Router), Hono, Bun, Deno e Workers, use `await request.text()` como no exemplo da skill principal. No Next.js com Pages Router é preciso desligar o leitor de corpo da rota (`export const config = { api: { bodyParser: false } }`) e ler o fluxo cru.
+
+O mesmo receptor com o servidor padrão do Node, sem framework, conferido pela verificação das skills:
+
+```ts
+import { createServer } from "node:http";
+
+import { Meeng, WebhookVerificationError } from "@meeng-dev/sdk";
+
+const webhooks = new Meeng().webhooks(process.env.MEENG_WEBHOOK_SECRET ?? "");
+
+createServer(async (req, res) => {
+  if (req.method !== "POST" || req.url !== "/webhooks/meeng") {
+    res.writeHead(404).end();
+    return;
+  }
+  const pedacos: Buffer[] = [];
+  for await (const pedaco of req) {
+    pedacos.push(pedaco as Buffer);
+  }
+  const corpo = Buffer.concat(pedacos); // o corpo cru
+
+  try {
+    const evento = webhooks.constructEvent(corpo, { headers: req.headers });
+    console.log(evento.type, evento.id);
+    res.writeHead(200).end("ok");
+  } catch (erro) {
+    if (erro instanceof WebhookVerificationError) {
+      res.writeHead(401).end(erro.code);
+      return;
+    }
+    res.writeHead(500).end();
+  }
+}).listen(8080);
+```
+
+## Go
+
+O exemplo da skill principal usa `net/http`. Com **Gin** ou **Echo**, leia o corpo com `io.ReadAll(c.Request.Body)` (não use `c.BindJSON`, que consome o corpo) e passe `c.Request.Header`. Com **Chi** e **Fiber** vale a mesma regra: o corpo em bytes, antes de decodificar.
+
 ## Python
 
 A parte que decide é uma função que não depende de framework: recebe o corpo cru e os cabeçalhos e devolve o status HTTP.
@@ -103,68 +165,6 @@ http_response_code(200);
 ```
 
 No Laravel, leia `$request->getContent()` (o corpo cru) e `$request->headers->all()`, e tire a rota do `VerifyCsrfToken`. No Symfony, `$request->getContent()`.
-
-## TypeScript e JavaScript
-
-O verificador aceita os `Headers` do `fetch` e o objeto de cabeçalhos do Node, e o corpo como texto ou bytes. Em **Express**, o corpo cru exige `express.raw`, na rota do webhook, antes de qualquer `express.json()`:
-
-```ts nocheck
-import express from "express";
-import { Meeng } from "@meeng-dev/sdk";
-
-const app = express();
-const webhooks = new Meeng().webhooks(process.env.MEENG_WEBHOOK_SECRET ?? "");
-
-app.post("/webhooks/meeng", express.raw({ type: "application/json" }), (req, res) => {
-  try {
-    const evento = webhooks.constructEvent(req.body, { headers: req.headers }); // req.body é um Buffer
-    console.log(evento.type, evento.id);
-    res.sendStatus(200);
-  } catch {
-    res.sendStatus(401);
-  }
-});
-```
-
-Em Next.js (App Router), Hono, Bun, Deno e Workers, use `await request.text()` como no exemplo da skill principal. No Next.js com Pages Router é preciso desligar o leitor de corpo da rota (`export const config = { api: { bodyParser: false } }`) e ler o fluxo cru.
-
-O mesmo receptor com o servidor padrão do Node, sem framework, conferido pela verificação das skills:
-
-```ts
-import { createServer } from "node:http";
-
-import { Meeng, WebhookVerificationError } from "@meeng-dev/sdk";
-
-const webhooks = new Meeng().webhooks(process.env.MEENG_WEBHOOK_SECRET ?? "");
-
-createServer(async (req, res) => {
-  if (req.method !== "POST" || req.url !== "/webhooks/meeng") {
-    res.writeHead(404).end();
-    return;
-  }
-  const pedacos: Buffer[] = [];
-  for await (const pedaco of req) {
-    pedacos.push(pedaco as Buffer);
-  }
-  const corpo = Buffer.concat(pedacos); // o corpo cru
-
-  try {
-    const evento = webhooks.constructEvent(corpo, { headers: req.headers });
-    console.log(evento.type, evento.id);
-    res.writeHead(200).end("ok");
-  } catch (erro) {
-    if (erro instanceof WebhookVerificationError) {
-      res.writeHead(401).end(erro.code);
-      return;
-    }
-    res.writeHead(500).end();
-  }
-}).listen(8080);
-```
-
-## Go
-
-O exemplo da skill principal usa `net/http`. Com **Gin** ou **Echo**, leia o corpo com `io.ReadAll(c.Request.Body)` (não use `c.BindJSON`, que consome o corpo) e passe `c.Request.Header`. Com **Chi** e **Fiber** vale a mesma regra: o corpo em bytes, antes de decodificar.
 
 ## Outras linguagens
 

@@ -5,7 +5,7 @@ description: Ensina a receber os avisos do Meeng.dev (webhooks), a plataforma br
 
 # Webhooks do Meeng.dev
 
-Um webhook é um aviso que o Meeng.dev manda ao servidor do dono, por um POST assinado, a cada coisa que acontece: e-mail entregue, devolvido, aberto, clicado, reclamação de spam, domínio verificado, contato criado. É por ele que o sistema do dono fica sabendo o que **aconteceu depois** do envio: um `200` no envio quer dizer só "aceito na fila".
+Um webhook é um aviso que o Meeng.dev manda ao servidor do dono, por um POST assinado, a cada coisa que acontece: e-mail entregue, devolvido, aberto, clicado, reclamação de spam, domínio verificado, contato criado. É por ele que o sistema do dono fica sabendo o que **aconteceu depois** do envio: um `200` no envio quer dizer só "aceito na fila". Como o envio é pela API (o caminho principal), o webhook é o par dela: o evento `email.delivered` só sai quando o servidor de destino respondeu `250`, e um e-mail enviado pelo relay SMTP (a reserva) gera os mesmos avisos.
 
 Fale com o dono em português simples. Explique em uma frase o que é webhook (o Meeng.dev "liga" para o seu servidor quando algo acontece) e assinatura (o carimbo que prova que o aviso veio mesmo do Meeng.dev). Pergunte só o que falta: a linguagem e o framework do servidor, o endereço público onde o aviso vai chegar e quais eventos interessam.
 
@@ -17,7 +17,7 @@ Não use para receber e-mail (caixa de entrada). Para algo que não está aqui, 
 
 ## Como criar o endpoint
 
-Os webhooks são criados **no painel**: Webhooks (`https://meeng.dev/painel/webhooks`) › criar um webhook. Não há rota pública da API para isso.
+Os webhooks são criados **no painel**: Webhooks (`https://meeng.dev/painel/webhooks`) › criar um webhook. Não há rota pública da API para isso. Um assistente conectado ao servidor MCP com uma chave de acesso total também pode listá-los (`list_webhooks`) e cadastrar um (`create_webhook`, que não devolve o segredo: a pessoa o lê no painel); a chave "Só envio" não vê nem cria webhook.
 
 | Campo | Regra |
 |---|---|

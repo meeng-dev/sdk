@@ -2,6 +2,8 @@
 
 Tudo o que o dono precisa publicar vem na resposta de `POST /v1/domains` e de `GET /v1/domains/{id}`, no campo `dnsRecords`. Cada item tem `type`, `name`, `value`, `ttl`, `priority` (só no MX), `status` e `recommended`.
 
+> **Num domínio novo** a API devolve o `CNAME` de retorno (seção "Retorno por CNAME", abaixo) **no lugar** do MX e do SPF das seções 1 e 2, mais o DKIM e o DMARC. As seções 1 e 2 valem para um domínio mais antigo, que ainda tem o retorno por MX. Leia o `type` de cada item e publique o que a API devolveu.
+
 Os exemplos abaixo usam o domínio `envio.exemplo.com.br`, um subdomínio de `exemplo.com.br`. Os valores reais (o servidor de entrada, o `include` do SPF e a chave DKIM) mudam: **copie sempre da resposta da API**.
 
 ## 1. MX: onde voltam as devoluções
@@ -64,6 +66,17 @@ Em domínios que usam o domínio de retorno do Meeng.dev, a API **não devolve**
 | Valor | `v=DMARC1; p=none;` |
 
 O domínio funciona sem este registro e a API o marca como `recommended`. Os grandes provedores de caixa de entrada exigem DMARC de quem envia em volume. Comece em `p=none` (só observa) e endureça aos poucos; veja [`dmarc.md`](dmarc.md). Se o domínio já tem um DMARC, **não crie outro**: só pode haver um, e o `dmarcAdded` do domínio vira `true` quando ele existe.
+
+## Registros opcionais: rastreio e recebimento
+
+Dois grupos aparecem em `dnsRecords` à parte (campo `group`) e **nunca decidem o status do domínio**: a falha deles não derruba um domínio verificado.
+
+- **Rastreio de abertura e clique**: um `CNAME` no subdomínio de rastreio do próprio domínio (por exemplo `links.envio.exemplo.com.br`), publicado só depois de o domínio estar verificado. Sem ele, os links dos e-mails não ganham o endereço do dono.
+- **Recebimento**: um `MX` do subdomínio que recebe, só se o dono ligou o recebimento. Não toca no MX do domínio principal.
+
+## Publicar sem copiar e colar: "Configurar automaticamente"
+
+O botão da página do domínio, no painel, escreve o CNAME de retorno e o DKIM (e os opcionais ligados) pela Cloudflare ou por um provedor compatível com o Domain Connect, depois de mostrar o plano e de a pessoa confirmar. Registro com o mesmo nome e outro valor é atualizado; um que não pode dividir o nome com o nosso é substituído (mostrado antes); os de outro serviço de envio em outros nomes ficam, e o MX, o SPF ou o DMARC da raiz da zona nunca são trocados sozinhos. O agente não aperta o botão: veja a tabela completa em [`../SKILL.md`](../SKILL.md), seção "Configurar automaticamente".
 
 ## Como preencher o painel do provedor de DNS
 

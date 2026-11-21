@@ -2,7 +2,7 @@
 
 ## Antes de testar
 
-1. A tela **Configurações › SMTP** do painel mostra o relay como **ligado**.
+1. A tela **Configurações › SMTP** do painel traz o servidor, as portas e o usuário (o relay está ligado).
 2. Existe um domínio **verificado** na conta (`meeng-dominios`) e o `From` do teste é dele.
 3. A chave de API existe e está completa (`mg_...`, sem espaço no começo ou no fim).
 

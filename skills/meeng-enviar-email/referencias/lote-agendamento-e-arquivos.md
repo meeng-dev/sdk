@@ -7,8 +7,8 @@
 - No máximo **100** e-mails por chamada; mais que isso é recusado. Lista vazia dá `400` com `No emails provided for bulk send`.
 - Aceita o cabeçalho `Idempotency-Key`, como o envio simples; o espaço de chaves é o mesmo dos dois.
 - Cada e-mail do lote é validado como um envio simples (domínio verificado, template existente, supressão).
-- **O lote não é atômico**: um erro de validação no meio da lista pode deixar já aceitos os e-mails dos grupos anteriores. Por isso a `Idempotency-Key` importa ainda mais: repetir o mesmo lote com a mesma chave devolve os mesmos ids, na mesma ordem, sem enviar de novo.
-- A ordem da resposta segue a ordem da entrada, mas o SDK não garante correspondência por posição quando algum item falha ao ser gravado. Guarde o vínculo pelo seu próprio cabeçalho (`X-Pedido`) e confira pelos eventos de webhook.
+- **O lote é tudo ou nada**: todos os e-mails são validados antes de qualquer um ser gravado, e são gravados juntos. Se um deles é recusado, nenhum é aceito e a resposta diz qual e por quê; corrija e envie o lote de novo. A `Idempotency-Key` continua importando: repetir o mesmo lote com a mesma chave depois de um erro de rede devolve os mesmos ids, na mesma ordem, sem enviar de novo.
+- A ordem da resposta é a ordem da entrada: o `emailId` da posição `n` é o do e-mail `n` do lote. Guarde mesmo assim o vínculo pelo seu próprio cabeçalho (`X-Pedido`) e confira com `GET /v1/emails/{id}`.
 - Um lote conta como **uma** requisição no limite de requisições por segundo; cada e-mail dele conta no limite do plano.
 
 Para mais de 100, divida em pedaços de 100 e dê uma chave diferente a cada pedaço, derivada do conteúdo (`campanha-natal-lote-0007`).
