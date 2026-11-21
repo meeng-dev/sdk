@@ -5,7 +5,7 @@
 Gem::Specification.new do |spec|
   spec.name = "meeng-sdk"
   spec.version = "0.1.0"
-  spec.authors = ["meeng"]
+  spec.authors = ["Meeng.dev"]
   spec.summary = "SDK do Meeng.dev para Ruby: e-mails, domínios, contatos, listas de contatos, campanhas, análises e webhooks."
   spec.homepage = "https://meeng.dev"
   spec.license = "MIT"

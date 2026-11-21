@@ -13,8 +13,8 @@
 
     <PackageId>MeengDev.Sdk</PackageId>
     <Version>0.1.0</Version>
-    <Authors>meeng</Authors>
-    <Company>meeng</Company>
+    <Authors>Meeng.dev</Authors>
+    <Company>Meeng.dev</Company>
     <Description>SDK do Meeng.dev para .NET: e-mails, domínios, contatos, listas de contatos, campanhas, análises e webhooks.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://meeng.dev</PackageProjectUrl>
