@@ -21,6 +21,18 @@ public sealed record Email
     [JsonPropertyName("to")]
     public required IReadOnlyList<string> To { get; init; }
 
+    /// <summary>The API's <c>replyTo</c>.</summary>
+    [JsonPropertyName("replyTo")]
+    public required IReadOnlyList<string> ReplyTo { get; init; }
+
+    /// <summary>The API's <c>cc</c>.</summary>
+    [JsonPropertyName("cc")]
+    public required IReadOnlyList<string> Cc { get; init; }
+
+    /// <summary>The API's <c>bcc</c>.</summary>
+    [JsonPropertyName("bcc")]
+    public required IReadOnlyList<string> Bcc { get; init; }
+
     /// <summary>The API's <c>from</c>.</summary>
     [JsonPropertyName("from")]
     public required string From { get; init; }
@@ -44,6 +56,14 @@ public sealed record Email
     /// <summary>The API's <c>updatedAt</c>.</summary>
     [JsonPropertyName("updatedAt")]
     public required string UpdatedAt { get; init; }
+
+    /// <summary>The API's <c>latestStatus</c>. Null when the API sends none.</summary>
+    [JsonPropertyName("latestStatus")]
+    public string? LatestStatus { get; init; }
+
+    /// <summary>The API's <c>scheduledAt</c>. Null when the API sends none.</summary>
+    [JsonPropertyName("scheduledAt")]
+    public string? ScheduledAt { get; init; }
 
     /// <summary>The API's <c>emailEvents</c>.</summary>
     [JsonPropertyName("emailEvents")]

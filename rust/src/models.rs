@@ -434,6 +434,10 @@ pub struct Email {
     #[serde(rename = "teamId")]
     pub team_id: i64,
     pub to: Vec<String>,
+    #[serde(rename = "replyTo")]
+    pub reply_to: Vec<String>,
+    pub cc: Vec<String>,
+    pub bcc: Vec<String>,
     pub from: String,
     pub subject: String,
     pub html: Option<String>,
@@ -442,6 +446,10 @@ pub struct Email {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+    #[serde(rename = "latestStatus")]
+    pub latest_status: Option<String>,
+    #[serde(rename = "scheduledAt")]
+    pub scheduled_at: Option<String>,
     #[serde(rename = "emailEvents")]
     pub email_events: Vec<EmailEvent>,
 }

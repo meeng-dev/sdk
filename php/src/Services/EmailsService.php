@@ -45,11 +45,11 @@ final class EmailsService
      * Reads one email with its events.
      *
      * @param string|int $emailId
-     * @return array{'id': string, 'teamId': int, 'to': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'emailEvents': list<array{'emailId': string, 'status': string, 'createdAt': string, 'data'?: array<string, mixed>}>}
+     * @return array{'id': string, 'teamId': int, 'to': list<string>, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'latestStatus': string|null, 'scheduledAt': string|null, 'emailEvents': list<array{'emailId': string, 'status': string, 'createdAt': string, 'data'?: array<string, mixed>}>}
      */
     public function get(string|int $emailId, ): array
     {
-        /** @var array{'id': string, 'teamId': int, 'to': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'emailEvents': list<array{'emailId': string, 'status': string, 'createdAt': string, 'data'?: array<string, mixed>}>} */
+        /** @var array{'id': string, 'teamId': int, 'to': list<string>, 'replyTo': list<string>, 'cc': list<string>, 'bcc': list<string>, 'from': string, 'subject': string, 'html': string|null, 'text': string|null, 'createdAt': string, 'updatedAt': string, 'latestStatus': string|null, 'scheduledAt': string|null, 'emailEvents': list<array{'emailId': string, 'status': string, 'createdAt': string, 'data'?: array<string, mixed>}>} */
         return $this->client->request('GET', '/v1/emails/' . rawurlencode((string) $emailId));
     }
 

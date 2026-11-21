@@ -376,12 +376,17 @@ Email = TypedDict("Email", {
     "id": str,
     "teamId": int,
     "to": list[str],
+    "replyTo": list[str],
+    "cc": list[str],
+    "bcc": list[str],
     "from": str,
     "subject": str,
     "html": str | None,
     "text": str | None,
     "createdAt": str,
     "updatedAt": str,
+    "latestStatus": str | None,
+    "scheduledAt": str | None,
     "emailEvents": list[EmailEvent],
 })
 

@@ -4603,12 +4603,17 @@
           "id",
           "teamId",
           "to",
+          "replyTo",
+          "cc",
+          "bcc",
           "from",
           "subject",
           "html",
           "text",
           "createdAt",
           "updatedAt",
+          "latestStatus",
+          "scheduledAt",
           "emailEvents"
         ],
         "properties": {
@@ -4619,6 +4624,24 @@
             "type": "integer"
           },
           "to": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "replyTo": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bcc": {
             "type": "array",
             "items": {
               "type": "string"
@@ -4647,6 +4670,18 @@
           },
           "updatedAt": {
             "type": "string"
+          },
+          "latestStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "emailEvents": {
             "type": "array",

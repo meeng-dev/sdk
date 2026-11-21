@@ -383,12 +383,17 @@ export interface Email {
   id: string;
   teamId: number;
   to: string[];
+  replyTo: string[];
+  cc: string[];
+  bcc: string[];
   from: string;
   subject: string;
   html: string | null;
   text: string | null;
   createdAt: string;
   updatedAt: string;
+  latestStatus: string | null;
+  scheduledAt: string | null;
   emailEvents: EmailEvent[];
 }
 

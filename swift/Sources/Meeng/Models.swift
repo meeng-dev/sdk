@@ -810,24 +810,34 @@ public struct Email: Codable, Sendable, Hashable {
     public let id: String
     public let teamID: Int
     public let to: [String]
+    public let replyTo: [String]
+    public let cc: [String]
+    public let bcc: [String]
     public let from: String
     public let subject: String
     public let html: String?
     public let text: String?
     public let createdAt: String
     public let updatedAt: String
+    public let latestStatus: String?
+    public let scheduledAt: String?
     public let emailEvents: [EmailEvent]
 
-    public init(id: String, teamID: Int, to: [String], from: String, subject: String, html: String?, text: String?, createdAt: String, updatedAt: String, emailEvents: [EmailEvent]) {
+    public init(id: String, teamID: Int, to: [String], replyTo: [String], cc: [String], bcc: [String], from: String, subject: String, html: String?, text: String?, createdAt: String, updatedAt: String, latestStatus: String?, scheduledAt: String?, emailEvents: [EmailEvent]) {
         self.id = id
         self.teamID = teamID
         self.to = to
+        self.replyTo = replyTo
+        self.cc = cc
+        self.bcc = bcc
         self.from = from
         self.subject = subject
         self.html = html
         self.text = text
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.latestStatus = latestStatus
+        self.scheduledAt = scheduledAt
         self.emailEvents = emailEvents
     }
 
@@ -835,12 +845,17 @@ public struct Email: Codable, Sendable, Hashable {
         case id
         case teamID = "teamId"
         case to
+        case replyTo
+        case cc
+        case bcc
         case from
         case subject
         case html
         case text
         case createdAt
         case updatedAt
+        case latestStatus
+        case scheduledAt
         case emailEvents
     }
 }

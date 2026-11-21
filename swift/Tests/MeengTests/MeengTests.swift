@@ -201,7 +201,8 @@ final class MeengTests: XCTestCase {
                 200,
                 [
                     "id": "a/b c", "teamId": 1, "to": ["a@x.com"], "from": "h@acme.com", "subject": "Hi", "html": NSNull(),
-                    "text": NSNull(), "createdAt": "x", "updatedAt": "x",
+                    "text": NSNull(), "replyTo": [String](), "cc": [String](), "bcc": [String](), "latestStatus": "SENT",
+                    "scheduledAt": NSNull(), "createdAt": "x", "updatedAt": "x",
                     "emailEvents": [["emailId": "a/b c", "status": "SENT", "createdAt": "x", "data": ["ip": "1.2.3.4"]]],
                 ]
             )
@@ -281,7 +282,8 @@ final class MeengTests: XCTestCase {
                 200,
                 [
                     "id": "em_1", "teamId": 1, "to": ["a@x.com", "b@x.com"], "from": "h@acme.com", "subject": "Hi", "html": NSNull(),
-                    "text": NSNull(), "createdAt": "x", "updatedAt": "x", "emailEvents": [Any](),
+                    "text": NSNull(), "replyTo": [String](), "cc": [String](), "bcc": [String](), "latestStatus": "SENT",
+                    "scheduledAt": NSNull(), "createdAt": "x", "updatedAt": "x", "emailEvents": [Any](),
                 ]
             )
         }

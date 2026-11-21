@@ -207,7 +207,7 @@ public class MeengTests
     [Fact]
     public async Task APathParameterIsEscaped()
     {
-        var recorder = Replying(HttpStatusCode.OK, """{"id":"a/b c","teamId":1,"to":["a@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[{"emailId":"a/b c","status":"SENT","createdAt":"x","data":{"ip":"1.2.3.4"}}]}""");
+        var recorder = Replying(HttpStatusCode.OK, """{"id":"a/b c","teamId":1,"to":["a@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"replyTo":[],"cc":[],"bcc":[],"latestStatus":"SENT","scheduledAt":null,"createdAt":"x","updatedAt":"x","emailEvents":[{"emailId":"a/b c","status":"SENT","createdAt":"x","data":{"ip":"1.2.3.4"}}]}""");
         var email = await Client(recorder).Emails.GetAsync("a/b c");
         Assert.Equal("https://meeng.test/api/v1/emails/a%2Fb%20c", recorder.Requests[0].Url.AbsoluteUri);
         Assert.Equal("SENT", email.EmailEvents[0].Status);
@@ -262,7 +262,7 @@ public class MeengTests
     [Fact]
     public async Task AnEmailsRecipientsAreAList()
     {
-        var recorder = Replying(HttpStatusCode.OK, """{"id":"em_1","teamId":1,"to":["a@x.com","b@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"createdAt":"x","updatedAt":"x","emailEvents":[]}""");
+        var recorder = Replying(HttpStatusCode.OK, """{"id":"em_1","teamId":1,"to":["a@x.com","b@x.com"],"from":"h@acme.com","subject":"Hi","html":null,"text":null,"replyTo":[],"cc":[],"bcc":[],"latestStatus":"SENT","scheduledAt":null,"createdAt":"x","updatedAt":"x","emailEvents":[]}""");
         var email = await Client(recorder).Emails.GetAsync("em_1");
         Assert.Equal(["a@x.com", "b@x.com"], email.To);
     }

@@ -1592,12 +1592,17 @@ final class Email {
     required this.id,
     required this.teamId,
     required this.to,
+    required this.replyTo,
+    required this.cc,
+    required this.bcc,
     required this.from,
     required this.subject,
     this.html,
     this.text,
     required this.createdAt,
     required this.updatedAt,
+    this.latestStatus,
+    this.scheduledAt,
     required this.emailEvents,
   });
 
@@ -1607,12 +1612,17 @@ final class Email {
       id: json['id'] as String,
       teamId: json['teamId'] as int,
       to: readList(json['to'], readString),
+      replyTo: readList(json['replyTo'], readString),
+      cc: readList(json['cc'], readString),
+      bcc: readList(json['bcc'], readString),
       from: json['from'] as String,
       subject: json['subject'] as String,
       html: json['html'] as String?,
       text: json['text'] as String?,
       createdAt: json['createdAt'] as String,
       updatedAt: json['updatedAt'] as String,
+      latestStatus: json['latestStatus'] as String?,
+      scheduledAt: json['scheduledAt'] as String?,
       emailEvents: readList(
         json['emailEvents'],
         (value) => EmailEvent.fromJson(readObject(value)),
@@ -1626,6 +1636,12 @@ final class Email {
 
   final List<String> to;
 
+  final List<String> replyTo;
+
+  final List<String> cc;
+
+  final List<String> bcc;
+
   final String from;
 
   final String subject;
@@ -1638,6 +1654,10 @@ final class Email {
 
   final String updatedAt;
 
+  final String? latestStatus;
+
+  final String? scheduledAt;
+
   final List<EmailEvent> emailEvents;
 
   /// The JSON the API answers.
@@ -1645,12 +1665,17 @@ final class Email {
     'id': id,
     'teamId': teamId,
     'to': to,
+    'replyTo': replyTo,
+    'cc': cc,
+    'bcc': bcc,
     'from': from,
     'subject': subject,
     'html': html,
     'text': text,
     'createdAt': createdAt,
     'updatedAt': updatedAt,
+    'latestStatus': latestStatus,
+    'scheduledAt': scheduledAt,
     'emailEvents': emailEvents.map((item) => item.toJson()).toList(),
   };
 }

@@ -415,16 +415,21 @@ type DomainsVerifyResponse struct {
 
 // Email is a resource of meeng's API.
 type Email struct {
-	ID          string       `json:"id"`
-	TeamID      int64        `json:"teamId"`
-	To          []string     `json:"to"`
-	From        string       `json:"from"`
-	Subject     string       `json:"subject"`
-	HTML        *string      `json:"html"`
-	Text        *string      `json:"text"`
-	CreatedAt   string       `json:"createdAt"`
-	UpdatedAt   string       `json:"updatedAt"`
-	EmailEvents []EmailEvent `json:"emailEvents"`
+	ID           string       `json:"id"`
+	TeamID       int64        `json:"teamId"`
+	To           []string     `json:"to"`
+	ReplyTo      []string     `json:"replyTo"`
+	Cc           []string     `json:"cc"`
+	Bcc          []string     `json:"bcc"`
+	From         string       `json:"from"`
+	Subject      string       `json:"subject"`
+	HTML         *string      `json:"html"`
+	Text         *string      `json:"text"`
+	CreatedAt    string       `json:"createdAt"`
+	UpdatedAt    string       `json:"updatedAt"`
+	LatestStatus *string      `json:"latestStatus"`
+	ScheduledAt  *string      `json:"scheduledAt"`
+	EmailEvents  []EmailEvent `json:"emailEvents"`
 }
 
 // What most email events carry: the email, its status and when it happened.

@@ -286,7 +286,7 @@ fn a_path_parameter_is_escaped() {
     let (client, seen) = client(|_| {
         json(
             200,
-            serde_json::json!({"id": "a/b c", "teamId": 1, "to": ["a@x.com"], "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "createdAt": "x", "updatedAt": "x", "emailEvents": [{"emailId": "a/b c", "status": "SENT", "createdAt": "x", "data": {"ip": "1.2.3.4"}}]}),
+            serde_json::json!({"id": "a/b c", "teamId": 1, "to": ["a@x.com"], "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "replyTo": [], "cc": [], "bcc": [], "latestStatus": "SENT", "scheduledAt": null, "createdAt": "x", "updatedAt": "x", "emailEvents": [{"emailId": "a/b c", "status": "SENT", "createdAt": "x", "data": {"ip": "1.2.3.4"}}]}),
         )
     });
     let email = client.emails().get("a/b c").unwrap();
@@ -383,7 +383,7 @@ fn an_emails_recipients_are_a_list() {
     let (client, _) = client(|_| {
         json(
             200,
-            serde_json::json!({"id": "em_1", "teamId": 1, "to": ["a@x.com", "b@x.com"], "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "createdAt": "x", "updatedAt": "x", "emailEvents": []}),
+            serde_json::json!({"id": "em_1", "teamId": 1, "to": ["a@x.com", "b@x.com"], "from": "h@acme.com", "subject": "Hi", "html": null, "text": null, "replyTo": [], "cc": [], "bcc": [], "latestStatus": "SENT", "scheduledAt": null, "createdAt": "x", "updatedAt": "x", "emailEvents": []}),
         )
     });
     assert_eq!(

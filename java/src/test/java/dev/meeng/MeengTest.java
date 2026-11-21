@@ -212,6 +212,7 @@ class MeengTest {
     @Test
     void aPathParameterIsEscaped() {
         Recorder recorder = new Recorder(r -> json(200, map("id", "a/b c", "teamId", 1, "to", List.of("a@x.com"), "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
+                "replyTo", List.of(), "cc", List.of(), "bcc", List.of(), "latestStatus", "SENT", "scheduledAt", null,
                 "createdAt", "x", "updatedAt", "x", "emailEvents", List.of(map("emailId", "a/b c", "status", "SENT", "createdAt", "x", "data", map("ip", "1.2.3.4"))))));
         Email email = client(recorder).emails().get("a/b c");
         assertEquals("https://meeng.test/api/v1/emails/a%2Fb%20c", recorder.seen.get(0).getUrl());
@@ -270,6 +271,7 @@ class MeengTest {
     @Test
     void anEmailsRecipientsAreAList() {
         Recorder recorder = new Recorder(r -> json(200, map("id", "em_1", "teamId", 1, "to", List.of("a@x.com", "b@x.com"), "from", "h@acme.com", "subject", "Hi", "html", null, "text", null,
+                "replyTo", List.of(), "cc", List.of(), "bcc", List.of(), "latestStatus", "SENT", "scheduledAt", null,
                 "createdAt", "x", "updatedAt", "x", "emailEvents", List.of())));
         assertEquals(List.of("a@x.com", "b@x.com"), client(recorder).emails().get("em_1").getTo());
     }

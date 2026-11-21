@@ -11,24 +11,34 @@ public final class Email {
     private final String id;
     private final long teamId;
     private final List<String> to;
+    private final List<String> replyTo;
+    private final List<String> cc;
+    private final List<String> bcc;
     private final String from;
     private final String subject;
     private final String html;
     private final String text;
     private final String createdAt;
     private final String updatedAt;
+    private final String latestStatus;
+    private final String scheduledAt;
     private final List<EmailEvent> emailEvents;
 
-    Email(String id, long teamId, List<String> to, String from, String subject, String html, String text, String createdAt, String updatedAt, List<EmailEvent> emailEvents) {
+    Email(String id, long teamId, List<String> to, List<String> replyTo, List<String> cc, List<String> bcc, String from, String subject, String html, String text, String createdAt, String updatedAt, String latestStatus, String scheduledAt, List<EmailEvent> emailEvents) {
         this.id = id;
         this.teamId = teamId;
         this.to = to;
+        this.replyTo = replyTo;
+        this.cc = cc;
+        this.bcc = bcc;
         this.from = from;
         this.subject = subject;
         this.html = html;
         this.text = text;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.latestStatus = latestStatus;
+        this.scheduledAt = scheduledAt;
         this.emailEvents = emailEvents;
     }
 
@@ -37,12 +47,17 @@ public final class Email {
                 Json.required(data, "id", Json::asString),
                 Json.required(data, "teamId", Json::asLong),
                 Json.required(data, "to", Json.list(Json::asString)),
+                Json.required(data, "replyTo", Json.list(Json::asString)),
+                Json.required(data, "cc", Json.list(Json::asString)),
+                Json.required(data, "bcc", Json.list(Json::asString)),
                 Json.required(data, "from", Json::asString),
                 Json.required(data, "subject", Json::asString),
                 Json.optional(data, "html", Json::asString),
                 Json.optional(data, "text", Json::asString),
                 Json.required(data, "createdAt", Json::asString),
                 Json.required(data, "updatedAt", Json::asString),
+                Json.optional(data, "latestStatus", Json::asString),
+                Json.optional(data, "scheduledAt", Json::asString),
                 Json.required(data, "emailEvents", Json.list(Json.model(EmailEvent::fromJson))));
     }
 
@@ -59,6 +74,21 @@ public final class Email {
     /** @return the API's {@code to} */
     public List<String> getTo() {
         return to;
+    }
+
+    /** @return the API's {@code replyTo} */
+    public List<String> getReplyTo() {
+        return replyTo;
+    }
+
+    /** @return the API's {@code cc} */
+    public List<String> getCc() {
+        return cc;
+    }
+
+    /** @return the API's {@code bcc} */
+    public List<String> getBcc() {
+        return bcc;
     }
 
     /** @return the API's {@code from} */
@@ -91,6 +121,16 @@ public final class Email {
         return updatedAt;
     }
 
+    /** @return the API's {@code latestStatus} (null when the API sends none) */
+    public String getLatestStatus() {
+        return latestStatus;
+    }
+
+    /** @return the API's {@code scheduledAt} (null when the API sends none) */
+    public String getScheduledAt() {
+        return scheduledAt;
+    }
+
     /** @return the API's {@code emailEvents} */
     public List<EmailEvent> getEmailEvents() {
         return emailEvents;
@@ -98,6 +138,6 @@ public final class Email {
 
     @Override
     public String toString() {
-        return "Email{" + "id=" + id + ", teamId=" + teamId + ", to=" + to + ", from=" + from + ", subject=" + subject + ", html=" + html + ", text=" + text + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + ", emailEvents=" + emailEvents + "}";
+        return "Email{" + "id=" + id + ", teamId=" + teamId + ", to=" + to + ", replyTo=" + replyTo + ", cc=" + cc + ", bcc=" + bcc + ", from=" + from + ", subject=" + subject + ", html=" + html + ", text=" + text + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt + ", latestStatus=" + latestStatus + ", scheduledAt=" + scheduledAt + ", emailEvents=" + emailEvents + "}";
     }
 }
