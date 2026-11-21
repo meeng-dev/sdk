@@ -38,7 +38,8 @@ class ContractTest {
 
     @Test
     void aRefusalIsATypedError() {
-        MeengException refusal = assertThrows(MeengException.class, () -> client().emails().get("fake-404"));
+        Meeng meeng = client();
+        MeengException refusal = assertThrows(MeengException.class, () -> meeng.emails().get("fake-404"));
         assertEquals(404, refusal.getStatus());
         assertEquals("NOT_FOUND", refusal.getCode());
     }
