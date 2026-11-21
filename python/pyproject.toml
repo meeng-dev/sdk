@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "meeng-sdk"
 version = "0.1.0"
-description = "SDK do Meeng.dev para Python: e-mails, domínios, contatos, listas de contatos, campanhas, análises e webhooks."
+description = "Meeng.dev's SDK for Python: emails, domains, contacts, contact books, campaigns, analytics and webhooks."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"

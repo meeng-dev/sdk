@@ -89,7 +89,7 @@ Os nomes públicos foram **confirmados pelo Paulo** (regra global `public-names-
 | Hex, pub.dev | `meeng_sdk` |
 | Swift (SwiftPM) | `https://github.com/meeng-dev/sdk`, produto `Meeng` |
 
-Nunca renomeie nem acrescente um pacote sem a confirmação do Paulo. Os textos que a pessoa lê nos pacotes (descrição, resumo, README) são em português do Brasil e nunca citam outro produto de e-mail.
+Nunca renomeie nem acrescente um pacote sem a confirmação do Paulo. A descrição de cada pacote nos registros é em inglês, na mesma frase do Peráta ("Meeng.dev's SDK for <linguagem>: ..."), decisão do Paulo; os README e o código ficam como estão. Nada do que a pessoa lê nos pacotes cita outro produto de e-mail.
 
 ## Release
 

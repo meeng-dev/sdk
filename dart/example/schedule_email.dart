@@ -1,6 +1,6 @@
 // Schedules an e-mail, moves it to another time and cancels it.
 //
-//   MEENG_API_KEY=mg_xxx dart run examples/schedule_email.dart
+//   MEENG_API_KEY=mg_xxx dart run example/schedule_email.dart
 import 'dart:io';
 
 import 'package:meeng_sdk/meeng_sdk.dart';

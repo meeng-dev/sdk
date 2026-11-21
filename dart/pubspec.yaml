@@ -1,8 +1,8 @@
 name: meeng_sdk
 version: 0.1.0
 description: >-
-  SDK do Meeng.dev para Dart e Flutter: e-mails, domínios, contatos, listas de
-  contatos, campanhas, análises e verificação de webhooks.
+  Meeng.dev's SDK for Dart and Flutter: emails, domains, contacts, contact books,
+  campaigns, analytics and webhook verification.
 homepage: https://meeng.dev
 repository: https://github.com/meeng-dev/sdk
 issue_tracker: https://github.com/meeng-dev/sdk/issues

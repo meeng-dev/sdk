@@ -3,7 +3,7 @@
 // The request here is made in the program; a real endpoint reads the body and the
 // headers of the request it receives, and the secret from its settings.
 //
-//   dart run examples/verify_webhook.dart
+//   dart run example/verify_webhook.dart
 import 'dart:convert';
 import 'dart:io';
 

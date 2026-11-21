@@ -1,6 +1,6 @@
 // Sends up to 100 e-mails in one request.
 //
-//   MEENG_API_KEY=mg_xxx dart run examples/send_batch.dart
+//   MEENG_API_KEY=mg_xxx dart run example/send_batch.dart
 import 'dart:io';
 
 import 'package:meeng_sdk/meeng_sdk.dart';

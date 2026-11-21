@@ -1,7 +1,7 @@
 // Sends one e-mail. The key comes from MEENG_API_KEY and, to point the client at
 // another app, the address from MEENG_BASE_URL.
 //
-//   MEENG_API_KEY=mg_xxx dart run examples/send_email.dart
+//   MEENG_API_KEY=mg_xxx dart run example/send_email.dart
 import 'dart:io';
 
 import 'package:meeng_sdk/meeng_sdk.dart';

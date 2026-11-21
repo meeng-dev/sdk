@@ -1,7 +1,7 @@
 // Adds a sending domain, prints the DNS records to publish and asks for them to
 // be checked.
 //
-//   MEENG_API_KEY=mg_xxx dart run examples/add_domain.dart
+//   MEENG_API_KEY=mg_xxx dart run example/add_domain.dart
 import 'dart:io';
 
 import 'package:meeng_sdk/meeng_sdk.dart';

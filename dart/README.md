@@ -117,15 +117,15 @@ final meeng = Meeng(
 
 ## Exemplos
 
-A pasta [`examples/`](examples) tem programas que rodam: enviar um e-mail, enviar em lote, agendar (remarcar e cancelar), adicionar um domínio (com os registros DNS) e verificar um webhook.
+A pasta [`example/`](example) tem programas que rodam: enviar um e-mail, enviar em lote, agendar (remarcar e cancelar), adicionar um domínio (com os registros DNS) e verificar um webhook.
 
 | Exemplo | Arquivo | Rode com |
 |---|---|---|
-| Enviar um e-mail | `examples/send_email.dart` | `dart run examples/send_email.dart` |
-| Enviar em lote | `examples/send_batch.dart` | `dart run examples/send_batch.dart` |
-| Agendar, remarcar e cancelar | `examples/schedule_email.dart` | `dart run examples/schedule_email.dart` |
-| Adicionar um domínio | `examples/add_domain.dart` | `dart run examples/add_domain.dart` |
-| Verificar um webhook | `examples/verify_webhook.dart` | `dart run examples/verify_webhook.dart` |
+| Enviar um e-mail | `example/send_email.dart` | `dart run example/send_email.dart` |
+| Enviar em lote | `example/send_batch.dart` | `dart run example/send_batch.dart` |
+| Agendar, remarcar e cancelar | `example/schedule_email.dart` | `dart run example/schedule_email.dart` |
+| Adicionar um domínio | `example/add_domain.dart` | `dart run example/add_domain.dart` |
+| Verificar um webhook | `example/verify_webhook.dart` | `dart run example/verify_webhook.dart` |
 
 Todos leem `MEENG_API_KEY` e, se quiser apontar para outro app, `MEENG_BASE_URL`; o de webhook roda sem chave, com uma requisição montada no próprio programa.
 

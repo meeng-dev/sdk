@@ -163,7 +163,7 @@ echo "== dart"
 if need dart dart; then
 	(cd dart && dart pub get && dart format --language-version=3.8 --output=none --set-exit-if-changed . && dart analyze --fatal-infos && dart test)
 	contract dart
-	examples dart 'cd dart && dart run examples/"$1".dart' send_email send_batch schedule_email add_domain verify_webhook
+	examples dart 'cd dart && dart run example/"$1".dart' send_email send_batch schedule_email add_domain verify_webhook
 fi
 
 echo "== rust"
