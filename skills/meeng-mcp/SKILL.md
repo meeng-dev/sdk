@@ -30,13 +30,14 @@ O servidor oferece ferramentas e leituras do mesmo conjunto da API, com a chave 
 | Envio | `send_email` e `send_batch_emails` (até 100 e-mails por chamada, com agendamento) |
 | E-mails | `list_emails`, `get_email`, `update_email` (reagendar), `cancel_email` |
 | Domínios | `list_domains`, `create_domain`, `get_domain`, `get_domain_dns_records` (os registros que faltam publicar, em texto para seguir), `verify_domain`, `delete_domain` |
-| Contatos | `list_contact_books`, `create_contact_book`, `list_contacts`, `create_contact`, `update_contact`, `delete_contact` |
-| Campanhas | `list_campaigns`, `create_campaign` (rascunho), `schedule_campaign`, `pause_campaign`, `resume_campaign` |
+| Contatos | `list_contact_books`, `create_contact_book`, `delete_contact_book`, `list_contacts`, `get_contact`, `create_contact`, `update_contact`, `delete_contact` |
+| Campanhas | `list_campaigns`, `get_campaign`, `create_campaign` (rascunho, com o link de descadastro no corpo), `schedule_campaign`, `pause_campaign`, `resume_campaign` |
 | Modelos | `list_templates`, `get_template`, `render_template` (mostra o resultado com variáveis, sem enviar) |
 | Supressões | `list_suppressions`, `add_suppression`, `remove_suppression` |
-| Webhooks | `list_webhooks`, `create_webhook` |
+| Webhooks | `list_webhooks`, `create_webhook` (o segredo de assinatura não volta: o dono o lê no painel) |
+| Números | `get_email_metrics` (envios por dia), `get_reputation_metrics` (devolução e reclamação) |
 
-Também há leituras (resources), como os registros DNS dos domínios da conta. Confira tudo com `tools/list` e `resources/list`.
+Também há leituras (resources), como o guia da API (`meeng://docs/api`) e os registros DNS dos domínios da conta, e dois roteiros prontos (prompts): `send_first_email` e `set_up_domain`. Confira tudo com `tools/list` e `resources/list`.
 
 **Sem anexos:** o Meeng.dev não anexa arquivos, e `send_email` não tem o campo. Para mandar um documento, o assistente põe o **link** do arquivo no corpo (`html` ou `text`); um link que expira, se o documento é sensível.
 
@@ -47,8 +48,8 @@ O MCP não cria chaves de API nem mexe em plano ou cobrança, e o assistente age
 1. **A chave é a senha do assistente.** Crie uma chave **só para ele** no painel (`https://meeng.dev/configuracoes/chaves`), com nome que diga isso (`assistente-claude-code`), e apague-a quando não precisar mais. Nunca use a chave de produção do sistema do dono.
 2. **Escolha a permissão certa.** Uma chave **SENDING** só envia e-mail (`send_email` e `send_batch_emails`): as demais ferramentas respondem que a chave não pode usá-las. Uma chave **FULL** administra a conta toda (domínios, contatos, campanhas, supressões, webhooks). Para um assistente que só ajuda a testar envio, use SENDING; use FULL só se o dono pediu que o assistente administre.
 3. **Restrinja a um domínio** quando o assistente só mexe num (a chave restrita só envia com `from` daquele domínio e só enxerga ele).
-4. **Escritas pedem confirmação.** As ferramentas que mudam algo (enviar, criar domínio, apagar contato, agendar campanha, adicionar supressão, criar webhook) só executam com `confirm=true`, e o assistente deve mandar isso **só depois de o dono aprovar** naquela conversa. Sem `confirm`, a ferramenta não faz nada e conta o que faria. Isso protege contra o assistente mandar e-mail por engano.
-5. **Idempotência:** as escritas aceitam `idempotency_key` (de 1 a 256 caracteres). Repetir a mesma chamada com a mesma chave devolve o primeiro resultado, sem fazer duas vezes. Repita a **mesma** chave ao tentar de novo depois de um erro.
+4. **O que envia ou apaga pede confirmação.** `send_email`, `send_batch_emails`, `schedule_campaign`, `update_email`, `cancel_email`, `delete_domain`, `delete_contact`, `delete_contact_book` e `remove_suppression` só executam com `confirm=true`, e o assistente deve mandar isso **só depois de o dono aprovar** naquela conversa. Sem `confirm`, a ferramenta não faz nada e conta o que faria. Isso protege contra o assistente mandar e-mail por engano. Criar um domínio, uma lista, um contato, um rascunho de campanha, uma supressão ou um webhook não envia nada e não pede `confirm`, mas conta como escrita no limite.
+5. **Idempotência:** `send_email` e `send_batch_emails` aceitam `idempotency_key` (de 1 a 256 caracteres). Repetir o mesmo envio com a mesma chave devolve o primeiro resultado, sem enviar duas vezes. Repita a **mesma** chave ao tentar de novo depois de um erro de rede. As outras ferramentas que criam não têm essa proteção: depois de um erro, o assistente lista antes de criar de novo, para não duplicar.
 6. **Limites:** cada chave tem um orçamento por minuto (hoje, 120 chamadas, das quais no máximo 30 escritas). Passou: o servidor responde `429` com `Retry-After`. Um assistente que entra em laço não manda e-mail sem fim.
 7. **Nada de e-mail em massa pelo assistente.** Para campanhas use `meeng-contatos-e-campanhas`; o assistente serve para tarefas pontuais.
 8. **A chave nunca vai na conversa.** Ela fica no arquivo de configuração do cliente (ou numa variável de ambiente), não no texto que o assistente lê. Não cole a chave em chat, issue ou commit.
