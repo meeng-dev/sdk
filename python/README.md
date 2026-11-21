@@ -85,6 +85,16 @@ Sem argumentos, `Meeng()` lê a chave de `MEENG_API_KEY` e o endereço do app de
 
 Os filtros de listagem são argumentos nomeados em snake_case (`start_date`, `domain_id`); uma lista em `domain_id` vira um `domainId` por valor. `emails.send` e `emails.batch` aceitam `options={"idempotency_key": "pedido-1"}`: a mesma chave com o mesmo corpo devolve o primeiro resultado.
 
+## Arquivos: use links, não anexos
+
+O Meeng.dev não anexa, não guarda e não repassa arquivos, e por isso nenhum SDK tem o campo `attachments`. Hospede o arquivo onde preferir (seu armazenamento, um link assinado com prazo) e ponha o link no corpo do e-mail:
+
+```html
+<p>Sua fatura está pronta: <a href="https://exemplo.com.br/faturas/1042?token=...">baixar a fatura (PDF)</a></p>
+```
+
+Se um pedido chegar à API com `attachments` e itens, ela responde `400` (`ZodError`) com a mensagem `Attachments are not supported. Include links to your files in the email body.`; uma lista vazia passa. Para um documento sensível, use um link que expira.
+
 ## Configuração
 
 A API do Meeng.dev fica em `https://meeng.dev/api`. O cliente recebe o endereço do app, `https://meeng.dev` (o padrão), e acrescenta `/api/v1` a cada chamada. Crie uma chave em [Configurações > Chaves](https://meeng.dev/configuracoes/chaves); ela tem a forma `mg_<id>_<segredo>`.

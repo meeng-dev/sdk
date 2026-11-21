@@ -43,6 +43,10 @@ const { data, error } = await meeng.emails.send({
 
 O README de cada pasta mostra o equivalente na linguagem.
 
+## Arquivos: use links, não anexos
+
+O Meeng.dev não anexa, não guarda e não repassa arquivos, e por isso nenhum SDK tem o campo `attachments`. O e-mail leva o link do arquivo no corpo; quem envia hospeda o arquivo e mantém o link vivo (para um documento sensível, um link que expira). Se um pedido chegar à API com `attachments` e itens, ela responde `400` (`ZodError`) com `Attachments are not supported. Include links to your files in the email body.`; uma lista vazia passa.
+
 ## Skills
 
 A pasta [`skills/`](skills) tem as skills do Meeng.dev para assistentes de código: enviar e-mail, domínios, webhooks, contatos e campanhas, SMTP, MCP e migração de outro provedor. Cada uma traz exemplos nos SDKs deste repositório, e o `./check.sh` compila esses exemplos contra os SDKs, para que uma skill nunca ensine uma chamada que não existe. Veja [`skills/README.md`](skills/README.md).

@@ -4,7 +4,7 @@ Skills para assistentes de código (Claude Code, Codex, Cursor e outros): cada p
 
 | Skill | Para quê |
 |---|---|
-| [`meeng-enviar-email`](meeng-enviar-email/SKILL.md) | enviar e-mail: simples, em lote, agendado, com anexo e modelo; idempotência, erros e limites |
+| [`meeng-enviar-email`](meeng-enviar-email/SKILL.md) | enviar e-mail: simples, em lote, agendado e com modelo, com links no lugar de anexos; idempotência, erros e limites |
 | [`meeng-dominios`](meeng-dominios/SKILL.md) | cadastrar o domínio de envio, publicar o DNS (MX, SPF, DKIM, DMARC), verificar e resolver o que falta |
 | [`meeng-webhooks`](meeng-webhooks/SKILL.md) | receber os avisos (entregue, devolvido, aberto...), conferir a assinatura, tratar repetições |
 | [`meeng-contatos-e-campanhas`](meeng-contatos-e-campanhas/SKILL.md) | listas de contatos, dupla confirmação, descadastro, campanhas, LGPD |
@@ -24,6 +24,7 @@ cp -R skills/meeng-enviar-email ~/.claude/skills/
 
 - **Estado dos pacotes.** Os SDKs ainda não foram publicados nos registros; as skills dizem isso e mandam conferir antes de escrever uma instalação.
 - **SMTP e MCP só valem ligados.** `meeng-smtp` pede que se confira a tela Configurações › SMTP, e `meeng-mcp` que se teste o endereço e se leia a lista real de ferramentas (`tools/list`) antes de prometer algo.
+- **Sem anexos.** O Meeng.dev não anexa nem guarda arquivos: as skills ensinam a pôr o link do arquivo no corpo, e nenhum exemplo usa `attachments`.
 - **A API é a fonte da verdade.** Em caso de dúvida, o contrato é `https://meeng.dev/api/v1/doc`; as skills mandam o assistente nunca inventar campo, rota ou evento.
 
 ## Como mantê-las
