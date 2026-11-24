@@ -64,7 +64,8 @@ Desligar a confirmação (`doubleOptInEnabled: false` na lista) faz o contato na
 
 ## Descadastro
 
-- **Pelo link do e-mail.** O marcador `{{meeng_unsubscribe_url}}` de cada campanha vira um link próprio de cada contato, que leva a uma página pública do Meeng.dev (`/cancelar-inscricao`), sem login, e descadastra o contato. O contato vira `subscribed: false` com motivo `UNSUBSCRIBED`, o webhook `contact.updated` sai, e ele não recebe mais campanhas daquela lista. O cabeçalho `List-Unsubscribe` de um clique, que os provedores de caixa de entrada mostram como botão "cancelar inscrição", também vai nas campanhas.
+- **Pelo link do e-mail.** O marcador `{{meeng_unsubscribe_url}}` de cada campanha vira um link próprio de cada contato, que leva a uma página pública do Meeng.dev (`/cancelar-inscricao`), sem login, e descadastra o contato. O contato vira `subscribed: false` com motivo `UNSUBSCRIBED`, o webhook `contact.updated` sai, e ele não recebe mais campanhas daquela lista. 
+- **Pelo botão do provedor (um clique).** Todo e-mail de campanha sai com `List-Unsubscribe: <https://meeng.dev/api/unsubscribe-oneclick?id=...&hash=...>` e `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058), que o Gmail e o Yahoo mostram como "Cancelar inscrição". O provedor faz um `POST` nesse endereço, sem login nem confirmação, e o contato daquela lista sai na hora (`subscribed: false`, `UNSUBSCRIBED`, o webhook `contact.updated` e o registro de atividades). O link é assinado: ele só descadastra o contato de quem recebeu o e-mail, e repetir o clique não muda nada.
 - **Por devolução e reclamação.** Um bounce duro marca o contato como `BOUNCED`; uma reclamação de spam, `COMPLAINED`. Em ambos o contato sai da lista de envio e o endereço entra na lista de supressão da conta.
 - **Pela API.** `PATCH` com `subscribed: false` (motivo `UNSUBSCRIBED`), por exemplo quando a pessoa pede a saída por outro canal.
 

@@ -70,6 +70,25 @@ Como as variáveis valem:
 
 A plataforma acrescenta `X-Meeng-Email-ID` com o id do e-mail.
 
+### Descadastro de um clique (`List-Unsubscribe`)
+
+O Gmail e o Yahoo pedem, de quem envia em volume, o cabeçalho `List-Unsubscribe` com descadastro de um clique (RFC 8058). Em e-mail que a pessoa assinou receber (boletim, avisos de produto, promoção), mande:
+
+```json
+{
+  "headers": {
+    "List-Unsubscribe": "<https://seu-site.com/sair?u=123&h=assinatura>, <mailto:sair@seu-dominio.com.br?subject=sair>"
+  }
+}
+```
+
+- O valor é uma lista de endereços entre `< >`, separados por vírgula: `https`, `http` ou `mailto`. Um endereço puro, sem `< >`, também passa. Qualquer outra forma (outro esquema, texto em volta, espaço dentro do endereço) é descartada em silêncio, sem erro.
+- Com pelo menos um endereço `https`, o Meeng.dev acrescenta sozinho `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, o outro cabeçalho do RFC 8058. Não mande esse: o valor que vier é trocado. Com só `http` ou só `mailto`, ele não sai.
+- O endereço `https` é uma rota **sua**: ela recebe um `POST` com o corpo `List-Unsubscribe=One-Click`, sem login nem confirmação, e tira a pessoa da sua lista na hora. Assine o link (um HMAC com o id da pessoa) para ninguém descadastrar outra pessoa.
+- O primeiro endereço `https` ou `http` também vale onde o corpo tiver `{{meeng_unsubscribe_url}}`.
+- E-mail de transação (recibo, código, redefinição de senha) não leva esse cabeçalho.
+- Campanhas das listas de contatos da plataforma não precisam disso: os dois cabeçalhos saem sozinhos, com o link próprio de cada contato, e o descadastro já é tratado ([`meeng-contatos-e-campanhas`](../../meeng-contatos-e-campanhas/SKILL.md)).
+
 ## Responder na mesma conversa
 
 ```go
